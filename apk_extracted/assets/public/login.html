@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Sign In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+</head>
+<body class="bg-background font-sans text-on-background min-h-screen pt-safe pb-safe flex flex-col">
+  <main class="flex flex-col flex-1 w-full max-w-md mx-auto px-5">
+    <!-- Brand -->
+    <div class="flex flex-col items-center justify-center pt-14 pb-8">
+      <div class="w-24 h-24 mb-6 relative">
+        <div class="absolute inset-0 bg-primary/5 rounded-full scale-110 animate-pulse"></div>
+        <div class="relative z-10 w-full h-full rounded-full bg-primary flex items-center justify-center shadow-lg">
+          <svg viewBox="0 0 32 32" class="w-12 h-12 text-on-primary" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z"/><path d="M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z"/></svg>
+        </div>
+      </div>
+      <div class="text-center">
+        <h1 class="font-sans text-[24px] font-bold text-on-background mb-2">Mushroom OS</h1>
+        <p class="font-sans text-[14px] font-medium text-secondary max-w-[260px]">
+          Securely sign in to manage your industrial operations and logistics.
+        </p>
+      </div>
+    </div>
+
+    <!-- Login Card -->
+    <div class="bg-surface-container-lowest rounded-xl p-6 shadow-[4px_8px_16px_rgba(0,0,0,0.08)]">
+      <form id="loginForm" onsubmit="return false;" class="flex flex-col gap-5">
+        <!-- Username -->
+        <div class="flex flex-col gap-2">
+          <label class="text-[11px] font-bold tracking-widest text-outline uppercase" for="email">Email</label>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline" style="font-size:20px;">person</span>
+            <input id="email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@freshbowl.dev"
+              class="w-full pl-12 pr-4 py-4 bg-surface-container-low rounded-lg text-[14px] font-medium text-on-surface border-none focus:ring-2 focus:ring-primary/20 outline-none shadow-inner placeholder:text-outline-variant" />
+          </div>
+        </div>
+        <!-- Password -->
+        <div class="flex flex-col gap-2">
+          <div class="flex justify-between items-center">
+            <label class="text-[11px] font-bold tracking-widest text-outline uppercase" for="password">Password</label>
+            <button type="button" class="text-primary text-[11px] font-bold hover:underline">Forgot Password?</button>
+          </div>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline" style="font-size:20px;">lock</span>
+            <input id="password" name="password" type="password" placeholder="Enter your password"
+              class="w-full pl-12 pr-12 py-4 bg-surface-container-low rounded-lg text-[14px] font-medium text-on-surface border-none focus:ring-2 focus:ring-primary/20 outline-none shadow-inner placeholder:text-outline-variant" />
+            <button id="togglePassword" type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-outline">
+              <span id="eyeIcon" class="material-symbols-outlined" style="font-size:20px;">visibility</span>
+            </button>
+          </div>
+        </div>
+        <!-- Error -->
+        <div id="loginError" role="alert"
+          class="hidden items-center gap-2 px-4 py-3 rounded-lg bg-error-container text-on-error-container text-[13px] font-semibold">
+          <span class="material-symbols-outlined" style="font-size:18px;">error</span>
+          <span id="loginErrorText"></span>
+        </div>
+        <!-- Log In -->
+        <button id="loginBtn" type="submit"
+          class="w-full py-4 bg-primary text-on-primary text-[18px] font-semibold rounded-lg shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+          <span>Log In</span>
+          <span class="material-symbols-outlined">arrow_forward</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Demo accounts — the APK goes to stakeholders with no credentials.
+         Without this they cannot get past the first screen. -->
+    <div class="mt-6">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-1 h-px bg-outline-variant"></div>
+        <span class="text-[11px] font-bold tracking-widest text-outline uppercase">Demo accounts</span>
+        <div class="flex-1 h-px bg-outline-variant"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" data-demo-login="op1@freshbowl.dev"
+          class="flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-lg bg-surface-container-low border border-outline-variant/60 active:scale-[0.98] transition-all">
+          <span class="text-[13px] font-bold text-on-surface">Ramesh</span>
+          <span class="text-[11px] font-medium text-on-surface-variant">Operator</span>
+        </button>
+        <button type="button" data-demo-login="admin@freshbowl.dev"
+          class="flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-lg bg-surface-container-low border border-outline-variant/60 active:scale-[0.98] transition-all">
+          <span class="text-[13px] font-bold text-on-surface">Mike</span>
+          <span class="text-[11px] font-medium text-on-surface-variant">Administrator</span>
+        </button>
+      </div>
+      <p class="text-[11px] text-outline text-center mt-2.5">Tap one to fill the form, then Log In.</p>
+    </div>
+
+    <!-- Secondary -->
+    <div class="mt-6 text-center">
+      <p class="text-[14px] font-medium text-secondary mb-3">New to the platform?</p>
+      <button class="text-[18px] font-semibold text-primary px-6 py-2 rounded-full hover:bg-primary/5 transition-colors">
+        Request Access
+      </button>
+    </div>
+    <script>
+      // Fills the real form; the user still presses Log In and the real
+      // credential check still runs. It does not bypass authentication.
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-demo-login]').forEach(b => {
+          b.addEventListener('click', () => {
+            document.getElementById('email').value = b.getAttribute('data-demo-login');
+            document.getElementById('password').value = 'Gadi99$$##@@';
+            document.getElementById('password').focus();
+          });
+        });
+      });
+    </script>
+
+    <!-- Decorative -->
+    <div class="mt-auto pt-10 pb-6 flex justify-center opacity-30">
+      <svg width="40" height="4" viewBox="0 0 40 4" fill="none">
+        <rect width="8" height="4" rx="2" fill="#16794a"/>
+        <rect x="12" width="28" height="4" rx="2" fill="#bfd0c4"/>
+      </svg>
+    </div>
+  </main>
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Home</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+  <script>Auth.requireAuth();</script>
+</head>
+<body class="bg-background font-sans text-on-background flex flex-col min-h-screen">
+  <!-- Top Bar -->
+  <header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe">
+    <div class="h-16 px-5 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+          <svg viewBox="0 0 32 32" class="w-[18px] h-[18px] text-on-primary" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z"/><path d="M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z"/></svg>
+        </div>
+        <span class="text-[18px] font-semibold text-primary">Operations Home</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="notifications.html" class="relative w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors no-underline">
+          <span class="material-symbols-outlined">notifications</span>
+          <span class="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center">2</span>
+        </a>
+        <a href="profile.html" class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-md">
+          <span class="material-symbols-outlined text-on-primary" style="font-size:18px;">person</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 pt-16 pb-20 bg-background px-5 page-in">
+    <div class="flex flex-col gap-5 max-w-lg mx-auto">
+      <!-- Shown when a role guard bounced the user off a restricted screen -->
+      <div id="deniedBanner" role="alert"
+        class="hidden items-start gap-2 px-4 py-3 rounded-xl bg-error-container text-on-error-container text-[13px] font-semibold">
+        <span class="material-symbols-outlined" style="font-size:18px;">lock</span>
+        <span id="deniedBannerText"></span>
+      </div>
+      <!-- ── Greeting ─────────────────────────────────────────────────────── -->
+      <section class="flex items-start justify-between pt-2">
+        <div>
+          <span class="label-caps text-on-surface-variant">Operational Overview</span>
+          <h1 class="text-[24px] font-bold text-on-surface leading-tight">Hello, <span data-user="name">Mike</span></h1>
+          <p class="text-[13px] font-medium text-on-surface-variant mt-0.5" data-user="role-label">Composting Operator</p>
+        </div>
+        <div class="flex items-center gap-1.5 bg-primary-fixed text-on-primary-fixed-variant px-3 py-1 rounded-full text-[11px] font-bold shadow-sm shrink-0 mt-1">
+          <span class="material-symbols-outlined" style="font-size:14px;">wb_sunny</span> MORNING A
+        </div>
+      </section>
+
+      <!-- ── Up next: the one thing this screen exists for ─────────────────── -->
+      <!-- An operator opens the app to answer "what do I do now". This is that
+           answer, driven by the real current stage rather than a fixed link. -->
+      <a href="workflow.html" data-current-stage-link
+         class="mos-next-card no-underline block rounded-2xl overflow-hidden shadow-lg tappable">
+        <div class="px-5 pt-4 pb-5 relative">
+          <span class="label-caps text-on-primary/70">Up next</span>
+          <p class="text-[22px] font-bold text-on-primary leading-tight mt-1" data-stage-name>—</p>
+          <p class="text-[13px] font-medium text-on-primary/80 mt-1">
+            <span data-stage-phase>—</span> · <span data-stage-count>—</span>
+          </p>
+          <div class="mt-4 inline-flex items-center gap-2 bg-on-primary text-primary px-4 py-2 rounded-full text-[14px] font-bold shadow-sm">
+            Continue <span class="material-symbols-outlined" style="font-size:18px;">arrow_forward</span>
+          </div>
+          <span class="material-symbols-outlined absolute right-3 bottom-2 text-on-primary/15" style="font-size:96px;">compost</span>
+        </div>
+      </a>
+
+      <!-- ── Batch progress ───────────────────────────────────────────────── -->
+      <section class="mos-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <span class="label-caps text-on-surface-variant">Active batch</span>
+            <p class="text-[16px] font-bold text-on-surface">#FB-202507-014</p>
+            <p class="text-[12px] text-on-surface-variant">Paddy Straw</p>
+          </div>
+          <div class="relative w-16 h-16 shrink-0">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+              <circle cx="18" cy="18" r="15.5" fill="none" stroke="#dde8e1" stroke-width="4"/>
+              <circle id="batchRing" cx="18" cy="18" r="15.5" fill="none" stroke="#16794a" stroke-width="4"
+                      stroke-linecap="round" stroke-dasharray="97.4" stroke-dashoffset="97.4"
+                      style="transition:stroke-dashoffset .6s ease"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-[13px] font-bold text-primary" data-stage-pct-short>0%</span>
+            </div>
+          </div>
+        </div>
+        <!-- Phase strip: where this batch sits across the three PRD phases -->
+        <div class="flex items-center gap-1.5" id="phaseStrip"></div>
+        <div class="flex justify-between mt-2 text-[11px] font-bold text-on-surface-variant">
+          <span>Phase 0</span><span>Phase I</span><span>Phase II</span>
+        </div>
+      </section>
+
+      <!-- ── Needs attention ──────────────────────────────────────────────── -->
+      <section class="grid grid-cols-2 gap-3">
+        <a href="approvals.html" class="mos-card p-4 flex items-center gap-3 tappable no-underline">
+          <div class="mos-icon-tile bg-tertiary-container/25 text-tertiary">
+            <span class="material-symbols-outlined">fact_check</span>
+          </div>
+          <div>
+            <p class="text-[18px] font-bold text-on-surface leading-none">4</p>
+            <p class="text-[12px] text-on-surface-variant mt-1">Approvals</p>
+          </div>
+        </a>
+        <a href="notifications.html" class="mos-card p-4 flex items-center gap-3 tappable no-underline">
+          <div class="mos-icon-tile bg-error-container/50 text-error">
+            <span class="material-symbols-outlined">notifications_active</span>
+          </div>
+          <div>
+            <p class="text-[18px] font-bold text-on-surface leading-none">2</p>
+            <p class="text-[12px] text-on-surface-variant mt-1">Alerts</p>
+          </div>
+        </a>
+      </section>
+
+      <!-- ── Recent activity — real, from completed stage records ─────────── -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-[18px] font-semibold text-on-surface">Recent activity</h2>
+          <a href="records.html" class="text-[12px] font-bold text-primary no-underline">Full log</a>
+        </div>
+        <div id="recentActivity" class="flex flex-col"></div>
+      </section>
+
+      <!-- ── Shortcuts ────────────────────────────────────────────────────── -->
+      <section class="grid grid-cols-2 gap-3">
+        <a href="workflow.html" class="mos-card p-4 flex flex-col gap-2 tappable no-underline">
+          <div class="mos-icon-tile bg-primary-fixed text-on-primary-fixed-variant">
+            <span class="material-symbols-outlined">account_tree</span>
+          </div>
+          <div>
+            <p class="text-[14px] font-bold text-on-surface">All stages</p>
+            <p class="text-[12px] text-on-surface-variant">17-stage SOP</p>
+          </div>
+        </a>
+        <a href="planning.html" class="mos-card p-4 flex flex-col gap-2 tappable no-underline">
+          <div class="mos-icon-tile bg-primary-fixed text-on-primary-fixed-variant">
+            <span class="material-symbols-outlined">calendar_month</span>
+          </div>
+          <div>
+            <p class="text-[14px] font-bold text-on-surface">Planning</p>
+            <p class="text-[12px] text-on-surface-variant">Batch calendar</p>
+          </div>
+        </a>
+      </section>
+
+      <script>
+        // Everything below reads the same completion records the workflow list
+        // and the stage engine use. No figure on this screen is typed in.
+        document.addEventListener('DOMContentLoaded', () => {
+          const order = window.STAGE_ORDER || [];
+          const labels = window.STAGE_LABELS || {};
+          const done = order.filter(s => window.stageRecord(s));
+          const pct = order.length ? Math.round((done.length / order.length) * 100) : 0;
+
+          const short = document.querySelector('[data-stage-pct-short]');
+          if (short) short.textContent = pct + '%';
+          const ring = document.getElementById('batchRing');
+          if (ring) ring.setAttribute('stroke-dashoffset', String(97.4 * (1 - pct / 100)));
+
+          // Phase strip — Phase 0 is stages 1-4, Phase I 5-13, Phase II 14-17.
+          const strip = document.getElementById('phaseStrip');
+          if (strip) {
+            const bounds = [[0, 4], [4, 13], [13, 17]];
+            strip.innerHTML = bounds.map(([a, b]) => {
+              const total = b - a;
+              const complete = order.slice(a, b).filter(s => window.stageRecord(s)).length;
+              const p = Math.round((complete / total) * 100);
+              return `<div class="flex-1 h-2 rounded-full bg-surface-container-high overflow-hidden">
+                        <div class="h-full bg-primary rounded-full" style="width:${p}%"></div>
+                      </div>`;
+            }).join('');
+          }
+
+          // Recent activity — newest first, this batch's real completions.
+          const list = document.getElementById('recentActivity');
+          if (!list) return;
+          const rows = done
+            .map(s => ({ stage: s, rec: window.stageRecord(s) }))
+            .sort((a, b) => (b.rec.at || 0) - (a.rec.at || 0))
+            .slice(0, 4);
+
+          if (!rows.length) {
+            list.innerHTML = `<div class="mos-card p-5 text-center">
+              <p class="text-[14px] font-semibold text-on-surface">Nothing completed yet</p>
+              <p class="text-[12px] text-on-surface-variant mt-1">Finish a stage and it will appear here.</p>
+            </div>`;
+            return;
+          }
+
+          list.innerHTML = rows.map((r, i) => {
+            const [phase, name] = labels[r.stage] || ['', r.stage];
+            const when = r.rec.at
+              ? new Date(r.rec.at).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+              : '';
+            const last = i === rows.length - 1;
+            return `<div class="flex gap-3">
+              <div class="flex flex-col items-center shrink-0">
+                <div class="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center">
+                  <span class="material-symbols-outlined" style="font-size:17px;">check</span>
+                </div>
+                ${last ? '' : '<div class="w-px flex-1 bg-outline-variant my-1"></div>'}
+              </div>
+              <div class="mos-card px-4 py-3 flex-1 ${last ? '' : 'mb-3'}">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-[14px] font-bold text-on-surface">${name}</p>
+                    <p class="text-[12px] text-on-surface-variant">${phase}</p>
+                  </div>
+                  <span class="label-caps text-primary shrink-0">${r.rec.by || ''}</span>
+                </div>
+                <p class="text-[11px] text-outline mt-1.5">${when}</p>
+              </div>
+            </div>`;
+          }).join('');
+        });
+      </script>
+
+    </div>
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <a href="home.html" data-navlink="home.html" class="active">
+      <span class="material-symbols-outlined">home</span><span>Home</span>
+    </a>
+    <a href="workflow.html" data-navlink="workflow.html">
+      <span class="material-symbols-outlined">account_tree</span><span>Workflow</span>
+    </a>
+    <a href="records.html" data-navlink="records.html">
+      <span class="material-symbols-outlined">history</span><span>Records</span>
+    </a>
+    <a href="admin_dashboard.html" data-navlink="admin_dashboard.html" data-admin-only>
+      <span class="material-symbols-outlined">monitoring</span><span>Admin</span>
+    </a>
+    <a href="approvals.html" data-navlink="approvals.html">
+      <span class="material-symbols-outlined">fact_check</span><span>Approvals</span>
+    </a>
+    <a href="profile.html" data-navlink="profile.html">
+      <span class="material-symbols-outlined">person</span><span>Profile</span>
+    </a>
+  </nav>
+  <div style="height:64px"></div>
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+</body>
+</html>

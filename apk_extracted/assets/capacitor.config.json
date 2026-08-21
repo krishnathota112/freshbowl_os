@@ -1,0 +1,9 @@
+{
+	"appId": "com.freshbowl.agrimaster",
+	"appName": "Mushroom OS",
+	"webDir": "www",
+	"bundledWebRuntime": false,
+	"server": {
+		"androidScheme": "https"
+	}
+}

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Phase 1D-A</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+  <script>Auth.requireAuth();</script>
+</head>
+<body class="bg-background font-sans text-on-background min-h-screen">
+  <div class="stage-topbar">
+    <a href="phase_1C.html" class="flex items-center gap-1 text-on-surface-variant text-[12px] font-bold no-underline"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span> Back</a>
+    <span class="text-[12px] font-bold text-on-surface text-center flex-1 truncate px-2">Phase 1D-A · Unload &amp; Reload 1</span>
+    <a data-topbar-next href="phase_1DB.html" class="flex items-center gap-1 bg-primary text-on-primary text-[12px] font-bold px-3 py-2 rounded-full no-underline shrink-0">Next <span class="material-symbols-outlined" style="font-size:15px;">arrow_forward</span></a>
+  </div>
+  <main class="pt-14 pb-28 min-h-screen" data-form>
+    <div class="max-w-lg mx-auto">
+      <div class="px-5 py-4">
+        <span class="text-[11px] font-bold text-primary tracking-widest uppercase">Stage 12 of 17</span>
+        <h2 class="text-[20px] font-bold text-on-surface">Phase 1D-A – Unload &amp; Reload 1</h2>
+      </div>
+      <div class="px-5 flex flex-col gap-4 pb-4">
+        <!-- Trigger Check -->
+        <div class="bg-surface-container-lowest rounded-xl p-4 shadow-md flex flex-col gap-3">
+          <h3 class="text-[18px] font-semibold text-on-surface">Unload Trigger Verification</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-on-surface-variant uppercase">Core Temp (°C)</label>
+              <div class="flex items-center bg-surface-container rounded-lg px-4 py-3 shadow-inner gap-2">
+                <input type="number" placeholder="73–74°C" required class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+              </div>
+              <p class="text-[12px] text-on-surface-variant">Trigger at 73–74°C</p>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-on-surface-variant uppercase">Hours Elapsed</label>
+              <div class="flex items-center bg-surface-container rounded-lg px-4 py-3 shadow-inner gap-2">
+                <input type="number" placeholder="28–30h" required class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+              </div>
+              <p class="text-[12px] text-on-surface-variant">Duration 28–30h</p>
+            </div>
+          </div>
+          <div id="triggerResult" class="p-3 bg-surface-container rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-outline" style="font-size:18px;">help_outline</span>
+            <span class="text-[12px] text-on-surface-variant">Enter readings to evaluate trigger condition</span>
+          </div>
+        </div>
+        <!-- Unloading -->
+        <div class="bg-surface-container-lowest rounded-xl p-4 shadow-md flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary text-[18px] font-semibold">1</div>
+            <h3 class="text-[18px] font-semibold text-on-surface">Unloading</h3>
+          </div>
+          <div class="check-item" data-required><span class="text-[14px] font-medium">Loader unloading confirmed</span><div class="check-box"></div></div>
+          <div class="check-item" data-required><span class="text-[14px] font-medium">Substrate flipped during unload</span><div class="check-box"></div></div>
+          <div class="photo-upload-area" data-required>
+            <span class="material-symbols-outlined text-primary" style="font-size:28px;">add_a_photo</span>
+            <p class="text-[14px] font-medium text-on-surface">Mandatory: Unloading Photo</p>
+            <input type="file" accept="image/*" capture="environment">
+          </div>
+        </div>
+        <!-- Moisture Re-check -->
+        <div class="bg-surface-container-lowest rounded-xl p-4 shadow-md flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant text-[18px] font-semibold">2</div>
+            <h3 class="text-[18px] font-semibold text-on-surface">Moisture Re-check</h3>
+          </div>
+          <div class="flex items-center bg-surface-container rounded-lg px-4 py-3 shadow-inner gap-2">
+            <input type="number" placeholder="% moisture" class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+            <span class="text-[12px] text-on-surface-variant">%</span>
+          </div>
+        </div>
+        <!-- Reload -->
+        <div class="bg-surface-container-lowest rounded-xl p-4 shadow-md flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant text-[18px] font-semibold">3</div>
+            <h3 class="text-[18px] font-semibold text-on-surface">Reload</h3>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] font-bold text-on-surface-variant uppercase">Fill Height (m)</label>
+            <div class="flex items-center bg-surface-container rounded-lg px-4 py-3 shadow-inner gap-2">
+              <input type="number" step="0.1" placeholder="2.5–2.6m" required class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+              <span class="text-[12px] text-on-surface-variant">m</span>
+            </div>
+          </div>
+          <div class="check-item" data-required><span class="text-[14px] font-medium">No water added during reload</span><div class="check-box"></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div class="lock-banner" data-lock-banner><div class="lock-banner-inner"><span class="material-symbols-outlined text-error shrink-0">error</span><span class="text-[12px] font-medium">All required fields and unloading photo must be completed.</span></div></div>
+  <div class="fixed bottom-16 left-0 right-0 px-5 pb-3 z-50 bg-gradient-to-t from-background via-background/90 to-transparent pt-2">
+    <button data-submit-btn data-next-stage="phase_1DB.html" class="w-full bg-primary text-on-primary py-4 rounded-xl text-[18px] font-semibold shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed no-underline">Proceed to Unload &amp; Reload 2 <span class="material-symbols-outlined">arrow_forward</span></button>
+  </div>
+  <nav class="bottom-nav">
+    <a href="home.html"><span class="material-symbols-outlined">home</span><span>Home</span></a>
+    <a href="workflow.html" class="active"><span class="material-symbols-outlined">account_tree</span><span>Workflow</span></a>
+    <a href="records.html"><span class="material-symbols-outlined">history</span><span>Records</span></a>
+    <a href="admin_dashboard.html" data-admin-only><span class="material-symbols-outlined">monitoring</span><span>Admin</span></a>
+    <a href="approvals.html"><span class="material-symbols-outlined">fact_check</span><span>Approvals</span></a>
+    <a href="profile.html"><span class="material-symbols-outlined">person</span><span>Profile</span></a>
+  </nav>
+  <div style="height:64px"></div>
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tempInp = document.querySelectorAll('input[required]:not([type="file"])');
+      const checks = document.querySelectorAll('.check-item[data-required]');
+      const photoArea = document.querySelector('.photo-upload-area');
+      const btn = document.querySelector('[data-submit-btn]');
+      const banner = document.querySelector('[data-lock-banner]');
+      const result = document.getElementById('triggerResult');
+      function check() {
+        const tempVal = tempInp[0].value;
+        const hoursVal = tempInp[1] ? tempInp[1].value : '';
+        if(tempVal && hoursVal) {
+          const triggered = parseFloat(tempVal) >= 73 || parseFloat(hoursVal) >= 28;
+          result.innerHTML = triggered
+            ? '<span class="material-symbols-outlined text-primary" style="font-size:18px;">check_circle</span><span class="text-[12px] text-primary font-bold">Trigger condition MET – proceed with unload</span>'
+            : '<span class="material-symbols-outlined text-error" style="font-size:18px;">cancel</span><span class="text-[12px] text-error">Trigger NOT met – continue monitoring</span>';
+        }
+        const valid = Array.from(checks).every(c=>c.getAttribute('data-checked')==='true') && Array.from(tempInp).every(i=>i.value.trim()!=='') && photoArea.getAttribute('data-photo')==='true';
+        btn.classList.toggle('opacity-50',!valid); btn.classList.toggle('cursor-not-allowed',!valid);
+        banner.style.display = valid ? 'none' : 'flex';
+      }
+      tempInp.forEach(i=>i.addEventListener('input',check));
+      checks.forEach(c=>new MutationObserver(check).observe(c,{attributes:true}));
+      new MutationObserver(check).observe(photoArea,{attributes:true});
+    });
+  </script>
+</body>
+</html>
