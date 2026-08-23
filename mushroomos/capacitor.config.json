@@ -1,0 +1,11 @@
+{
+  "appId": "in.freshbowl.mushroomos",
+  "appName": "MushroomOS",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
