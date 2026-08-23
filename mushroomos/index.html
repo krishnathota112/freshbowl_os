@@ -4,6 +4,40 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MushroomOS</title>
+
+    <!--
+      PWA manifest — BUILD_SEQUENCE_KIRO.md §C-FIELD.
+
+      "PWA manifest with start_url at the field home, so an operator installs a home-screen icon that
+      opens straight into their work and never renders the management shell."
+
+      `start_url` IS `/`, AND THAT IS THE FIELD HOME. It is not a hedge. A manifest carries exactly one
+      `start_url`, and there are TWO field homes — `ROLE_HOME.operator` is `/operator/my-work` and
+      `ROLE_HOME.lab_tech` is `/lab/queue`. Naming one of them in this file would put the wrong screen
+      on the other person's home screen, and copying the mapping here would make it a second source of
+      truth for something `lib/auth.ts` already decides. `/` is the `Landing` route, whose only job is
+      to redirect to `ROLE_HOME[role]`: an operator lands on their work, a lab technician on theirs, and
+      because the shell is chosen by role neither ever renders the management chrome.
+
+      `theme_color` and `background_color` are `--accent` and `--paper` from `theme/tokens.css`, read
+      not invented. They cannot be `var(--accent)` — a manifest is JSON parsed by the operating system,
+      with no access to the document's custom properties — so this is the one place a token value is
+      duplicated, and it is duplicated as the light-theme value because the OS chrome draws before any
+      theme attribute exists.
+
+      NO `icons` KEY, and it is missing on purpose. Android Chrome wants a 192 px and a 512 px icon
+      (one `maskable`) before it will offer "Install", so this manifest is installable on desktop and
+      addable-to-home-screen on iOS, but will not trigger Android's install prompt. An icon is a brand
+      asset, not a build task, and inventing a logo would be inventing the product's identity. Named as
+      owed in docs/REPORTS/C-FIELD.md rather than filled with a placeholder glyph.
+
+      NO service worker, by instruction. §C-FIELD: "Offline is out of scope. ARCHITECTURE_V2 §5 remains
+      the specification if the network assumption ever changes. Do not build the queue."
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0e5d6b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="MushroomOS" />
   </head>
   <body>
     <div id="root"></div>

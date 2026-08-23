@@ -57,7 +57,12 @@ export type BatchStep = {
   scope_label: string;
   instance_no: number;
   planned_qty_mt: number | null;
-  planned_start: string | null;
+  /** Hours from H0, point scale. Zone-free, so populated even while TBD-50 is open. */
+  baseline_start_hour: number | null;
+  baseline_end_hour: number | null;
+  /** H0 + the baseline hour. Null while H0 is unknown — never a midnight stand-in. */
+  planned_start_at: string | null;
+  planned_end_at: string | null;
   duration_target_min_hr: number | null;
   duration_target_max_hr: number | null;
   day0_duration_hr: number | null;
@@ -66,12 +71,14 @@ export type BatchStep = {
   tbd_marker: string | null;
   state: string;
   blocked_reason: string | null;
+  /** GENERATED in the database. Criterion 21. */
+  variance_minutes: number | null;
 };
 
 export async function listBatches(): Promise<BatchSummary[]> {
   const { data, error } = await supabase
     .from('master_batch')
-    .select('id, code, label, start_date, status, supervisor_name, activated_at')
+    .select('id, code, label, start_date, start_at, status, supervisor_name, activated_at')
     .order('start_date', { ascending: false });
   if (error) throw error;
   return (data ?? []) as BatchSummary[];
@@ -81,13 +88,15 @@ export async function getBatch(id: string) {
   const [batch, steps, roles] = await Promise.all([
     supabase
       .from('master_batch')
-      .select('id, code, label, start_date, status, supervisor_name, weather_note, config, activated_at')
+      .select(
+        'id, code, label, start_date, start_at, status, supervisor_name, weather_note, config, activated_at'
+      )
       .eq('id', id)
       .single(),
     supabase
       .from('batch_activity')
       .select(
-        'id, code, title, stream, rel_day, seq, scope_label, instance_no, planned_qty_mt, planned_start, duration_target_min_hr, duration_target_max_hr, day0_duration_hr, is_time_gate, golden_rule, tbd_marker, state, blocked_reason'
+        'id, code, title, stream, rel_day, seq, scope_label, instance_no, planned_qty_mt, baseline_start_hour, baseline_end_hour, planned_start_at, planned_end_at, duration_target_min_hr, duration_target_max_hr, day0_duration_hr, is_time_gate, golden_rule, tbd_marker, state, blocked_reason, variance_minutes'
       )
       .eq('master_batch_id', id)
       .order('seq')

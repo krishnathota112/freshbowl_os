@@ -9,8 +9,8 @@ import { evaluateCardinality, type BatchConfigView } from '../domain/cardinality
 import { tryResolveLabel } from '../domain/label';
 import type { ProcessActivity, StreamCode } from '../domain/types';
 import { FiveLayerNode } from '../components/node/FiveLayerNode';
-import { PageHeading } from '../components/layout/AppShell';
-import { Bar, Card, Chip, ConflictMarker, EmptyState, NumberInput, Stat } from '../components/primitives';
+import { PageHeading } from '../components/layout/PageHeading';
+import { Card, Chip, ConflictMarker, EmptyState, NumberInput, Stat } from '../components/primitives';
 
 /**
  * The process explorer. Read-only.
@@ -266,9 +266,11 @@ function LoadPlanPanel({
               compare="remainder, not a full load"
             />
           </div>
-          <div className="mt-3">
-            <Bar value={result.instances.length} max={Math.max(result.instances.length, 12)} />
-          </div>
+          {/*
+            The bar that was here compared the instance count against an arbitrary maximum, so its
+            fill meant nothing. Deleted rather than given a unit: the Stat above already states the
+            count and the formula that produced it. UI_ACCEPTANCE_CRITERIA A4.
+          */}
           <p className="mt-2 mono text-[11px] leading-relaxed text-muted">
             {title.ok ? title.text : activity.label_template} ·{' '}
             {result.instances

@@ -18,5 +18,7 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "tests"]
+  "include": ["src", "tests"],
+  "comment": "tests/typeprobes holds files that MUST NOT compile — A3 and A4 are negative type tests. They are checked by their own tsconfig, driven from tests/uiFoundations.test.ts.",
+  "exclude": ["tests/typeprobes"]
 }

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "//": "exclude MUST be reset. `extends` inherits it, and the base config excludes this very directory so that `npm run typecheck` stays clean — inheriting it here made tsc compile nothing and report success, which looked exactly like the probes passing.",
+  "exclude": [],
+  "include": ["./**/*.ts", "./**/*.tsx", "../../src/**/*.ts", "../../src/**/*.tsx"]
+}

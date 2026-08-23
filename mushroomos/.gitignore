@@ -1,5 +1,8 @@
 node_modules
 dist
+# The audit build tests/fieldShell.test.ts makes: the same production build with sourcemaps, so the
+# module membership of every chunk can be read exactly rather than guessed from minified output.
+dist-audit
 dist-ssr
 *.local
 .env
@@ -12,3 +15,21 @@ supabase/.branches
 *.log
 coverage
 .vite
+
+# ── Capacitor / Android ───────────────────────────────────────────────────────
+# The `android/` project itself IS committed — it carries the app id, the label and the manifest,
+# and regenerating it from scratch on another machine would silently change all three. What is
+# ignored is everything Gradle derives, plus the two files that are machine- or secret-specific:
+#   local.properties  names an SDK path that exists only on the machine that wrote it
+#   assets/public     is a copy of `dist`, which is already ignored above
+android/local.properties
+android/.gradle
+android/build
+android/app/build
+android/app/src/main/assets/public
+android/capacitor-cordova-android-plugins/build
+*.keystore
+*.jks
+
+# The staged APK. Built artefacts are handed out, not committed.
+dist-apk

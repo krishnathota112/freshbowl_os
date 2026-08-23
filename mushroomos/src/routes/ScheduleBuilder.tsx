@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  DAY_TITLES,
   assignActivity,
+  loadDayTitles,
   loadOptions,
   loadSchedule,
   loadTemplateMap,
@@ -37,6 +37,8 @@ export function ScheduleBuilder() {
   const opts = useQuery({ queryKey: ['schedule-options'], queryFn: loadOptions });
   const tmap = useQuery({ queryKey: ['template-map', id], queryFn: () => loadTemplateMap(id) });
   const findings = useQuery({ queryKey: ['validate', id], queryFn: () => validateBatch(id) });
+  // Day headings come from process_day, not from a map in this file. A2.
+  const dayTitles = useQuery({ queryKey: ['day-titles', id], queryFn: () => loadDayTitles(id) });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['schedule', id] });
@@ -108,7 +110,7 @@ export function ScheduleBuilder() {
               </button>
             ) : (
               <Link
-                to={`/admin/batch/${id}`}
+                to={`/batch/${id}`}
                 className="rounded-lg border px-3 py-2 font-head text-[12px] font-700"
                 style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
               >
@@ -212,7 +214,7 @@ export function ScheduleBuilder() {
             <section key={day}>
               <div className="mb-2 flex flex-wrap items-baseline gap-2 border-b pb-1" style={{ borderColor: 'var(--line-2)' }}>
                 <h2 className="font-head text-[15px] font-800">{label}</h2>
-                <span className="text-[12px] text-muted">{DAY_TITLES[day] ?? ''}</span>
+                <span className="text-[12px] text-muted">{dayTitles.data?.[day] ?? ''}</span>
                 <span className="ml-auto mono text-[11px] text-muted">{items.length} rows</span>
               </div>
               <div className="flex flex-col gap-1.5">

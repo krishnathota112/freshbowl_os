@@ -9,12 +9,19 @@ import {
   type BatchActivityRow,
 } from '../api/batch';
 import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/AppShell';
-import { Bar, Card, Chip, ConflictMarker, EmptyState, Stat } from '../components/primitives';
+import { PageHeading } from '../components/layout/PageHeading';
+import { Card, Chip, ConflictMarker, EmptyState, Stat } from '../components/primitives';
 import { TaskDrawer } from './TaskDrawer';
 
-/** The batch, day by day. This is the plan a supervisor or admin reads. */
-export function BatchDetail() {
+/**
+ * The batch, day by day. This is the plan a supervisor or admin reads.
+ *
+ * `embedded` is set when `BatchPage` renders this under `?tab=activities` (P3). It suppresses only
+ * the PAGE HEADING — the batch's name and status are already on the page above, and two `<h1>`s on
+ * one document is both wrong for a screen reader and confusing to look at. The actions are kept:
+ * activate, open the schedule and check the rest timers are the reasons to be on this tab.
+ */
+export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const [openTask, setOpenTask] = useState<string | null>(null);
@@ -48,13 +55,8 @@ export function BatchDetail() {
   const ready = rows.filter((r) => r.state === 'READY' || r.state === 'IN_PROGRESS').length;
   const flagged = rows.filter((r) => r.state === 'DEVIATION' || r.state === 'BLOCKED').length;
 
-  return (
-    <>
-      <PageHeading
-        title={b.label}
-        subtitle={`Day 0 is ${new Date(b.start_date).toDateString()} · supervisor ${b.supervisor_name ?? '—'}`}
-        right={
-          <div className="flex items-center gap-2">
+  const actions = (
+          <div className="flex flex-wrap items-center gap-2">
             <Chip tone={b.status === 'active' ? 'ok' : b.status === 'draft' ? 'inherit' : 'lock'}>
               {b.status}
             </Chip>
@@ -86,8 +88,19 @@ export function BatchDetail() {
               </button>
             )}
           </div>
-        }
-      />
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="mb-4 flex justify-end">{actions}</div>
+      ) : (
+        <PageHeading
+          title={b.label}
+          subtitle={`Day 0 is ${new Date(b.start_date).toDateString()} · supervisor ${b.supervisor_name ?? '—'}`}
+          right={actions}
+        />
+      )}
 
       {error && (
         <div
@@ -415,9 +428,13 @@ function EvidenceSummary({ batchId }: { batchId: string }) {
           size="lg"
         />
       </div>
-      <div className="mt-3">
-        <Bar value={done} max={Math.max(total, 1)} tone={done === total ? 'ok' : 'accent'} />
-      </div>
+      {/*
+        The done/total bar that was here has been DELETED, not relabelled.
+        It rendered a batch as a percentage, which UI_CONTROL_TOWER_SPEC §8.3 bans and
+        UI_ACCEPTANCE_CRITERIA rule E.1 auto-fails the workstream for. The Stat above already says
+        `done / total` with its comparison, which is the honest form. Position on the hour rail is
+        the batch indicator, and that is HourRail's job — C2.
+      */}
 
       {outstanding.length > 0 ? (
         <div className="mt-3">

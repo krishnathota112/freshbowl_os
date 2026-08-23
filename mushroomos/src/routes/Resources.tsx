@@ -1,63 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/AppShell';
+import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, EmptyState, Stat } from '../components/primitives';
 
 /**
- * Five of the six role homes have no screen until later steps.
+ * S14 · Manager resources. `UI_IMPLEMENTATION_PLAN §S14`.
  *
- * They say what will fill them and when. docs/UI_DESIGN_SPEC.md §5 — never "No data",
- * and no placeholder cards, because docs/KIRO_BUILD_INSTRUCTIONS.md §1 item 10 forbids
- * faking a workflow in the frontend.
+ * Extracted from `routes/Placeholders.tsx` into its own file, which `UI_IMPLEMENTATION_PLAN §3.1`
+ * asked for — "extracted to its own file, Gantt added at A5" — and which C-FIELD now requires: this
+ * is where `VesselGantt` and `MachineLoadGrid` land at A5, and the field entry must not download
+ * them. While this shared a module with `LabQueue` it would have.
+ *
+ * The reference data seeded in step 2 is real, so it is shown. The occupancy timeline is not, so it
+ * is stated rather than drawn.
  */
-
-function Pending({
-  title,
-  subtitle,
-  waitingFor,
-  step,
-}: {
-  title: string;
-  subtitle: string;
-  waitingFor: string;
-  step: string;
-}) {
-  return (
-    <>
-      <PageHeading title={title} subtitle={subtitle} right={<Chip tone="lock">{step}</Chip>} />
-      <EmptyState title={waitingFor} detail={`This screen is built in ${step}. Steps 1 and 2 build the process definition and the mechanisms that read it; nothing has instantiated a batch yet, so there is no work to show. Filling this with placeholder cards would be faking the workflow in the frontend, which the build instructions forbid.`} />
-    </>
-  );
-}
-
-export const LabQueue = () => (
-  <Pending
-    title="Lab Queue"
-    subtitle="Overdue, today, retest required"
-    waitingFor="Samples appear here when an activity submission generates them"
-    step="Step 8"
-  />
-);
-
-export const ControlRoom = () => (
-  <Pending
-    title="Control Room"
-    subtitle="Ordered by urgency, not by batch"
-    waitingFor="Time-critical gates, lab failures and open deviations appear here once batches are running"
-    step="Step 9"
-  />
-);
-
-export const CommandCenter = () => (
-  <Pending
-    title="Command Center"
-    subtitle="Exceptions first, not what is fine"
-    waitingFor="Checkpoint decision packages appear here when a batch reaches one"
-    step="Step 10"
-  />
-);
-
-/** Manager resources — the reference data this step DID seed is real, so show it. */
 export function Resources() {
   const q = useQuery({
     queryKey: ['resources'],

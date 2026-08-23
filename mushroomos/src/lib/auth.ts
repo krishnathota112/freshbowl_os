@@ -29,8 +29,28 @@ export const ROLE_HOME: Record<AppRole, string> = {
   supervisor: '/supervisor/control-room',
   admin: '/admin/today',
   manager: '/manager/resources',
-  gm: '/gm/command-center',
+  // S1 · the Control Tower, C3. `/gm/command-center` still resolves — App.tsx redirects it.
+  gm: '/gm/control-tower',
 };
+
+/**
+ * The two roles that work on the factory floor. `BUILD_SEQUENCE_KIRO.md §C-FIELD`.
+ *
+ * This is what chooses `FieldShell` over `AppShell` — "chosen by role, not by URL". It sits beside
+ * `ROLE_HOME` because the two answer the same question about the same six roles, and putting them
+ * in one file is what keeps a third mapping from appearing.
+ *
+ * A supervisor is DELIBERATELY NOT in this list, even though `OPS` in `App.tsx` lets them open
+ * `/operator/my-work`. §C-FIELD's whole argument against a second application is that "a supervisor
+ * is genuinely both roles — on the floor and in the control room", and a supervisor who lost the nav
+ * bar on the operator screen would be stranded there. They keep the management shell and see the
+ * operator's screen inside it.
+ */
+export const FIELD_ROLES: readonly AppRole[] = ['operator', 'lab_tech'];
+
+export function isFieldRole(role: AppRole | null): boolean {
+  return role !== null && FIELD_ROLES.includes(role);
+}
 
 export const ROLE_LABEL: Record<AppRole, string> = {
   operator: 'Field Operator',

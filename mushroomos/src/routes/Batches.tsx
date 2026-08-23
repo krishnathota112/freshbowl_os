@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listBatches } from '../api/batch';
 import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/AppShell';
+import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, EmptyState } from '../components/primitives';
 
 /** Every batch, newest first, with what each is waiting on. */
@@ -61,7 +61,7 @@ export function Batches() {
             return (
               <Link
                 key={b.id}
-                to={`/admin/batch/${b.id}`}
+                to={`/batch/${b.id}`}
                 className="rounded-md border bg-surface p-4"
                 style={{
                   borderColor: 'var(--line)',

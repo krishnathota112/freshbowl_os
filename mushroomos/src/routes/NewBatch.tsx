@@ -7,11 +7,13 @@ import {
   DEFAULT_STRUCTURE,
   STRUCTURE_QUESTIONS,
   createBatch,
+  getPublishedBaseline,
+  getFactoryClock,
   type RoleBindingInput,
 } from '../api/batch';
 import { evaluateCardinality } from '../domain/cardinality';
 import type { CardinalityRule } from '../domain/types';
-import { PageHeading } from '../components/layout/AppShell';
+import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, ConflictMarker, NumberInput, Stat } from '../components/primitives';
 
 /**
@@ -59,6 +61,13 @@ export function NewBatch() {
   const [error, setError] = useState<string | null>(null);
 
   const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
+  // The factory clock, so the screen can SHOW the H0 the server will compose rather than letting
+  // it happen invisibly. Read-only here: `create_master_batch` composes the instant itself.
+  const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
+
+  // The process length comes from the published definition, never from a number typed in here.
+  // TIME_CONTRACT §1.3 and invariant 8.
+  const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: getPublishedBaseline });
 
   // The rest activities, and the weighment rule, read from the definition.
   const meta = useQuery({
@@ -170,7 +179,8 @@ export function NewBatch() {
   });
 
   const canAdvance = () => {
-    if (step === 0) return code.trim().length > 0 && startDate.length === 10;
+    if (step === 0)
+      return code.trim().length > 0 && startDate.length === 10 && Boolean(clock.data?.timezone);
     if (step === 1) return Boolean(leads['PRIMARY_FIBRE'] && leads['STRUCTURAL_STRAW']);
     if (step === 2) return loadPreview?.ok === true;
     if (step === 3) return missingRests.length === 0;
@@ -230,6 +240,49 @@ export function NewBatch() {
                   style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
                 />
               </Q>
+              {/*
+                H0 IS SHOWN, NOT TYPED.
+
+                `TIME_CONTRACT §1.1` makes `start_at` mandatory and `validate_batch` blocks on
+                `H0_NOT_SET`, but until 0023 this screen never sent it — so every batch created
+                here was unactivatable by construction, and nobody noticed because nobody had used
+                the screen.
+
+                The instant is composed on the SERVER by `factory_h0_instant`, from the factory
+                clock's own hour and timezone. Composing it here would use the BROWSER's zone, and
+                an admin on any other zone would silently shift the whole baseline.
+
+                No override is offered: `Book1.xlsx` shows all three batches starting in the same
+                hour-of-day slot and no source describes a batch starting anywhere else. A field
+                with no factory behind it is exactly what this project does not build.
+              */}
+              <Q
+                label="Day 0 starts at"
+                help="The factory clock decides this. Every hour of the batch counts from it."
+              >
+                {clock.data ? (
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="mono text-[15px]">
+                      {String(clock.data.h0HourOfDay).padStart(2, '0')}:
+                      {String(clock.data.h0MinuteOfHour).padStart(2, '0')}
+                    </span>
+                    <Chip tone="lock">{clock.data.timezone ?? 'no timezone set'}</Chip>
+                    <span className="text-[11px] text-muted">
+                      {startDate
+                        ? `H0 is ${startDate} at ${String(clock.data.h0HourOfDay).padStart(2, '0')}:${String(
+                            clock.data.h0MinuteOfHour
+                          ).padStart(2, '0')} factory time`
+                        : 'pick a Day 0 date'}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[12px]" style={{ color: 'var(--crit)' }}>
+                    The factory clock has no timezone set, so H0 cannot be computed and this batch
+                    cannot be created. Run set_factory_timezone once.
+                  </span>
+                )}
+              </Q>
+
               <Q label="Supervisor" help="Who releases work and handles deviations.">
                 <input
                   value={supervisor}
@@ -503,7 +556,16 @@ export function NewBatch() {
                 value={Object.values(leads).filter(Boolean).length}
                 compare="one per material job filled"
               />
-              <Stat label="Process length" value={23} unit="days" compare="Day 0 to Day 22" />
+              <Stat
+                label="Process length"
+                value={baseline.data?.baselineDays ?? '—'}
+                unit="days"
+                compare={
+                  baseline.data
+                    ? `Day 0 to Day ${baseline.data.finalDayIndex} · ${baseline.data.baselineHours} h`
+                    : 'no published definition'
+                }
+              />
             </div>
           </Card>
           <Card className="p-3">

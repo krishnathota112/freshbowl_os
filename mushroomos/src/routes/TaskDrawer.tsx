@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  captureEvidence,
   getActivityDetail,
-  markEvidence,
   startActivity,
   submitActivity,
   type BatchValueRow,
 } from '../api/batch';
 import { supabase } from '../api/client';
 import { Chip, ConflictMarker, Countdown } from '../components/primitives';
+
+/** What the file picker will accept, from the requirement's own `media_kinds`. */
+function acceptFor(kinds: string[] | null): string {
+  const set = new Set(kinds ?? ['photo']);
+  const accept: string[] = [];
+  if (set.has('photo')) accept.push('image/jpeg', 'image/png', 'image/webp');
+  if (set.has('video')) accept.push('video/mp4', 'video/quicktime');
+  return accept.join(',');
+}
 
 type TaskDetail = {
   id: string;
@@ -95,7 +104,31 @@ export function TaskDrawer({
   };
 
   const start = useMutation({ mutationFn: () => startActivity(activityId), onSuccess: refresh });
-  const evidence = useMutation({ mutationFn: (id: string) => markEvidence(id), onSuccess: refresh });
+
+  /**
+   * Capture. Uploads the file, then binds it — A4.
+   *
+   * The previous version called an RPC that incremented a counter with no file. That affordance is
+   * what `UI_ACCEPTANCE_CRITERIA` rule E.3 auto-fails the workstream for, and it is gone: there is no
+   * longer a server function that can satisfy a requirement without an object in storage.
+   *
+   * A failure leaves the requirement outstanding and says why. It never marks it met — criterion 59.
+   */
+  const evidence = useMutation({
+    mutationFn: (input: { requirementKey: string; file: File; mediaKind: 'photo' | 'video' }) =>
+      captureEvidence({
+        batchId: a!.master_batch_id,
+        activityId,
+        requirementKey: input.requirementKey,
+        file: input.file,
+        mediaKind: input.mediaKind,
+      }),
+    onSuccess: () => {
+      setError(null);
+      refresh();
+    },
+    onError: (e) => setError(`Capture failed — nothing was recorded. ${(e as Error).message}`),
+  });
   const submit = useMutation({
     mutationFn: () => submitActivity(activityId, values, remarks),
     onSuccess: (r) => {
@@ -333,13 +366,40 @@ export function TaskDrawer({
                       )}
                     </span>
                     {!met && editable && (
-                      <button
-                        onClick={() => evidence.mutate(e.id)}
-                        className="shrink-0 rounded border px-2 py-1 font-head text-[10px] font-600"
-                        style={{ borderColor: 'var(--accent)', color: 'var(--accent-ink)' }}
+                      /*
+                        A real file input with `capture`, which opens the camera on a phone and a file
+                        picker on a desktop. `ARCHITECTURE_V2 §7` wants a client downscale to
+                        <=1600 px before upload; that is not done here yet and is named in the report.
+                      */
+                      <label
+                        className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
+                        style={{
+                          borderColor: 'var(--accent)',
+                          color: 'var(--accent-ink)',
+                          minHeight: 48,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
                       >
-                        Attach
-                      </button>
+                        {evidence.isPending ? 'Uploading…' : 'Capture'}
+                        <input
+                          type="file"
+                          accept={acceptFor(e.media_kinds)}
+                          capture="environment"
+                          className="hidden"
+                          disabled={evidence.isPending}
+                          onChange={(ev) => {
+                            const file = ev.target.files?.[0];
+                            ev.target.value = '';
+                            if (!file) return;
+                            evidence.mutate({
+                              requirementKey: e.key,
+                              file,
+                              mediaKind: file.type.startsWith('video/') ? 'video' : 'photo',
+                            });
+                          }}
+                        />
+                      </label>
                     )}
                   </div>
                 );
@@ -347,8 +407,9 @@ export function TaskDrawer({
             </div>
           )}
           <p className="mt-1.5 text-[10px] text-muted">
-            Upload arrives with Storage in a later step. Attaching here satisfies the named
-            requirement so the submission gate is real now.
+            The file is uploaded first, then bound to the named requirement. If the upload fails
+            nothing is recorded and the requirement stays outstanding — a record of a photograph that
+            is not in storage would be a false record.
           </p>
         </section>
 

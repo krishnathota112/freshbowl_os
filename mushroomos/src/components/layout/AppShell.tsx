@@ -26,7 +26,11 @@ const NAV: Record<string, { to: string; label: string }[]> = {
     { to: '/admin/batches', label: 'Batches' },
   ],
   gm: [
-    { to: '/gm/command-center', label: 'Command Center' },
+    // S1's name, and its real route. The nav pointed at `/gm/command-center` — which still
+    // resolves, because it is kept as a redirect for the GM's bookmark — but sending every
+    // in-app click through a redirect, under the screen's PREVIOUS name, is how a rename stays
+    // half-done forever.
+    { to: '/gm/control-tower', label: 'Control Tower' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/process-explorer', label: 'Process' },
   ],
@@ -152,22 +156,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-export function PageHeading({
-  title,
-  subtitle,
-  right,
-}: {
-  title: string;
-  subtitle?: string;
-  right?: ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="font-head text-xl font-800 tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
-      </div>
-      {right}
-    </div>
-  );
-}
+/**
+ * `PageHeading` MOVED to `./PageHeading.tsx`.
+ *
+ * It is not re-exported from here on purpose. Ten routes import it, `MyWork` among them, and a
+ * re-export would keep every one of them pulling this file — the nav table, the theme toggle,
+ * `useAuth`, `signOut` — into their chunk. That is exactly what `C-FIELD`'s bundle requirement
+ * forbids for the field entry. See the module header of `PageHeading.tsx`.
+ */

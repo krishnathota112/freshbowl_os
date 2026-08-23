@@ -182,20 +182,30 @@ export function dayLabel(rows: ScheduleRow[], day: number, allDays: number[]): s
   return spans ? `Day ${day}–${next - 1}` : `Day ${day}`;
 }
 
-export const DAY_TITLES: Record<number, string> = {
-  0: 'Weighment',
-  1: 'Wetting and bunker loading',
-  2: 'Rest',
-  4: 'Reload, and straw arrives',
-  5: 'First soak, bunker storage',
-  6: 'Second soak',
-  7: 'Third soak, nitrogen mix, yard integration',
-  8: 'Turner passes and bunker loading',
-  10: 'Rest',
-  12: 'Bunker reload',
-  13: 'Rest',
-  15: 'Tunnel loading',
-  16: 'Tunnel process',
-  22: 'Tunnel unloading and compost-out',
-  23: 'Batch state',
-};
+/**
+ * The day headings, read from `process_day`.
+ *
+ * These used to be a literal map here, and its last key was the process length written as a
+ * number — invariant 8's second debt (docs/TIME_CONTRACT.md §2). A day heading is process copy,
+ * and the process is data, so it now lives in the definition and is seeded in s10. Changing a
+ * heading is a seed change with no code change, which is criterion 22.
+ */
+export async function loadDayTitles(batchId: string): Promise<Record<number, string>> {
+  const { data: batch, error: batchErr } = await supabase
+    .from('master_batch')
+    .select('process_definition_id')
+    .eq('id', batchId)
+    .single();
+  if (batchErr) throw batchErr;
+
+  const { data, error } = await supabase
+    .from('process_day')
+    .select('rel_day, title')
+    .eq('process_definition_id', batch.process_definition_id as string)
+    .order('rel_day');
+  if (error) throw error;
+
+  const titles: Record<number, string> = {};
+  for (const row of data ?? []) titles[row.rel_day as number] = row.title as string;
+  return titles;
+}

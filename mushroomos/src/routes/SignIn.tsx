@@ -102,8 +102,16 @@ export function SignIn() {
         </form>
 
         <div className="mt-5">
-          <p className="font-head text-[11px] font-600 uppercase tracking-wider text-muted">
-            Demo accounts · password <span className="mono">{DEMO_PASSWORD}</span>
+          {/*
+            `uppercase` on the paragraph rendered `mushroom2026` as `MUSHROOM2026`, and the password
+            is case-sensitive. Anyone typing what the screen showed was rejected. The label keeps
+            the styling; the value is excluded from it and marked `normal-case`.
+          */}
+          <p className="font-head text-[11px] font-600 tracking-wider text-muted">
+            <span className="uppercase">Demo accounts · password </span>
+            <span className="mono normal-case" style={{ color: 'var(--ink-2)' }}>
+              {DEMO_PASSWORD}
+            </span>
           </p>
           <div className="mt-2 grid gap-1">
             {DEMO_ACCOUNTS.map((a) => (

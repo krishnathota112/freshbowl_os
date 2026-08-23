@@ -1,191 +1,217 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/AppShell';
-import { Card, Chip, ConflictMarker, EmptyState, Stat } from '../components/primitives';
+import { loadAdminToday } from '../api/adminToday';
+import { getFactoryClock } from '../api/batch';
+import { factoryDate } from '../components/composite/geometry';
+import { PageHeading } from '../components/layout/PageHeading';
+import { Card, Chip, EmptyState, Skeleton } from '../components/primitives';
+
+/*
+ * C4 HAS LANDED, so these point at `/batch/:id` — the shared management batch page.
+ *
+ * They pointed at `/admin/batch/:id` until it existed, deliberately: a link to a planned route is a
+ * dead link, and a dead link on the home screen of the person the product is for is not an
+ * acceptable way to stage a rename. `/admin/batch/:id` is still a redirect for anything that kept
+ * the old address.
+ *
+ * `/admin/batch/:id/schedule` is unchanged — ScheduleBuilder has not moved.
+ */
 
 /**
- * Admin's home. In the finished product this is today's schedule with "start these" and
- * "these are running". Neither exists yet — there is no schedule import and no batch — so
- * it shows what Steps 1 and 2 actually produced, honestly labelled.
+ * S4 · Admin's home.  `UI_IMPLEMENTATION_PLAN §S4`.
+ *
+ * WHAT STARTS TODAY · WHAT IS RUNNING · WHAT NEEDS ME.
+ *
+ * The previous version of this screen rendered `Process definition`, `Activity templates`,
+ * `Evidence requirements` and `Gates shipped disabled` — process-engine metadata on a factory
+ * manager's home screen. Those counts still exist, on `/admin/reference` and
+ * `/admin/process-explorer`, which is where someone goes to ask about the process rather than
+ * about today.
+ *
+ * NOTHING HERE IS A CHART OR A TOTAL. A count that cannot be acted on is not information a
+ * manager needs at 6am; every row on this screen names one batch and one thing to do about it.
  */
 export function AdminToday() {
+  const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
+
+  // Today in the FACTORY's timezone. An admin travelling, or a browser on a different zone, must
+  // still see the factory's day — `TIME_CONTRACT §3.2`. `factoryDate` is the one implementation.
+  const today = clock.data?.timezone ? factoryDate(Date.now(), clock.data.timezone).iso : null;
+
   const q = useQuery({
-    queryKey: ['admin-today'],
-    queryFn: async () => {
-      const [defs, acts, gates, conflicts, evidence, mapping] = await Promise.all([
-        supabase.from('process_definition').select('code, name, status, total_days'),
-        supabase.from('process_activity').select('id, process_definition_id, is_time_gate'),
-        supabase.from('gate_rule').select('mapping_confidence, is_enabled'),
-        supabase.from('conflict_register').select('conflict_id, kind, status, severity, question'),
-        supabase.from('evidence_requirement').select('id'),
-        supabase.from('v_sop_limit_mapping').select('mapping_confidence'),
-      ]);
-      for (const r of [defs, acts, gates, conflicts, evidence, mapping]) {
-        if (r.error) throw r.error;
-      }
-      return {
-        defs: defs.data ?? [],
-        acts: acts.data ?? [],
-        gates: gates.data ?? [],
-        conflicts: conflicts.data ?? [],
-        evidence: evidence.data ?? [],
-        mapping: mapping.data ?? [],
-      };
-    },
+    queryKey: ['admin-today', today],
+    queryFn: () => loadAdminToday(today as string),
+    enabled: Boolean(today),
+    refetchInterval: 60_000,
   });
 
-  if (q.isLoading) return <p className="text-sm text-muted">Loading…</p>;
+  if (clock.isLoading || q.isLoading) {
+    return (
+      <>
+        <PageHeading title="Today" subtitle="What starts, what is running, what needs you" />
+        <Skeleton label="Loading today" />
+        <Skeleton label="Loading today" />
+      </>
+    );
+  }
+
+  if (!clock.data?.timezone) {
+    return (
+      <>
+        <PageHeading title="Today" subtitle="What starts, what is running, what needs you" />
+        <EmptyState
+          title="The factory clock has no timezone"
+          detail="Today's date depends on the factory's own zone, and no batch can be created without it. Run set_factory_timezone once, then reload."
+        />
+      </>
+    );
+  }
+
   if (q.error) {
     return (
-      <EmptyState
-        title="Could not read reference data"
-        detail={(q.error as Error).message}
-      />
+      <>
+        <PageHeading title="Today" subtitle="What starts, what is running, what needs you" />
+        <EmptyState
+          title="Could not read today"
+          detail={`${(q.error as Error).message}. Nothing has been changed — try again.`}
+        />
+      </>
     );
   }
 
   const d = q.data!;
-  const published = d.defs.find((x) => x.status === 'published');
-  const archived = d.defs.find((x) => x.status === 'archived');
-  const pubId = d.defs.length ? undefined : undefined; // ids not selected; count below by def
-  void pubId;
-
-  const disabledGates = d.gates.filter((g) => !g.is_enabled).length;
-  const openConflicts = d.conflicts.filter((c) => c.status === 'open');
-  const decided = d.conflicts.filter((c) => c.status === 'decided');
-  const blockers = openConflicts.filter((c) => c.severity === 'blocks_build');
+  // `FactoryDate` carries the parts rather than a formatted string, deliberately — the ISO date is
+  // built from NUMERIC parts so a locale rendering "Sept" cannot corrupt it. Composed here.
+  const f = factoryDate(Date.now(), clock.data.timezone);
+  const dayLabel = `${f.weekday} ${f.dayOfMonth} ${f.month}`;
 
   return (
     <>
       <PageHeading
         title="Today"
-        subtitle={new Date().toLocaleDateString(undefined, {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })}
+        subtitle={dayLabel}
+        right={<Chip tone="lock">{clock.data.timezone}</Chip>}
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-3" rail="var(--ok)">
-          <Stat
-            label="Process definition"
-            value={published?.code ?? '—'}
-            compare={published ? `published · ${published.total_days} days` : 'none published'}
+      {/* ── STARTING TODAY ─────────────────────────────────────────────── */}
+      <section className="mb-6">
+        <h2 className="mb-2 font-head text-[12px] font-700 uppercase tracking-wider text-muted">
+          Starting today
+        </h2>
+        {d.startingToday.length === 0 ? (
+          <EmptyState
+            title="Nothing is due to start today."
+            detail="A batch appears here on its Day 0. Create one from + New Batch when the schedule calls for it."
           />
-        </Card>
-        <Card className="p-3">
-          <Stat label="Activity templates" value={d.acts.length} compare="across both definitions" />
-        </Card>
-        <Card className="p-3">
-          <Stat
-            label="Evidence requirements"
-            value={d.evidence.length}
-            compare="named, individually satisfied"
-          />
-        </Card>
-        <Card className="p-3" rail="var(--warn)">
-          <Stat
-            label="Gates shipped disabled"
-            value={disabledGates}
-            tone="warn"
-            compare="ambiguous SOP mappings · C-28"
-          />
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-4">
-          <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-            Starting today
-          </p>
-          <div className="mt-3">
-            <EmptyState
-              title="No batch can start yet"
-              detail="A master batch is instantiated from an approved schedule slot, and the schedule importer arrives in Step 4. Admin never types a batch number — that is the point of the slot being upstream."
-            />
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-            Needs me
-          </p>
-          <ul className="mt-3 flex flex-col gap-2">
-            {blockers.map((c) => (
-              <li
-                key={c.conflict_id}
-                className="rounded border px-2 py-1.5"
-                style={{ borderColor: 'var(--crit)', background: 'var(--crit-soft)' }}
-              >
-                <div className="flex items-center gap-2">
-                  <ConflictMarker id={c.conflict_id} />
-                  <Chip tone="crit">blocks build</Chip>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {d.startingToday.map((b) => (
+              <Card key={b.batchId} className="p-3" rail={b.overdue ? 'var(--crit)' : 'var(--accent)'}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-head text-[15px] font-800">{b.code}</span>
+                  {b.overdue && <Chip tone="crit">Day 0 was {b.startDate}</Chip>}
                 </div>
-                <p className="mt-1 text-[12px]" style={{ color: 'var(--ink-2)' }}>
-                  {c.question}
+                <p className="mt-0.5 text-[12px] text-muted">
+                  {b.label}
+                  {b.supervisor ? ` · ${b.supervisor}` : ''}
                 </p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[11px] text-muted">
-            {openConflicts.length} open, {decided.length} decided. Every one is carried as data and
-            rendered where it matters — none are silently resolved.
-          </p>
-        </Card>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card className="p-4">
-          <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-            SOP reference
-          </p>
-          <p className="mt-2 text-[13px] text-ink2">
-            <span className="mono">{archived?.code ?? '—'}</span> is seeded{' '}
-            <Chip tone="lock">archived</Chip> — queryable and citable, never executable. Its
-            process-control limits are mapped onto the current process with a confidence flag, and
-            an ambiguous mapping ships disabled.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {['dictated', 'sop_direct', 'sop_inferred', 'unmapped'].map((c) => {
-              const n = d.gates.filter((g) => g.mapping_confidence === c).length;
-              const enabled = d.gates.filter((g) => g.mapping_confidence === c && g.is_enabled).length;
-              return (
-                <span
-                  key={c}
-                  className="rounded border px-2 py-1"
-                  style={{ borderColor: 'var(--line-2)' }}
+                <p className="mt-2 text-[12px]">
+                  {b.blockingCount === 0 ? (
+                    <span style={{ color: 'var(--ok)' }}>Ready to activate</span>
+                  ) : (
+                    <span style={{ color: 'var(--warn)' }}>
+                      {b.blockingCount} thing{b.blockingCount > 1 ? 's' : ''} to settle before it can
+                      start
+                    </span>
+                  )}
+                </p>
+                <Link
+                  to={`/admin/batch/${b.batchId}/schedule`}
+                  className="mt-2 inline-flex items-center rounded border px-3 font-head text-[12px] font-700"
+                  style={{
+                    minHeight: 40,
+                    borderColor: 'var(--accent)',
+                    color: 'var(--accent-ink)',
+                    background: 'var(--accent-soft)',
+                  }}
                 >
-                  <span className="mono text-[11px] text-ink2">{c}</span>{' '}
-                  <span className="mono text-[11px] text-muted">
-                    {n} · {enabled} on
-                  </span>
-                </span>
-              );
-            })}
+                  Open the plan
+                </Link>
+              </Card>
+            ))}
           </div>
-        </Card>
+        )}
+      </section>
 
-        <Card className="p-4">
-          <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-            Look at the process
-          </p>
-          <p className="mt-2 text-[13px] text-ink2">
-            The process definition is data. Change which material leads a role and every label in
-            that stream follows; change a quantity and the instance count recalculates. Neither
-            needs a code change.
-          </p>
-          <Link
-            to="/admin/process-explorer"
-            className="mt-3 inline-block rounded px-3 py-2 font-head text-[12px] font-700"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >
-            Open the process explorer
-          </Link>
-        </Card>
-      </div>
+      {/* ── RUNNING ────────────────────────────────────────────────────── */}
+      <section className="mb-6">
+        <h2 className="mb-2 font-head text-[12px] font-700 uppercase tracking-wider text-muted">
+          Running
+        </h2>
+        {d.running.length === 0 ? (
+          <EmptyState
+            title="No batch is running."
+            detail="A batch appears here once it is activated."
+          />
+        ) : (
+          <div className="grid gap-2">
+            {d.running.map((b) => (
+              <Link
+                key={b.batchId}
+                to={`/batch/${b.batchId}`}
+                className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-md border px-3 py-2"
+                style={{ borderColor: 'var(--line)', background: 'var(--surface)', minHeight: 44 }}
+              >
+                <span className="font-head text-[14px] font-700">{b.code}</span>
+                {/*
+                  Null is not zero. A batch with nothing recorded has not started, and rendering
+                  "Day 0 · H0" would be a claim about progress that has not happened.
+                */}
+                {b.nowHour === null ? (
+                  <span className="text-[12px] text-muted">not started yet</span>
+                ) : (
+                  <span className="mono text-[13px]">
+                    Day {b.batchDayNo} · H{b.nowHour}
+                    {b.baselineHours ? ` of ${b.baselineHours}` : ''}
+                  </span>
+                )}
+                {b.flagCount > 0 && <Chip tone="warn">{b.flagCount} to look at</Chip>}
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── NEEDS ME ───────────────────────────────────────────────────── */}
+      <section>
+        <h2 className="mb-2 font-head text-[12px] font-700 uppercase tracking-wider text-muted">
+          Needs you
+        </h2>
+        {d.needsAdmin.length === 0 ? (
+          <EmptyState
+            title="Nothing is waiting on an Admin decision."
+            detail="Blocking findings on a draft batch appear here — a rest with no duration, a reload into the bunker it came from, an activity with nobody assigned."
+          />
+        ) : (
+          <div className="grid gap-2">
+            {d.needsAdmin.map((b, i) => (
+              <Card key={`${b.batchId}-${b.code}-${i}`} className="p-3" rail="var(--warn)">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  {/*
+                    The MESSAGE, not the code. `validate_batch` already writes a sentence naming the
+                    activity and what is wrong with it; showing `NO_ASSIGNEE` instead would be the
+                    same mistake this screen was rewritten to remove.
+                  */}
+                  <span className="text-[13px]">{b.message}</span>
+                  <Link to={`/admin/batch/${b.batchId}/schedule`} className="mono text-[11px] text-muted">
+                    {b.batchCode}
+                  </Link>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }

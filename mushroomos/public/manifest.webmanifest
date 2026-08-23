@@ -1,0 +1,11 @@
+{
+  "name": "MushroomOS",
+  "short_name": "MushroomOS",
+  "description": "Record what happened on the floor: the task, the reading, the proof, and who did it.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0e5d6b",
+  "background_color": "#faf7f2"
+}

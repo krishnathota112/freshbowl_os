@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/AppShell';
+import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, ConflictMarker } from '../components/primitives';
 
 /** Reference data as seeded: materials and their roles, lab specs, the conflict register. */

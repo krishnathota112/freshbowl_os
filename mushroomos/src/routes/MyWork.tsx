@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/client';
 import { releaseElapsedRests } from '../api/batch';
-import { PageHeading } from '../components/layout/AppShell';
+import { PageHeading } from '../components/layout/PageHeading';
 import { Bar, Card, Chip, ConflictMarker, Countdown, EmptyState, Stat } from '../components/primitives';
 import { TaskDrawer } from './TaskDrawer';
 
@@ -141,7 +141,8 @@ export function MyWork() {
             <Stat label="Loads" value={`${loadedCount} / ${loads.length}`} compare="derived, not typed" />
           </div>
           <div className="mt-3">
-            <Bar value={loaded} max={target} tone="ok" />
+            {/* Material, in MT. The one legal use of Bar — UI_ACCEPTANCE_CRITERIA A4. */}
+            <Bar kind="material" value={loaded} max={target} unit="MT" tone="ok" />
           </div>
         </Card>
       )}
