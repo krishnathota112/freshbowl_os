@@ -4,3 +4,8 @@ key.txt
 node_modules
 dist
 *.log
+
+# An UNPACKED APK — classes.dex, META-INF, decompiled bytecode. Reference material someone handed
+# over, not source, and 9.7 MB of it. The archive it came from is what belongs in a repo, if
+# anything does.
+MushroomOS-extracted/

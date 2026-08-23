@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mushroomos",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "mushroomos",
+      "port": 5173
+    },
+    {
+      "name": "mushroomos-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4173"],
+      "cwd": "mushroomos",
+      "port": 4173
+    }
+  ]
+}

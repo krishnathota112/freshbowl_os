@@ -175,6 +175,21 @@ batch 1 (reload-1, 18 Apr), batch 2 (reload-1, 21 Apr), batch 4 (reload-1, 28 Ap
 
 ## 5. Offline
 
+> **CLIENT DECISION 22 Aug 2026 — network assumption revised.** Operators and lab technicians
+> have **reliable realtime internet**. The offline design below is **not being built** and is
+> retained as the specification if that ever changes.
+>
+> Three of its rules are kept anyway, because they are correct for other reasons:
+> - **Evidence is upload-then-bind.** Not for replay — for integrity. A row that claims a photo
+>   which is not in storage is a false record, which is the failure mode this product exists to
+>   prevent.
+> - **Timers are computed from server timestamps, never the device clock.** Already built and
+>   tested (`advance_batch`, `unblocks_at`).
+> - **No offline auth fallback.** The legacy local password table stays deleted.
+>
+> The write queue, IndexedDB read cache and blob capture are **out of scope**. `idempotency_key`
+> is still worth having, but its justification is now double-tap and network retry, not replay.
+
 **[FACT]** The old app already assumed a hostile network — S8d ships a local account table
 "because the demo-room wifi must not hang the button". Bunkers and tunnels are worse than a
 demo room.
