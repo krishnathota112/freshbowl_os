@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Lab Entry</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+  <script>Auth.requireAuth() && Auth.requireRole('lab', 'admin');</script>
+  <style>
+    /* <details> as a collapsing card. The local Tailwind build has no
+       list-none or rotate-180 utility, so the marker and the chevron are
+       handled here rather than with classes that do not exist. */
+    .lab-sec > summary { list-style: none; cursor: pointer; }
+    .lab-sec > summary::-webkit-details-marker { display: none; }
+    .lab-sec > summary .lab-chev { transition: transform .2s ease; }
+    .lab-sec[open] > summary .lab-chev { transform: rotate(180deg); }
+    /* Read-only replay: nothing on the page should look editable. */
+    .lab-readonly input { pointer-events: none; }
+    .lab-readonly .pass-fail-group, .lab-readonly .photo-upload-area, .lab-readonly .toggle-btn {
+      pointer-events: none; opacity: .85;
+    }
+    .lab-dots { scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-background font-sans text-on-background min-h-screen">
+
+  <!-- Stage Top Bar — back only. A lab entry has no "next": the tech submits
+       and returns to the checkpoint list. -->
+  <div class="stage-topbar">
+    <a href="lab_dashboard.html" class="flex items-center gap-1 text-on-surface-variant text-[12px] font-bold no-underline">
+      <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span> Back
+    </a>
+    <span class="text-[12px] font-bold text-on-surface text-center flex-1 truncate px-2" id="topbarTitle">—</span>
+    <span class="w-8 shrink-0"></span>
+  </div>
+
+  <main class="pt-4 pb-28 min-h-screen bg-background" data-form>
+    <div class="max-w-lg mx-auto flex flex-col gap-4">
+
+      <!-- Checkpoint progress — read-only context, not navigation. -->
+      <div class="px-5">
+        <div class="lab-dots overflow-x-auto">
+          <div class="flex items-start gap-1 min-w-max" id="dayDots"></div>
+        </div>
+      </div>
+
+      <!-- Stage header -->
+      <div class="px-5">
+        <div class="bg-surface-container-lowest rounded-xl p-5 shadow-md flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-primary" style="font-size:20px;" id="stageIcon">science</span>
+          </div>
+          <div class="min-w-0">
+            <span class="label-caps text-primary" id="stagePosition">—</span>
+            <h2 class="text-[18px] font-semibold text-on-surface" id="stageName">—</h2>
+            <p class="text-[12px] text-on-surface-variant mt-0.5" id="stageDetail">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Read-only banner, shown only for an already-submitted checkpoint -->
+      <div class="px-5 hidden" id="submittedBanner">
+        <div class="bg-primary-fixed p-4 rounded-xl flex items-start gap-2">
+          <span class="material-symbols-outlined text-primary shrink-0" style="font-size:18px;">lock</span>
+          <div>
+            <p class="text-[13px] font-bold text-on-primary-fixed-variant" id="submittedBannerTitle">Submitted</p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5">Read-only. A submitted checkpoint cannot be edited.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Checkpoint sections render here -->
+      <div class="px-5 flex flex-col gap-4" id="sections"></div>
+
+    </div>
+  </main>
+
+  <!-- Lock Banner -->
+  <div class="lock-banner" data-lock-banner>
+    <div class="lock-banner-inner">
+      <span class="material-symbols-outlined text-error shrink-0">lock</span>
+      <span class="text-[12px] font-medium">Cannot submit until every required reading and photo is captured.</span>
+    </div>
+  </div>
+
+  <!-- Bottom Action -->
+  <div class="fixed bottom-16 left-0 right-0 px-5 pb-3 pt-2 bg-gradient-to-t from-background via-background/90 to-transparent z-50" id="submitBar">
+    <div class="flex items-center justify-between mb-2 px-1">
+      <span class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase">Evidence required</span>
+      <span class="text-[12px] font-bold text-on-surface-variant" id="evidenceCount">0 / 0 uploaded</span>
+    </div>
+    <button data-submit-btn id="labSubmit"
+      class="w-full bg-primary text-on-primary py-4 rounded-xl text-[18px] font-semibold shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
+      Submit for Approval
+      <span class="material-symbols-outlined">send</span>
+    </button>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="lab_dashboard.html" data-navlink="lab_dashboard.html">
+      <span class="material-symbols-outlined">home</span><span>Home</span>
+    </a>
+    <a href="records.html" data-navlink="records.html">
+      <span class="material-symbols-outlined">history</span><span>Records</span>
+    </a>
+    <a href="profile.html" data-navlink="profile.html">
+      <span class="material-symbols-outlined">person</span><span>Profile</span>
+    </a>
+  </nav>
+  <div style="height:64px"></div>
+
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+  <script src="lab_data.js"></script>
+  <script>
+    /**
+     * Lab entry for one batch-day.
+     *
+     * This script is deliberately SYNCHRONOUS and runs before DOMContentLoaded:
+     * app.js binds its input listeners, photo handlers, toggle handlers and
+     * pass/fail handlers on DOMContentLoaded, so the fields have to exist in the
+     * DOM by then. Rendering inside a DOMContentLoaded handler would produce a
+     * form that nothing is wired to and a submit button that never unlocks.
+     *
+     * Gating is app.js's, not a copy of it. Every reading is a real
+     * input[required]; every segmented choice writes to a hidden input[required];
+     * every photo is a .photo-upload-area[data-required]. checkFormValidity()
+     * already knows how to read all three.
+     */
+    (function () {
+      'use strict';
+      const L = window.LabData;
+      const params = new URLSearchParams(location.search);
+      const batchId = params.get('batch') || L.MASTER_BATCH.id;
+      const day = Number(params.get('day'));
+
+      const form = document.querySelector('[data-form]');
+      const host = document.getElementById('sections');
+
+      // ── Guard the URL, not just the tap ────────────────────────────────────
+      // The dashboard refuses to open a locked day. Typing the URL has to be
+      // refused for the same reason, or the progression rule is decorative.
+      const spec = L.DAY_FORMS[day];
+      if (!spec) { location.replace('lab_dashboard.html'); return; }
+      const status = L.getBatchStatus(batchId, day);
+      if (status === 'locked') { location.replace('lab_dashboard.html'); return; }
+
+      const record = L.getLabRecord(batchId, day);
+      const readOnly = status === 'submitted' || status === 'approved';
+
+      // ── Header ─────────────────────────────────────────────────────────────
+      const activity = L.ACTIVITY[day] || '';
+      const position = L.MASTER_BATCH.checkpointDays.indexOf(day) + 1;
+
+      document.getElementById('topbarTitle').textContent = `${batchId} · ${activity}`;
+      document.getElementById('stageIcon').textContent = spec.icon;
+      // Position in the sequence, not the day number — it orients the tech
+      // without exposing an internal ordering they have no use for.
+      document.getElementById('stagePosition').textContent =
+        `Checkpoint ${position} of ${L.MASTER_BATCH.checkpointDays.length}`;
+      document.getElementById('stageName').textContent = activity;
+      document.getElementById('stageDetail').textContent = spec.detail || '';
+
+      // ── Checkpoint dots ────────────────────────────────────────────────────
+      document.getElementById('dayDots').innerHTML = L.MASTER_BATCH.checkpointDays.map(d => {
+        const st = L.getBatchStatus(batchId, d);
+        const isNow = d === day;
+        // Numberless on purpose. The dot carries state, the label carries the
+        // activity — a day number here would be the one thing on screen the
+        // tech cannot act on.
+        let cls, inner;
+        if (isNow) {
+          cls = 'bg-primary text-on-primary';
+          inner = '<span class="material-symbols-outlined" style="font-size:14px;">edit_note</span>';
+        } else if (st === 'submitted' || st === 'approved') {
+          cls = 'bg-primary-fixed text-on-primary-fixed-variant';
+          inner = '<span class="material-symbols-outlined" style="font-size:14px;">check</span>';
+        } else {
+          cls = 'bg-surface-container-high text-outline';
+          inner = '<span class="material-symbols-outlined" style="font-size:13px;">lock</span>';
+        }
+        return `<div class="flex flex-col items-center gap-1 px-1">
+                  <div class="w-6 h-6 rounded-full ${cls} flex items-center justify-center">${inner}</div>
+                  <span class="text-[9px] font-bold ${isNow ? 'text-primary' : 'text-outline'}">${L.ACTIVITY_TINY[d] || ''}</span>
+                </div>`;
+      }).join('');
+
+      // ── Markup builders ────────────────────────────────────────────────────
+      const idFor = key => 'f_' + key.replace(/[^a-zA-Z0-9_]/g, '_');
+      const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+      function numberField(sectionKey, f, opts) {
+        const key = `${sectionKey}.${f.key}`;
+        const id = idFor(key);
+        const req = (opts && opts.optional) ? '' : 'required data-required';
+        return `
+          <div class="flex flex-col gap-1.5" data-field-wrap="${key}">
+            <label class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase" for="${id}">${esc(f.label)}</label>
+            <div class="flex items-center bg-surface-container rounded-lg px-3 py-3 shadow-inner gap-1">
+              <input id="${id}" name="${id}" data-key="${key}" type="number" step="${f.step || '0.1'}"
+                placeholder="${esc(f.placeholder || '0')}" ${req}
+                class="bg-transparent border-none outline-none w-full text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+              ${f.unit ? `<span class="text-[10px] text-outline shrink-0">${esc(f.unit)}</span>` : ''}
+            </div>
+          </div>`;
+      }
+
+      // A segmented choice is a hidden input[required] plus buttons. The hidden
+      // input is what app.js gates on; the buttons are the .pass-fail-group it
+      // already knows how to paint.
+      function segmentField(sectionKey, f) {
+        const key = `${sectionKey}.${f.key}`;
+        const id = idFor(key);
+        return `
+          <div class="flex flex-col gap-2" data-field-wrap="${key}">
+            <span class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase">${esc(f.label)}</span>
+            <input type="hidden" id="${id}" data-key="${key}" data-segment required data-required>
+            <div class="pass-fail-group flex gap-2" data-for="${id}">
+              ${f.options.map(o => `
+                <button type="button" data-value="${esc(o)}"
+                  class="flex-1 py-3 rounded-lg bg-surface-container text-on-surface-variant font-bold text-[13px] flex items-center justify-center text-center">
+                  ${esc(o)}
+                </button>`).join('')}
+            </div>
+            ${f.note ? `<p class="text-[11px] text-on-surface-variant">${esc(f.note)}</p>` : ''}
+          </div>`;
+      }
+
+      function photoField(sectionKey, p) {
+        const key = `${sectionKey}.${p.key}`;
+        return `
+          <div class="flex flex-col gap-2">
+            <span class="text-[11px] font-bold text-on-surface-variant uppercase">${esc(p.label)}</span>
+            <div class="photo-upload-area h-32" data-required data-key="${key}">
+              <span class="material-symbols-outlined text-primary" style="font-size:24px;">add_a_photo</span>
+              <span class="text-[10px] font-bold text-primary uppercase text-center px-2">${esc(p.label)}</span>
+              <input type="file" accept="image/*" capture="environment">
+            </div>
+          </div>`;
+      }
+
+      function observationBlock(sectionKey) {
+        return `
+          <div class="flex flex-col gap-4 border-t border-outline-variant/20 pt-4">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-tertiary" style="font-size:16px;">visibility</span>
+              <span class="text-[11px] font-bold tracking-widest text-tertiary uppercase">Common Observation</span>
+            </div>
+            ${L.OBSERVATION().map(f => segmentField(sectionKey, f)).join('')}
+          </div>`;
+      }
+
+      function revealBlock(sectionKey, r) {
+        const toggleKey = `${sectionKey}.${r.key}`;
+        return `
+          <div class="flex flex-col gap-4 border-t border-outline-variant/20 pt-4">
+            <div class="flex items-center justify-between bg-surface-container-low p-4 rounded-lg">
+              <div class="min-w-0 pr-3">
+                <p class="text-[14px] font-medium text-on-surface">${esc(r.label)}</p>
+                ${r.note ? `<p class="text-[12px] text-on-surface-variant">${esc(r.note)}</p>` : ''}
+              </div>
+              <button class="toggle-btn shrink-0" data-on="false" data-reveal="${toggleKey}" data-key="${toggleKey}">
+                <div class="toggle-knob"></div>
+              </button>
+            </div>
+            <div class="hidden flex-col gap-4" data-reveal-body="${toggleKey}">
+              ${r.fields.map(f => numberField(sectionKey, f)).join('')}
+            </div>
+          </div>`;
+      }
+
+      function sectionBody(s) {
+        const parts = [];
+        if (s.note) {
+          parts.push(`<p class="text-[12px] text-on-surface-variant bg-surface-container-low rounded-lg px-3 py-2">${esc(s.note)}</p>`);
+        }
+        if (s.fields && s.fields.length) {
+          parts.push(`<div class="grid grid-cols-2 gap-3">${s.fields.map(f => numberField(s.key, f)).join('')}</div>`);
+        }
+        if (s.extras && s.extras.length) {
+          parts.push(s.extras.map(f => segmentField(s.key, f)).join(''));
+        }
+        if (s.reveal) parts.push(revealBlock(s.key, s.reveal));
+        if (s.observation) parts.push(observationBlock(s.key));
+        if (s.photos && s.photos.length) {
+          parts.push(`<div class="grid grid-cols-2 gap-3 border-t border-outline-variant/20 pt-4">${s.photos.map(p => photoField(s.key, p)).join('')}</div>`);
+        }
+        return `<div class="flex flex-col gap-4">${parts.join('')}</div>`;
+      }
+
+      function renderSection(s) {
+        const head = `
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-primary" style="font-size:20px;">${s.icon || 'science'}</span>
+            </div>
+            <h3 class="text-[16px] font-semibold text-on-surface min-w-0">${esc(s.title)}</h3>
+          </div>`;
+
+        if (!s.collapsible) {
+          return `<div class="bg-surface-container-lowest rounded-xl p-5 shadow-md" data-section="${s.key}">
+                    <div class="flex items-center gap-2 mb-4">${head}
+                      <span class="material-symbols-outlined text-outline-variant shrink-0" style="font-size:20px;" data-section-tick>radio_button_unchecked</span>
+                    </div>
+                    ${sectionBody(s)}
+                  </div>`;
+        }
+        return `<details class="lab-sec bg-surface-container-lowest rounded-xl shadow-md" data-section="${s.key}" open>
+                  <summary class="p-5 flex items-center gap-2">${head}
+                    <span class="material-symbols-outlined text-outline-variant shrink-0" style="font-size:20px;" data-section-tick>radio_button_unchecked</span>
+                    <span class="material-symbols-outlined text-on-surface-variant shrink-0 lab-chev" style="font-size:20px;">expand_more</span>
+                  </summary>
+                  <div class="px-5 pb-5">${sectionBody(s)}</div>
+                </details>`;
+      }
+
+      host.innerHTML = spec.sections.map(renderSection).join('');
+
+      // ── Segmented choice wiring ────────────────────────────────────────────
+      // app.js's .pass-fail-group handler paints the selection. It does not know
+      // about the hidden input, so the value is written here. setTimeout(0)
+      // matches the pattern stage_0A uses, and keeps this after app.js's own
+      // handler for the same click.
+      host.querySelectorAll('.pass-fail-group[data-for]').forEach(group => {
+        const target = document.getElementById(group.getAttribute('data-for'));
+        group.querySelectorAll('button[data-value]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            setTimeout(() => {
+              target.value = btn.getAttribute('data-value');
+              target.dispatchEvent(new Event('input', { bubbles: true }));
+              paint();
+            }, 0);
+          });
+        });
+      });
+
+      // ── Reveal toggles ─────────────────────────────────────────────────────
+      // A hidden field must not be able to block the gate, so required is added
+      // and removed with the reveal rather than left on permanently.
+      function setRevealed(toggleKey, on) {
+        const body = host.querySelector(`[data-reveal-body="${toggleKey}"]`);
+        if (!body) return;
+        body.classList.toggle('hidden', !on);
+        body.classList.toggle('flex', on);
+        body.querySelectorAll('input[data-key]').forEach(i => {
+          if (on) { i.setAttribute('required', ''); i.setAttribute('data-required', ''); }
+          else { i.removeAttribute('required'); i.removeAttribute('data-required'); i.value = ''; }
+        });
+      }
+
+      host.querySelectorAll('.toggle-btn[data-reveal]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setTimeout(() => {
+            setRevealed(btn.getAttribute('data-reveal'), btn.getAttribute('data-on') === 'true');
+            if (typeof checkFormValidity === 'function') checkFormValidity();
+            paint();
+          }, 0);
+        });
+      });
+
+      // Start every reveal closed AND unrequired. The builder emits these fields
+      // with `required` like any other, so without this an invisible field would
+      // hold the submit button shut with nothing on screen to explain why.
+      host.querySelectorAll('.toggle-btn[data-reveal]').forEach(btn => {
+        setRevealed(btn.getAttribute('data-reveal'), false);
+      });
+
+      // ── Photo filenames ────────────────────────────────────────────────────
+      // Captured in the capture phase, because app.js's own change handler
+      // replaces the area's innerHTML and the file input with it.
+      document.addEventListener('change', e => {
+        const input = e.target;
+        if (!input.matches || !input.matches('.photo-upload-area input[type=file]')) return;
+        const area = input.closest('.photo-upload-area');
+        if (area && input.files && input.files[0]) area.setAttribute('data-filename', input.files[0].name);
+      }, true);
+
+      // ── Section ticks + evidence counter ───────────────────────────────────
+      function paint() {
+        host.querySelectorAll('[data-section]').forEach(sec => {
+          const tick = sec.querySelector('[data-section-tick]');
+          if (!tick) return;
+          const done = typeof window.sectionComplete === 'function' ? window.sectionComplete(sec) : false;
+          tick.textContent = done ? 'check_circle' : 'radio_button_unchecked';
+          tick.classList.toggle('text-primary', done);
+          tick.classList.toggle('text-outline-variant', !done);
+        });
+
+        const photos = Array.from(form.querySelectorAll('.photo-upload-area[data-required]'));
+        const got = photos.filter(p => p.getAttribute('data-photo') === 'true').length;
+        const el = document.getElementById('evidenceCount');
+        if (el) {
+          el.textContent = `${got} / ${photos.length} uploaded` + (photos.length && got === photos.length ? ' ✓' : '');
+          el.classList.toggle('text-primary', photos.length > 0 && got === photos.length);
+        }
+      }
+
+      // Delegated, and it re-runs the gate as well as the ticks. app.js binds its
+      // own listeners to input[required] once, at DOMContentLoaded — a field that
+      // only becomes required later (a reveal being switched on) is not in that
+      // set, so typing into it would otherwise never re-evaluate the gate.
+      function onEdit() {
+        if (typeof checkFormValidity === 'function') checkFormValidity();
+        paint();
+      }
+      form.addEventListener('input', onEdit);
+      form.addEventListener('change', onEdit);
+      // data-photo is set by app.js as an attribute, which fires no event.
+      const obs = new MutationObserver(paint);
+      host.querySelectorAll('.photo-upload-area').forEach(a =>
+        obs.observe(a, { attributes: true, attributeFilter: ['data-photo'] }));
+
+      // ── Submit ─────────────────────────────────────────────────────────────
+      function collect() {
+        const values = {}, photos = {};
+        form.querySelectorAll('input[data-key]').forEach(i => {
+          if (i.type === 'file') return;
+          if (i.value !== '') values[i.getAttribute('data-key')] = i.value;
+        });
+        form.querySelectorAll('.toggle-btn[data-key]').forEach(t => {
+          values[t.getAttribute('data-key')] = t.getAttribute('data-on') === 'true' ? 'Yes' : 'No';
+        });
+        form.querySelectorAll('.photo-upload-area[data-key]').forEach(a => {
+          if (a.getAttribute('data-photo') === 'true') {
+            photos[a.getAttribute('data-key')] = a.getAttribute('data-filename') || 'captured.jpg';
+          }
+        });
+        return { values, photos };
+      }
+
+      const submitBtn = document.getElementById('labSubmit');
+      submitBtn.addEventListener('click', () => {
+        // The button is disabled unless app.js's gate passed, so reaching here
+        // means the readings and the evidence are genuinely in.
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        L.saveLabRecord(batchId, day, collect());
+        toast(`${activity} submitted`, 'check_circle');
+        setTimeout(() => { location.href = 'lab_dashboard.html'; }, 1500);
+      });
+
+      // ── Read-only replay ───────────────────────────────────────────────────
+      // A submitted checkpoint is viewable but not editable. The same markup is
+      // reused and then frozen, so what the tech reviews is exactly the form
+      // they filled rather than a second rendering that could disagree with it.
+      function freeze() {
+        const v = (record && record.values) || {};
+        const p = (record && record.photos) || {};
+
+        // Reveal toggles first: their fields must exist before values land.
+        host.querySelectorAll('.toggle-btn[data-reveal]').forEach(btn => {
+          const key = btn.getAttribute('data-reveal');
+          if (v[key] === 'Yes') {
+            btn.setAttribute('data-on', 'true');
+            btn.classList.add('bg-primary');
+            const knob = btn.querySelector('.toggle-knob');
+            if (knob) knob.style.transform = 'translateX(24px)';
+            setRevealed(key, true);
+          }
+        });
+
+        form.querySelectorAll('input[data-key]').forEach(i => {
+          const key = i.getAttribute('data-key');
+          if (v[key] != null) i.value = v[key];
+          i.readOnly = true;
+          i.removeAttribute('required');
+        });
+
+        // Segmented choices: paint the stored option as selected.
+        host.querySelectorAll('.pass-fail-group[data-for]').forEach(group => {
+          const target = document.getElementById(group.getAttribute('data-for'));
+          const chosen = target && target.value;
+          group.querySelectorAll('button[data-value]').forEach(btn => {
+            if (btn.getAttribute('data-value') === chosen) {
+              btn.classList.add('bg-primary', 'text-on-primary');
+              btn.classList.remove('bg-surface-container', 'text-on-surface-variant');
+            }
+          });
+        });
+
+        host.querySelectorAll('.photo-upload-area[data-key]').forEach(area => {
+          const name = p[area.getAttribute('data-key')];
+          area.removeAttribute('data-required');
+          if (!name) return;
+          area.setAttribute('data-photo', 'true');
+          area.innerHTML =
+            '<span class="material-symbols-outlined text-primary" style="font-size:32px;">check_circle</span>' +
+            '<span class="text-[12px] font-medium text-on-surface mt-1">Photo Captured</span>' +
+            `<span class="text-[11px] text-outline">${esc(name)}</span>`;
+        });
+
+        document.body.classList.add('lab-readonly');
+        document.getElementById('submitBar').classList.add('hidden');
+        const banner = document.querySelector('[data-lock-banner]');
+        if (banner) banner.style.display = 'none';
+
+        const box = document.getElementById('submittedBanner');
+        box.classList.remove('hidden');
+        const when = record && record.at
+          ? new Date(record.at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+          : '';
+        document.getElementById('submittedBannerTitle').textContent =
+          `Submitted by ${(record && record.by) || 'Unknown'}${when ? ' · ' + when : ''}`;
+      }
+
+      if (readOnly) freeze();
+
+      // First paint. app.js runs its own checkFormValidity on DOMContentLoaded,
+      // which is what actually unlocks the button.
+      document.addEventListener('DOMContentLoaded', paint);
+      paint();
+    })();
+  </script>
+</body>
+</html>

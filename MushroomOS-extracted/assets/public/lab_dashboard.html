@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Lab Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+  <script>Auth.requireAuth() && Auth.requireRole('lab', 'admin');</script>
+  <style>
+    /* The vertical rail behind the checkpoint list. A 1px column that stops at
+       the last row, so the timeline does not trail off past the final day. */
+    .lab-rail { width: 1px; flex: 1; background: #bfd0c4; margin: 4px 0; }
+    .lab-chips { scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-background font-sans text-on-background flex flex-col min-h-screen">
+
+  <!-- Top Bar -->
+  <header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe">
+    <div class="h-16 px-5 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+          <span class="material-symbols-outlined text-on-primary" style="font-size:18px;">biotech</span>
+        </div>
+        <span class="text-[18px] font-semibold text-primary">Lab Dashboard</span>
+      </div>
+      <a href="profile.html" class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-md no-underline">
+        <span class="material-symbols-outlined text-on-primary" style="font-size:18px;">person</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-1 pt-16 pb-20 bg-background px-5 page-in">
+    <div class="flex flex-col gap-5 max-w-lg mx-auto">
+
+      <!-- Greeting -->
+      <section class="flex items-start justify-between pt-2">
+        <div>
+          <span class="label-caps text-on-surface-variant">Quality Control</span>
+          <h1 class="text-[24px] font-bold text-on-surface leading-tight">Hello, <span data-user="name">Priya</span></h1>
+          <p class="text-[13px] font-medium text-on-surface-variant mt-0.5" data-user="role-label">Lab Technician</p>
+        </div>
+        <div class="flex items-center gap-1.5 bg-primary-fixed text-on-primary-fixed-variant px-3 py-1 rounded-full text-[11px] font-bold shadow-sm shrink-0 mt-1">
+          <span class="material-symbols-outlined" style="font-size:14px;">science</span> LAB
+        </div>
+      </section>
+
+      <!-- Summary chips -->
+      <section class="lab-chips overflow-x-auto -mr-4">
+        <div class="flex gap-2 min-w-max pr-4" id="labChips"></div>
+      </section>
+
+      <!-- Master batch + checkpoint timeline -->
+      <section class="mos-card p-5">
+        <div class="mb-4">
+          <span class="label-caps text-on-surface-variant">Master batch</span>
+          <p class="text-[18px] font-bold text-on-surface truncate" id="batchId">—</p>
+          <p class="text-[12px] text-on-surface-variant" id="batchMeta">—</p>
+          <!-- Which activity is open, named. This was a narrow pill reading
+               "Day 4"; an activity name does not fit in a pill, and the day
+               number meant nothing to the tech anyway. -->
+          <div class="mt-3 flex items-center gap-2 bg-primary text-on-primary px-3 py-2 rounded-lg shadow-sm">
+            <span class="material-symbols-outlined shrink-0" style="font-size:16px;" id="openNowIcon">edit_note</span>
+            <span class="text-[13px] font-bold min-w-0 truncate" id="openNowText">—</span>
+          </div>
+        </div>
+        <div class="flex flex-col" id="checkpointList"></div>
+      </section>
+
+      <p class="text-[11px] text-outline text-center">
+        Tap the open checkpoint to record readings. Submitted days are read-only.
+      </p>
+    </div>
+  </main>
+
+  <!-- Bottom Nav — three tabs only. A lab tech has no workflow, admin or
+       approvals surface, and showing tabs that bounce them off with a denied
+       banner is worse than not showing them. -->
+  <nav class="bottom-nav">
+    <a href="lab_dashboard.html" data-navlink="lab_dashboard.html" class="active">
+      <span class="material-symbols-outlined">home</span><span>Home</span>
+    </a>
+    <a href="records.html" data-navlink="records.html">
+      <span class="material-symbols-outlined">history</span><span>Records</span>
+    </a>
+    <a href="profile.html" data-navlink="profile.html">
+      <span class="material-symbols-outlined">person</span><span>Profile</span>
+    </a>
+  </nav>
+  <div style="height:64px"></div>
+
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+  <script src="lab_data.js"></script>
+  <script>
+    // Everything on this screen is derived from the lab records in
+    // localStorage. No count and no status on this page is typed in.
+    (function () {
+      'use strict';
+      const L = window.LabData;
+      const batch = L.MASTER_BATCH;
+
+      const CHIP = {
+        pending:   { label: 'Pending Submissions', icon: 'edit_note',  cls: 'bg-error-container text-on-error-container' },
+        submitted: { label: 'Submitted',           icon: 'check_circle', cls: 'bg-primary-fixed text-on-primary-fixed-variant' },
+        locked:    { label: 'Locked',              icon: 'lock',       cls: 'bg-surface-container-high text-on-surface-variant' },
+      };
+
+      const STATUS_CHIP = {
+        pending:   { text: 'PENDING',   cls: 'bg-error-container text-on-error-container' },
+        submitted: { text: 'SUBMITTED', cls: 'bg-primary-fixed text-on-primary-fixed-variant' },
+        approved:  { text: 'APPROVED',  cls: 'bg-primary text-on-primary' },
+        locked:    { text: 'LOCKED',    cls: 'bg-surface-container-high text-outline' },
+      };
+
+      const RAIL_ICON = {
+        pending:   { icon: 'edit_note',    cls: 'bg-primary text-on-primary' },
+        submitted: { icon: 'check',        cls: 'bg-primary-fixed text-on-primary-fixed-variant' },
+        approved:  { icon: 'verified',     cls: 'bg-primary text-on-primary' },
+        locked:    { icon: 'lock',         cls: 'bg-surface-container-high text-outline' },
+      };
+
+      function paintHeader() {
+        const cur = L.currentDay(batch.id);
+        document.getElementById('batchId').textContent = batch.id;
+        document.getElementById('batchMeta').textContent =
+          `${batch.name} · started ${batch.startDate} · ${batch.checkpointDays.length} lab checkpoints`;
+        const icon = document.getElementById('openNowIcon');
+        const text = document.getElementById('openNowText');
+        if (cur === null) {
+          icon.textContent = 'check_circle';
+          text.textContent = 'All checkpoints submitted';
+        } else {
+          icon.textContent = 'edit_note';
+          text.textContent = 'Open now · ' + L.ACTIVITY[cur];
+        }
+      }
+
+      function paintChips() {
+        const s = L.summary(batch.id);
+        const counts = { pending: s.pending, submitted: s.submitted + s.approved, locked: s.locked };
+        document.getElementById('labChips').innerHTML = Object.keys(CHIP).map(k => {
+          const c = CHIP[k];
+          return `<div class="shrink-0 flex items-center gap-2 ${c.cls} px-3 py-2 rounded-full whitespace-nowrap">
+                    <span class="material-symbols-outlined" style="font-size:16px;">${c.icon}</span>
+                    <span class="text-[12px] font-bold">${counts[k]}</span>
+                    <span class="text-[11px] font-medium">${c.label}</span>
+                  </div>`;
+        }).join('');
+      }
+
+      function paintList() {
+        const list = document.getElementById('checkpointList');
+        const days = batch.checkpointDays;
+
+        list.innerHTML = days.map((day, i) => {
+          const status = L.getBatchStatus(batch.id, day);
+          const rail = RAIL_ICON[status];
+          const chip = STATUS_CHIP[status];
+          const rec = L.getLabRecord(batch.id, day);
+          const last = i === days.length - 1;
+          const openable = status !== 'locked';
+
+          const when = rec && rec.at
+            ? new Date(rec.at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+            : '';
+
+          return `
+            <div class="flex gap-3" data-day="${day}" data-status="${status}">
+              <div class="flex flex-col items-center shrink-0">
+                <div class="w-8 h-8 rounded-full ${rail.cls} flex items-center justify-center">
+                  <span class="material-symbols-outlined" style="font-size:17px;">${rail.icon}</span>
+                </div>
+                ${last ? '' : '<div class="lab-rail"></div>'}
+              </div>
+              <div class="flex-1 ${last ? '' : 'mb-3'} min-w-0">
+                <div class="mos-card px-4 py-3 flex items-center gap-3 ${openable ? 'tappable' : 'opacity-60'}"
+                     data-open="${openable ? day : ''}">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <p class="text-[14px] font-bold text-on-surface min-w-0 truncate">${L.ACTIVITY[day] || ''}</p>
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${chip.cls} shrink-0">${chip.text}</span>
+                    </div>
+                    <p class="text-[12px] text-on-surface-variant truncate mt-0.5">${(L.DAY_FORMS[day] && L.DAY_FORMS[day].detail) || ''}</p>
+                    ${when ? `<p class="text-[11px] text-outline mt-1">${rec.by || ''} · ${when}</p>` : ''}
+                  </div>
+                  <span class="material-symbols-outlined ${openable ? 'text-primary' : 'text-outline-variant'} shrink-0"
+                        style="font-size:20px;">${openable ? 'chevron_right' : 'lock'}</span>
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+      }
+
+      // One delegated handler. A locked day explains what is blocking it rather
+      // than doing nothing, which reads as a broken tap on a touch screen.
+      document.addEventListener('click', e => {
+        const row = e.target.closest('[data-day]');
+        if (!row) return;
+        const day = Number(row.getAttribute('data-day'));
+        const status = row.getAttribute('data-status');
+        if (status === 'locked') {
+          const prev = L.prevCheckpoint(day);
+          toast(prev === null ? 'Not open yet' : `Complete ${L.ACTIVITY[prev]} first`, 'lock');
+          return;
+        }
+        location.href = `lab_batch.html?batch=${encodeURIComponent(batch.id)}&day=${day}`;
+      });
+
+      paintHeader();
+      paintChips();
+      paintList();
+    })();
+  </script>
+</body>
+</html>

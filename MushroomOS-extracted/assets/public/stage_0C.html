@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Stage 0C</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+  <script>Auth.requireAuth();</script>
+</head>
+<body class="bg-background font-sans text-on-background min-h-screen">
+
+  <div class="stage-topbar">
+    <a href="stage_0B.html" class="flex items-center gap-1 text-on-surface-variant text-[12px] font-bold no-underline">
+      <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span> Back
+    </a>
+    <span class="text-[12px] font-bold text-on-surface text-center flex-1 truncate px-2">0C · Unloading &amp; Re-Loading</span>
+    <a data-topbar-next href="stage_0D.html" class="flex items-center gap-1 bg-primary text-on-primary text-[12px] font-bold px-3 py-2 rounded-full no-underline shrink-0">
+      Next <span class="material-symbols-outlined" style="font-size:15px;">arrow_forward</span>
+    </a>
+  </div>
+
+  <main class="pt-14 pb-28 min-h-screen" data-form>
+    <div class="max-w-lg mx-auto">
+
+      <!-- Header -->
+      <div class="px-5 py-4 bg-gradient-to-b from-surface-container-low to-background">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold text-primary tracking-widest uppercase">Stage 3 of 17</span>
+          <span class="text-[11px] font-bold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">Batch #FB-202507</span>
+        </div>
+        <h2 class="text-[20px] font-bold text-on-surface">Unloading &amp; Re-Loading</h2>
+      </div>
+
+      <!-- Step Tracker -->
+      <div class="px-5 py-3">
+        <div class="flex items-center justify-between relative">
+          <div class="absolute top-4 left-8 right-8 h-0.5 bg-outline-variant"></div>
+          <div class="flex flex-col items-center gap-1 z-10 flex-1" data-step-indicator="1">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-bold bg-primary text-on-primary ring-4 ring-primary/10">1</div>
+            <span class="text-[11px] font-bold text-primary">Moisture</span>
+          </div>
+          <div class="flex flex-col items-center gap-1 z-10 flex-1" data-step-indicator="2">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-bold bg-surface-container-high text-on-surface-variant">2</div>
+            <span class="text-[11px] font-bold text-on-surface-variant">Unload</span>
+          </div>
+          <div class="flex flex-col items-center gap-1 z-10 flex-1" data-step-indicator="3">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-bold bg-surface-container-high text-on-surface-variant">3</div>
+            <span class="text-[11px] font-bold text-on-surface-variant">Reload</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 flex flex-col gap-4 pb-4">
+        <!-- Step 1: Moisture Check -->
+        <div class="bg-surface-container-lowest p-4 rounded-xl shadow-md flex flex-col gap-4" data-step="1">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">water_drop</span>
+            <h3 class="text-[18px] font-semibold text-on-surface">Step 1: Moisture Check</h3>
+          </div>
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-on-surface-variant uppercase">Current Temperature (°C)</label>
+              <div class="flex items-center bg-surface-container-low rounded-lg px-4 py-3 shadow-inner gap-2">
+                <input id="tempInput" type="number" min="45" max="58" placeholder="45–58" required
+                  class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+                <span class="text-[12px] text-on-surface-variant">°C</span>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-on-surface-variant uppercase">Moisture Content (%)</label>
+              <div class="flex items-center bg-surface-container-low rounded-lg px-4 py-3 shadow-inner gap-2">
+                <input id="moistureInput" type="number" min="0" max="100" placeholder="Enter %" required
+                  class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+                <span class="text-[12px] text-on-surface-variant">%</span>
+              </div>
+            </div>
+            <!-- Dynamic condition result -->
+            <div id="conditionResult" class="p-4 rounded-lg bg-surface-container flex items-center justify-between transition-all">
+              <span class="text-[14px] font-medium text-on-surface-variant">Condition Result</span>
+              <div id="statusPill" class="px-3 py-1 rounded-full text-[11px] font-bold bg-outline-variant text-on-surface-variant">Awaiting Input</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Unload & Flip -->
+        <div class="bg-surface-container-low/50 rounded-xl shadow-sm" data-step="2">
+          <div class="p-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">conveyor_belt</span>
+              <h3 class="text-[18px] font-semibold text-on-surface">Step 2: Unload &amp; Flip</h3>
+            </div>
+            <span class="material-symbols-outlined text-outline" data-step-lock>lock</span>
+          </div>
+          <div class="px-4 pb-4 flex flex-col gap-3">
+            <div class="check-item" data-required><span class="text-[14px]">Loader Unloading Confirmed</span><div class="check-box"></div></div>
+            <div class="check-item" data-required><span class="text-[14px]">Flipping Cycle Complete</span><div class="check-box"></div></div>
+            <div class="photo-upload-area" data-required>
+              <span class="material-symbols-outlined text-outline" style="font-size:28px;">add_a_photo</span>
+              <span class="text-[11px] font-bold text-on-surface-variant uppercase text-center">Mandatory: Unloading Photo</span>
+              <input type="file" accept="image/*" capture="environment">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Reload -->
+        <div class="bg-surface-container-low/50 rounded-xl shadow-sm" data-step="3">
+          <div class="p-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">vertical_align_bottom</span>
+              <h3 class="text-[18px] font-semibold text-on-surface">Step 3: Reload</h3>
+            </div>
+            <span class="material-symbols-outlined text-outline" data-step-lock>lock</span>
+          </div>
+          <div class="px-4 pb-4 flex flex-col gap-3">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[11px] font-bold text-on-surface-variant uppercase" for="fillHeight">Fill Height (2.2–2.4m)</label>
+              <div class="flex items-center bg-surface-container-low rounded-lg px-4 py-3 shadow-inner gap-2">
+                <input id="fillHeight" type="number" step="0.01" min="2.2" max="2.4" placeholder="2.2–2.4" required
+                  class="bg-transparent border-none outline-none flex-1 text-[16px] font-bold text-on-surface placeholder:text-outline-variant">
+                <span class="text-[12px] text-on-surface-variant">m</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Key Reminders -->
+        <div class="bg-primary/10 p-4 rounded-xl flex gap-3">
+          <span class="material-symbols-outlined text-primary">info</span>
+          <div>
+            <p class="text-[14px] font-semibold text-primary mb-1">Key Reminders</p>
+            <ul class="text-[12px] text-on-surface-variant flex flex-col gap-1">
+              <li>• Mist only applies if moisture &lt;67%</li>
+              <li>• No water allowed at reload stage</li>
+              <li>• Fill height must be 2.2–2.4m</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="lock-banner" data-lock-banner>
+    <div class="lock-banner-inner">
+      <span class="material-symbols-outlined text-error shrink-0">error</span>
+      <span class="text-[12px] font-medium">Temperature and moisture readings are required.</span>
+    </div>
+  </div>
+
+  <div class="fixed bottom-16 left-0 right-0 px-5 pb-3 z-50 bg-gradient-to-t from-background via-background/90 to-transparent pt-2">
+    <button data-submit-btn data-next-stage="stage_0D.html"
+      class="w-full bg-primary text-on-primary py-4 rounded-xl text-[18px] font-semibold shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed no-underline">
+      Complete Stage 0C <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="home.html"><span class="material-symbols-outlined">home</span><span>Home</span></a>
+    <a href="workflow.html" class="active"><span class="material-symbols-outlined">account_tree</span><span>Workflow</span></a>
+    <a href="records.html"><span class="material-symbols-outlined">history</span><span>Records</span></a>
+    <a href="admin_dashboard.html" data-admin-only><span class="material-symbols-outlined">monitoring</span><span>Admin</span></a>
+    <a href="approvals.html"><span class="material-symbols-outlined">fact_check</span><span>Approvals</span></a>
+    <a href="profile.html"><span class="material-symbols-outlined">person</span><span>Profile</span></a>
+  </nav>
+  <div style="height:64px"></div>
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+  <script>
+    const moisture = document.getElementById('moistureInput');
+    const pill = document.getElementById('statusPill');
+    const result = document.getElementById('conditionResult');
+    const btn = document.querySelector('[data-submit-btn]');
+    const banner = document.querySelector('[data-lock-banner]');
+    function check() {
+      const v = parseFloat(moisture.value);
+      if (isNaN(v)) {
+        pill.textContent = 'Awaiting Input';
+        pill.className = 'px-3 py-1 rounded-full text-[11px] font-bold bg-outline-variant text-on-surface-variant';
+        result.className = 'p-4 rounded-lg bg-surface-container flex items-center justify-between transition-all';
+      } else if (v >= 68) {
+        pill.textContent = 'Proceed';
+        pill.className = 'px-3 py-1 rounded-full text-[11px] font-bold bg-primary text-on-primary';
+        result.className = 'p-4 rounded-lg bg-primary/10 flex items-center justify-between transition-all ring-1 ring-primary/20';
+      } else if (v < 67) {
+        pill.textContent = 'Controlled Mist';
+        pill.className = 'px-3 py-1 rounded-full text-[11px] font-bold bg-tertiary text-on-tertiary';
+        result.className = 'p-4 rounded-lg bg-tertiary-fixed/20 flex items-center justify-between transition-all ring-1 ring-tertiary/20';
+      } else {
+        pill.textContent = 'Stabilizing…';
+        pill.className = 'px-3 py-1 rounded-full text-[11px] font-bold bg-secondary text-on-secondary';
+      }
+      const temp = document.getElementById('tempInput');
+      const valid = temp && temp.value && moisture.value;
+      btn.classList.toggle('opacity-50', !valid);
+      btn.classList.toggle('cursor-not-allowed', !valid);
+      banner.style.display = valid ? 'none' : 'flex';
+    }
+    moisture.addEventListener('input', check);
+    document.getElementById('tempInput').addEventListener('input', check);
+  </script>
+</body>
+</html>

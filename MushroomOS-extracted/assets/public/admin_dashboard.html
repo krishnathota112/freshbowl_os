@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2316794a' fill-rule='evenodd' d='M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z'/%3E%3Cpath fill='%2316794a' d='M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mushroom OS – Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="shared.css" rel="stylesheet">
+  <link href="tailwind.local.css" rel="stylesheet">
+  <script src="auth.js"></script>
+  <script>Auth.requireAuth() && Auth.requireRole('admin');</script>
+</head>
+<body class="bg-background font-sans text-on-background flex flex-col min-h-screen">
+
+  <!-- Live Alert Banner (simulated push) -->
+  <div id="alertBanner" class="hidden fixed top-0 left-0 right-0 z-[9997] pt-safe px-3 pointer-events-none">
+    <div class="mt-16 bg-error text-white rounded-xl px-3.5 py-3 shadow-[0_6px_20px_rgba(186,26,26,0.35)] flex items-start gap-2.5 banner-in pointer-events-auto md:max-w-2xl md:mx-auto">
+      <span class="material-symbols-outlined" style="font-size:20px;">warning</span>
+      <div class="flex-1">
+        <p class="text-[12px] font-bold">Moisture out of range — Stage 0C</p>
+        <p class="text-[11px] opacity-90 mt-0.5">Reading 71.4% (target 68–69%) · Operator Ramesh · Bunker 2</p>
+      </div>
+      <button id="alertBannerClose" class="text-white">
+        <span class="material-symbols-outlined" style="font-size:18px;">close</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Top Bar -->
+  <header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe">
+    <div class="h-16 px-5 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center"><svg viewBox="0 0 32 32" class="w-[18px] h-[18px] text-on-primary" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M16 3C9.4 3 4 8.2 4 14.6c0 1.3 1.1 2.4 2.4 2.4h19.2c1.3 0 2.4-1.1 2.4-2.4C28 8.2 22.6 3 16 3ZM8.2 9.6a2 2 0 1 0 4 0a2 2 0 1 0-4 0ZM17.05 7.6a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0-2.7 0ZM21 12.2a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0ZM13.15 13.4a1.05 1.05 0 1 0 2.1 0a1.05 1.05 0 1 0-2.1 0Z"/><path d="M12.9 19.1h6.2l-.7 7.3a2.5 2.5 0 0 1-5 0l-.5-7.3Z"/></svg></div>
+        <span class="text-[18px] font-semibold text-primary">Admin Dashboard</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="notifications.html" class="relative w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors no-underline">
+          <span class="material-symbols-outlined">notifications</span>
+          <span class="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center">2</span>
+        </a>
+        <a href="profile.html" class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-md">
+          <span class="material-symbols-outlined text-on-primary" style="font-size:18px;">person</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 pt-16 pb-20 px-5 page-in md:pb-10 md:px-8">
+    <!-- Mobile (<768px): single stacked column, unchanged.
+         Desktop (>=768px): 3-column dashboard grid. Sections are placed
+         explicitly by row/column so the DOM order - and therefore the mobile
+         layout - stays exactly as it was. -->
+    <div class="flex flex-col gap-5 max-w-lg mx-auto md:max-w-6xl md:grid md:grid-cols-3 md:gap-6 md:items-start">
+
+      <!-- Greeting -->
+      <section class="flex items-center justify-between pt-2 md:col-span-3">
+        <div>
+          <h1 class="text-[24px] font-bold text-on-surface">Live Operations</h1>
+          <p class="text-[12px] text-on-surface-variant mt-0.5">6 active batches · 4 operators on shift</p>
+        </div>
+        <div class="flex items-center gap-1.5 bg-green-100 text-green-700 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm">
+          <span class="w-[7px] h-[7px] rounded-full bg-green-700 pulse-dot"></span> LIVE
+        </div>
+      </section>
+
+      <!-- KPI Row -->
+      <section class="grid grid-cols-3 gap-3 md:col-span-2 md:col-start-1 md:row-start-2 md:gap-6">
+        <div class="bg-surface-container-lowest p-3 rounded-xl shadow-md md:p-5">
+          <p class="text-[16px] font-bold text-on-surface md:text-[32px]">17</p>
+          <p class="text-[11px] text-on-surface-variant md:text-[13px]">Stages Today</p>
+        </div>
+        <div class="bg-surface-container-lowest p-3 rounded-xl shadow-md md:p-5">
+          <p class="text-[16px] font-bold text-error md:text-[32px]">2</p>
+          <p class="text-[11px] text-on-surface-variant md:text-[13px]">Open Alerts</p>
+        </div>
+        <div class="bg-surface-container-lowest p-3 rounded-xl shadow-md md:p-5">
+          <p class="text-[16px] font-bold text-green-700 md:text-[32px]">92%</p>
+          <p class="text-[11px] text-on-surface-variant md:text-[13px]">SOP Compliance</p>
+        </div>
+      </section>
+
+      <!-- Active batch progress - 17-stage track per batch, rendered from
+           DASH_DATA at the bottom of this file. -->
+      <section class="flex flex-col gap-3 md:col-span-2 md:col-start-1 md:row-start-3">
+        <span class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase px-1">Active Batch Progress</span>
+        <div id="batchTracks" class="flex flex-col gap-3"></div>
+      </section>
+
+      <!-- Right-hand sidebar on desktop: alerts feed, then analytics beneath
+           it. On mobile these simply stack in the same order. -->
+      <div class="flex flex-col gap-5 md:col-start-3 md:row-start-2 md:row-span-4">
+
+      <!-- Alerts Feed -->
+      <section class="flex flex-col gap-2">
+        <span class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase px-1">Alerts Feed</span>
+
+        <div class="alert-card bg-surface-container-lowest rounded-xl p-3 flex items-start gap-3 shadow-md border-l-[3px] border-error">
+          <span class="material-symbols-outlined text-error" style="font-size:20px;">warning</span>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Moisture 71.4% — Stage 0C, Bunker 2</p>
+            <p class="text-[12px] text-on-surface-variant">Ramesh · 2 min ago · Above 68–69% target</p>
+          </div>
+          <button class="ack-btn text-[11px] font-bold text-primary bg-primary/10 px-2 py-1 rounded">ACK</button>
+        </div>
+
+        <div class="alert-card bg-surface-container-lowest rounded-xl p-3 flex items-start gap-3 shadow-md border-l-[3px] border-tertiary-container">
+          <span class="material-symbols-outlined text-tertiary-container" style="font-size:20px;">schedule</span>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Heap rest overdue — Stage 0A</p>
+            <p class="text-[12px] text-on-surface-variant">Suresh · 14 min ago · 12hr rest window exceeded</p>
+          </div>
+          <button class="ack-btn text-[11px] font-bold text-primary bg-primary/10 px-2 py-1 rounded">ACK</button>
+        </div>
+
+        <div class="alert-card bg-surface-container-lowest rounded-xl p-3 flex items-start gap-3 shadow-md border-l-[3px] border-outline-variant opacity-70">
+          <span class="material-symbols-outlined text-outline" style="font-size:20px;">check_circle</span>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Stage 0B approved</p>
+            <p class="text-[12px] text-on-surface-variant">Admin · 41 min ago · Resolved</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analytics - every figure here is derived from the mock data already
+           shown on this page (see DASH_DATA), not from a separate dataset. -->
+      <section class="flex flex-col gap-2">
+        <span class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase px-1">Analytics</span>
+        <div class="bg-surface-container-lowest rounded-xl p-4 shadow-md flex flex-col gap-4">
+
+          <div>
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="text-[12px] font-bold text-on-surface">Batches by Phase</p>
+              <p class="text-[11px] text-on-surface-variant">6 active</p>
+            </div>
+            <div id="phaseBars" class="flex flex-col gap-2"></div>
+          </div>
+
+          <div class="border-t border-outline-variant/30 pt-3">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="text-[12px] font-bold text-on-surface">Schedule Health</p>
+              <p id="schedulePct" class="text-[11px] font-bold text-green-700"></p>
+            </div>
+            <div id="scheduleSplit" class="flex h-2.5 w-full rounded-full overflow-hidden bg-surface-container"></div>
+            <div id="scheduleLegend" class="flex items-center gap-4 mt-2"></div>
+          </div>
+
+          <div class="border-t border-outline-variant/30 pt-3">
+            <div class="flex items-baseline justify-between mb-2">
+              <p class="text-[12px] font-bold text-on-surface">Alerts · Last 60 min</p>
+              <p id="alertTotal" class="text-[11px] text-on-surface-variant"></p>
+            </div>
+            <div id="alertBars" class="flex items-end justify-between gap-2 h-16"></div>
+          </div>
+
+        </div>
+      </section>
+
+      </div><!-- /sidebar -->
+
+      <!-- Workers on Shift -->
+      <section class="flex flex-col gap-3 md:col-span-2 md:col-start-1 md:row-start-4">
+        <span class="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase px-1">Workers On Shift</span>
+
+        <div class="flex flex-col gap-3 md:grid md:grid-cols-2 md:gap-4">
+        <div class="bg-surface-container-lowest rounded-xl p-3 flex items-center gap-3 shadow-md">
+          <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-[14px] font-bold text-on-secondary-container">R</div>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Ramesh</p>
+            <p class="text-[12px] text-on-surface-variant">Stage 0C · Bunker 2</p>
+          </div>
+          <span class="bg-error-container text-on-error-container text-[10px] font-bold px-2 py-1 rounded-full">ALERT</span>
+        </div>
+
+        <div class="bg-surface-container-lowest rounded-xl p-3 flex items-center gap-3 shadow-md">
+          <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-[14px] font-bold text-on-secondary-container">S</div>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Suresh</p>
+            <p class="text-[12px] text-on-surface-variant">Stage 0A · Heap Rest</p>
+          </div>
+          <span class="bg-tertiary-fixed text-on-tertiary-fixed-variant text-[10px] font-bold px-2 py-1 rounded-full">DUE</span>
+        </div>
+
+        <div class="bg-surface-container-lowest rounded-xl p-3 flex items-center gap-3 shadow-md">
+          <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-[14px] font-bold text-on-secondary-container">M</div>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Mahesh</p>
+            <p class="text-[12px] text-on-surface-variant">Phase 2C · Tunnel Process</p>
+          </div>
+          <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">ON TRACK</span>
+        </div>
+
+        <div class="bg-surface-container-lowest rounded-xl p-3 flex items-center gap-3 shadow-md">
+          <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-[14px] font-bold text-on-secondary-container">P</div>
+          <div class="flex-1">
+            <p class="text-[14px] font-bold text-on-surface">Prasad</p>
+            <p class="text-[12px] text-on-surface-variant">Stage 1A · Dry Mix</p>
+          </div>
+          <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">ON TRACK</span>
+        </div>
+        </div>
+      </section>
+
+      <!-- Quick Links -->
+      <section class="grid grid-cols-2 gap-4 md:grid-cols-3 md:col-span-2 md:col-start-1 md:row-start-5">
+        <a href="approvals.html" class="bg-surface-container-lowest p-4 rounded-xl shadow-md flex items-center gap-3 no-underline tappable">
+          <div class="w-10 h-10 rounded-full bg-tertiary-container/20 flex items-center justify-center text-tertiary">
+            <span class="material-symbols-outlined">fact_check</span>
+          </div>
+          <div>
+            <p class="text-[16px] font-bold text-on-surface">Approvals</p>
+            <p class="text-[12px] text-on-surface-variant">3 pending</p>
+          </div>
+        </a>
+        <a href="records.html" class="bg-surface-container-lowest p-4 rounded-xl shadow-md flex items-center gap-3 no-underline tappable">
+          <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined">history</span>
+          </div>
+          <div>
+            <p class="text-[16px] font-bold text-on-surface">Records</p>
+            <p class="text-[12px] text-on-surface-variant">View logs</p>
+          </div>
+        </a>
+        <a href="users.html" class="bg-surface-container-lowest p-4 rounded-xl shadow-md flex items-center gap-3 no-underline tappable">
+          <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+            <span class="material-symbols-outlined">group</span>
+          </div>
+          <div>
+            <p class="text-[16px] font-bold text-on-surface">Users</p>
+            <p class="text-[12px] text-on-surface-variant">6 personnel</p>
+          </div>
+        </a>
+      </section>
+    </div>
+  </main>
+
+  <!-- Bottom Nav - mobile only; desktop viewers land here directly and don't
+       navigate the worker stage screens. -->
+  <nav class="bottom-nav md:hidden">
+    <a href="home.html" data-navlink="home.html">
+      <span class="material-symbols-outlined">home</span><span>Home</span>
+    </a>
+    <a href="workflow.html" data-navlink="workflow.html">
+      <span class="material-symbols-outlined">account_tree</span><span>Workflow</span>
+    </a>
+    <a href="records.html" data-navlink="records.html">
+      <span class="material-symbols-outlined">history</span><span>Records</span>
+    </a>
+    <a href="admin_dashboard.html" data-admin-only data-navlink="admin_dashboard.html" class="active">
+      <span class="material-symbols-outlined">monitoring</span><span>Admin</span>
+    </a>
+    <a href="approvals.html" data-navlink="approvals.html">
+      <span class="material-symbols-outlined">fact_check</span><span>Approvals</span>
+    </a>
+    <a href="profile.html" data-navlink="profile.html">
+      <span class="material-symbols-outlined">person</span><span>Profile</span>
+    </a>
+  </nav>
+  <div class="h-16 md:hidden"></div>
+  <script src="app.js"></script>
+  <script src="demo.js"></script>
+  <script>
+    /* ─────────────────────────────────────────────────────────────────────
+       MOCK DATA - single source for the batch tracks and the analytics
+       panel. Every number below is derived from figures already displayed
+       elsewhere on this page or in workflow.html; nothing here is random.
+       Swap this object for Firestore data later; the render code is generic.
+       ───────────────────────────────────────────────────────────────────── */
+    const DASH_DATA = {
+      // 17 SOP stages. "P" prefix marks the Phase-x screens, so Stage 1A and
+      // Phase 1A stay distinguishable in the compact track.
+      stages: [
+        { code: '0A',    name: 'Bagasse Pre-Wet & Rest' },
+        { code: '0B',    name: '1st Bunker Filling & Conditioning' },
+        { code: '0C',    name: 'Unloading & Re-Loading' },
+        { code: '0D',    name: '2nd Bunker Re-Filling & Conditioning' },
+        { code: '1A',    name: 'Chicken Manure + Minerals Dry Mix' },
+        { code: '1B',    name: 'Conditioned Bagasse + Dry Nitrogen Mix' },
+        { code: '1C-A',  name: 'Paddy Preparation' },
+        { code: '1C-B',  name: 'Paddy + Bagasse + Mineral Mixing' },
+        { code: 'P1A',   name: 'Phase 1A · T0 & T1 Continuous' },
+        { code: 'P1B',   name: 'Phase 1B · T2 (24 Hrs After T0)' },
+        { code: 'P1C',   name: 'Phase 1C · Bunker Filling 1' },
+        { code: 'P1D-A', name: 'Phase 1D-A · Unload & Reload 1' },
+        { code: 'P1D-B', name: 'Phase 1D-B · Unload & Reload 2' },
+        { code: 'P2A',   name: 'Phase 2A · Tunnel Preparation' },
+        { code: 'P2B',   name: 'Phase 2B · Tunnel Filling' },
+        { code: 'P2C',   name: 'Phase 2C · Tunnel Process' },
+        { code: 'P2D',   name: 'Phase 2D · Tunnel Unloading' },
+      ],
+      // Phase groupings follow the SOP: 0A-0D, then 1A-P1D-B, then P2A-P2D.
+      phases: [
+        { label: 'Phase 0', from: 0,  to: 3  },
+        { label: 'Phase 1', from: 4,  to: 12 },
+        { label: 'Phase 2', from: 13, to: 16 },
+      ],
+      // The two batches shown in workflow.html, at their stated positions.
+      batches: [
+        { id: '#FB-202507-014', crop: 'Paddy Straw', stageLabel: 'Bunker Conditioning',  current: 5,  status: 'Running'    },
+        { id: '#FB-202507-012', crop: 'Wheat Straw', stageLabel: 'Pasteurization Loop',  current: 15, status: 'Finalizing' },
+      ],
+      // Sums to the "6 active batches" in the page header. Phase 0 = the two
+      // batches Ramesh (0C) and Suresh (0A) are on; Phase 2 = Wheat Straw,
+      // which is the batch Mahesh (Phase 2C) is on.
+      phaseCounts: [2, 3, 1],
+      // "Delayed" = batches carrying an open alert, which matches the
+      // "2 Open Alerts" KPI and the two unresolved rows in the alerts feed.
+      schedule: { onTrack: 4, delayed: 2 },
+      // The three rows in the alerts feed above (2 min, 14 min, 41 min ago),
+      // bucketed into quarter-hours. No extra alerts invented.
+      alertBuckets: [
+        { label: '0-15m', n: 2 }, { label: '15-30m', n: 0 },
+        { label: '30-45m', n: 1 }, { label: '45-60m', n: 0 },
+      ],
+    };
+
+    (function renderDashboard() {
+      const { stages, phases, batches } = DASH_DATA;
+      const total = stages.length;
+
+      // ── Batch stage-flow tracks ──────────────────────────────────────
+      const host = document.getElementById('batchTracks');
+      batches.forEach(b => {
+        const done = b.current;                       // stages fully complete
+        const pct = Math.round(((b.current + 1) / total) * 100);
+        const card = document.createElement('div');
+        card.className = 'bg-surface-container-lowest rounded-xl p-4 shadow-md flex flex-col gap-3';
+
+        const seg = stages.map((s, i) => {
+          const state = i < done ? 'bg-primary'
+                      : i === done ? 'bg-primary pulse-dot'
+                      : 'bg-surface-container-highest';
+          const h = i === done ? 'h-3' : 'h-2';
+          return `<div class="flex-1 ${h} rounded-full ${state}" title="${s.code} · ${s.name}"></div>`;
+        }).join('');
+
+        const codes = stages.map((s, i) =>
+          `<div class="flex-1 text-center text-[9px] font-bold ${i === done ? 'text-primary' : 'text-outline'}">${s.code}</div>`
+        ).join('');
+
+        const groups = phases.map(p => {
+          const span = p.to - p.from + 1;
+          const active = b.current >= p.from && b.current <= p.to;
+          return `<div style="flex:${span}" class="text-center text-[10px] font-bold ${active ? 'text-primary' : 'text-outline'}">${p.label}</div>`;
+        }).join('');
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <span class="bg-primary text-on-primary text-[11px] font-bold px-2 py-0.5 rounded inline-block">${b.id}</span>
+              <h3 class="text-[18px] font-semibold text-on-surface mt-1 truncate">${b.crop}</h3>
+              <p class="text-[12px] text-on-surface-variant truncate">${stages[b.current].code} · ${b.stageLabel}</p>
+            </div>
+            <div class="flex flex-col items-center shrink-0">
+              <div class="w-14 h-14 relative">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="#dde8e1" stroke-width="3"/>
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="#16794a" stroke-width="3"
+                          stroke-dasharray="100" stroke-dashoffset="${100 - pct}" stroke-linecap="round"/>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-primary">${pct}%</div>
+              </div>
+              <p class="text-[11px] font-bold text-on-surface-variant mt-1">Stage ${b.current + 1}/${total}</p>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-[3px]">${seg}</div>
+            <div class="hidden md:flex mt-1">${codes}</div>
+            <div class="flex mt-1.5 border-t border-outline-variant/30 pt-1.5">${groups}</div>
+          </div>`;
+        host.appendChild(card);
+      });
+
+      // ── Batches by phase ─────────────────────────────────────────────
+      const maxCount = Math.max(...DASH_DATA.phaseCounts);
+      document.getElementById('phaseBars').innerHTML = phases.map((p, i) => {
+        const n = DASH_DATA.phaseCounts[i];
+        return `<div class="flex items-center gap-2">
+          <span class="text-[11px] font-bold text-on-surface-variant w-14 shrink-0">${p.label}</span>
+          <div class="flex-1 h-4 rounded-full bg-surface-container overflow-hidden">
+            <div class="h-full rounded-full bg-primary" style="width:${(n / maxCount) * 100}%"></div>
+          </div>
+          <span class="text-[12px] font-bold text-on-surface w-4 text-right">${n}</span>
+        </div>`;
+      }).join('');
+
+      // ── Schedule health ──────────────────────────────────────────────
+      const { onTrack, delayed } = DASH_DATA.schedule;
+      const sum = onTrack + delayed;
+      document.getElementById('schedulePct').textContent = Math.round((onTrack / sum) * 100) + '% on schedule';
+      document.getElementById('scheduleSplit').innerHTML =
+        `<div class="bg-green-600" style="width:${(onTrack / sum) * 100}%"></div>
+         <div class="bg-error" style="width:${(delayed / sum) * 100}%"></div>`;
+      document.getElementById('scheduleLegend').innerHTML =
+        `<span class="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+           <span class="w-2 h-2 rounded-full bg-green-600"></span>On schedule <b class="text-on-surface">${onTrack}</b></span>
+         <span class="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+           <span class="w-2 h-2 rounded-full bg-error"></span>Delayed <b class="text-on-surface">${delayed}</b></span>`;
+
+      // ── Alert frequency ──────────────────────────────────────────────
+      const buckets = DASH_DATA.alertBuckets;
+      const peak = Math.max(1, ...buckets.map(b => b.n));
+      document.getElementById('alertTotal').textContent = buckets.reduce((a, b) => a + b.n, 0) + ' total';
+      document.getElementById('alertBars').innerHTML = buckets.map(b => `
+        <div class="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+          <span class="text-[10px] font-bold ${b.n ? 'text-on-surface' : 'text-outline'}">${b.n}</span>
+          <div class="w-full rounded-t ${b.n ? 'bg-error' : 'bg-surface-container'}"
+               style="height:${Math.max(4, (b.n / peak) * 38)}px"></div>
+          <span class="text-[9px] text-outline">${b.label}</span>
+        </div>`).join('');
+    })();
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const banner = document.getElementById('alertBanner');
+      const closeBtn = document.getElementById('alertBannerClose');
+      let hideTimer;
+
+      // Simulated push alert ~2.5s after opening
+      setTimeout(() => {
+        banner.classList.remove('hidden');
+        hideTimer = setTimeout(() => banner.classList.add('hidden'), 6000);
+      }, 2500);
+
+      closeBtn.addEventListener('click', () => {
+        clearTimeout(hideTimer);
+        banner.classList.add('hidden');
+      });
+
+      document.querySelectorAll('.ack-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const card = btn.closest('.alert-card');
+          if (card) card.classList.add('opacity-40');
+          btn.textContent = 'ACKED';
+          btn.disabled = true;
+        });
+      });
+    });
+  </script>
+</body>
+</html>

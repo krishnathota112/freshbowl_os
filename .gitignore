@@ -8,7 +8,17 @@ dist
 # An UNPACKED APK — classes.dex, META-INF, decompiled bytecode. Reference material someone handed
 # over, not source, and 9.7 MB of it. The archive it came from is what belongs in a repo, if
 # anything does.
-MushroomOS-extracted/
+# An UNPACKED APK. 9.7 MB of classes.dex, META-INF and decompiled bytecode is not source
+# and is ignored — but `assets/public/` is. That is the hand-built UI the factory already
+# has and likes: ~30 screens, shared.css, the Material green palette, the mushroom mark.
+# It is the visual reference this product is being built toward.
+#
+# Git cannot re-include a file whose PARENT DIRECTORY is excluded, so the exclusion steps
+# down one level at a time rather than ignoring the whole tree and negating inside it.
+MushroomOS-extracted/*
+!MushroomOS-extracted/assets/
+MushroomOS-extracted/assets/*
+!MushroomOS-extracted/assets/public/
 apk_extracted/
 
 # OX Alpha isolated working copy of mushroomos/ — sandbox only, canonical work stays in mushroomos/.
