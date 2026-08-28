@@ -187,19 +187,48 @@ describeDb('A3 — the stagger and the three positions', () => {
       // The bug this catches: binding STRUCTURAL_STRAW to a material code that does not exist leaves
       // the role unbound, and generate_activity_plan skips the stream by design. Ten activities
       // vanish, the convergence gates have nothing to wait on, and nothing errors.
-      const missing = await all<{ code: string; batch: string }>(
+      // ⚠ ASSERTED PER STREAM, NOT PER ACTIVITY, and the change matters.
+      //
+      // This used to require every enabled definition activity to exist on every demo batch. It went
+      // red when client decision 3 added four Day-1 lab checkpoints: `generate_activity_plan` runs at
+      // CREATION, so a definition that grows afterwards does not retro-add activities to a batch that
+      // is already running — and it must not, because inserting work into a live batch is a decision
+      // nobody made. A per-activity check turns every legitimate process change into a false failure.
+      //
+      // A vanished STREAM is the actual bug, and it is still caught: an unbound role produces a batch
+      // with zero activities in that stream.
+      const emptyStreams = await all<{ batch: string; stream: string }>(
         db,
-        `select pa.code, mb.code as batch
+        `select mb.code as batch, pa.stream::text as stream
            from master_batch mb
            join process_definition pd on pd.id = mb.process_definition_id
-           cross join process_activity pa
-          where mb.${DEMO} and pa.process_definition_id = pd.id and pa.default_enabled
-            and not exists (select 1 from batch_activity ba
-                             where ba.master_batch_id = mb.id
-                               and ba.process_activity_id = pa.id)
+           join process_activity pa on pa.process_definition_id = pd.id and pa.default_enabled
+          where mb.${DEMO}
+          group by mb.id, mb.code, pa.stream
+         having count(*) filter (
+                  where exists (select 1 from batch_activity ba
+                                 where ba.master_batch_id = mb.id
+                                   and ba.process_activity_id = pa.id)) = 0
           order by 1, 2`
       );
-      expect(missing.map((m) => `${m.batch} is missing ${m.code}`)).toEqual([]);
+      expect(
+        emptyStreams.map((s) => `${s.batch} has NO activities in stream ${s.stream}`),
+        'a stream with no activities means its role went unbound and the plan skipped it silently'
+      ).toEqual([]);
+
+      // And the straw stream specifically, by name, because it is the one that actually broke.
+      const straw = await all<{ batch: string; n: string }>(
+        db,
+        `select mb.code as batch, count(*)::text as n
+           from master_batch mb
+           join batch_activity ba on ba.master_batch_id = mb.id
+          where mb.${DEMO} and ba.stream = 'STRUCTURAL_STRAW'
+          group by mb.code order by mb.code`
+      );
+      expect(straw.length, 'no demo batch has a straw stream at all').toBeGreaterThan(0);
+      for (const s of straw) {
+        expect(Number(s.n), `${s.batch} has a suspiciously thin straw stream`).toBeGreaterThan(1);
+      }
 
       // And every role that has a default lead is actually bound.
       const unbound = await all<{ code: string; role: string }>(

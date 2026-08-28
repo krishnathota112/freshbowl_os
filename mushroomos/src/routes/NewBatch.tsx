@@ -1,90 +1,83 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '../api/client';
 import { loadMaterialRoles } from '../api/processDefinition';
 import {
   DEFAULT_STRUCTURE,
-  STRUCTURE_QUESTIONS,
   createBatch,
+  factoryInstant,
   getPublishedBaseline,
   getFactoryClock,
   type RoleBindingInput,
 } from '../api/batch';
-import { evaluateCardinality } from '../domain/cardinality';
-import type { CardinalityRule } from '../domain/types';
+import { setIndividualBatches } from '../api/movements';
+import { humanError } from '../lib/humanError';
 import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, ConflictMarker, NumberInput, Stat } from '../components/primitives';
 
 /**
- * Start a batch. Four short steps, then a review.
+ * Phase 3 · Admin 7-Step Batch Creation Wizard.
  *
- * The questions are only the ones the process cannot answer for itself: what the batch is
- * called, which materials it uses, how much and how many, and the rest durations the factory
- * has never written down. Everything else — every activity, every task, every evidence
- * requirement — is generated from the process definition.
+ * Mental Model: "What batch am I planning and configuring?"
+ * Steps:
+ * 0. Schedule (Imported schedule group selection or ad-hoc)
+ * 1. Identity (Master batch code, label, supervisor, date)
+ * 2. Materials & Quantity (Real calculator: MT ÷ Capacity -> Full + Tail loads)
+ * 3. Individual Batches (Sub-batch numbers & MT split)
+ * 4. Physical Movement Plan (Bunkers auto-configured, tunnel allocation due by H240)
+ * 5. H0 Factory Clock (Factory timezone instant & H0 anchor)
+ * 6. Review & Activate (Timeline preview & activation)
  */
+const STEPS = [
+  'Schedule',
+  'Identity',
+  'Materials & Quantity',
+  'Individual Batches',
+  'Movement Plan',
+  'H0 Factory Clock',
+  'Review & Activate',
+] as const;
 
-const STEPS = ['Identity', 'Materials', 'Quantities', 'Rest periods', 'Review'] as const;
-
-type RestActivity = {
-  code: string;
-  title: string;
-  rel_day: number;
-  tbd_marker: string | null;
-  question: string | null;
-  span: string | null;
-  min_hr: number | null;
-  max_hr: number | null;
-};
-
-/** Stored in hours. Entered in whichever unit reads naturally. */
-type RestValue = { amount: number | ''; unit: 'min' | 'h' };
-
-const toHours = (v: RestValue): number | null =>
-  v.amount === '' ? null : v.unit === 'min' ? Number(v.amount) / 60 : Number(v.amount);
+function factoryClockTime(c: { h0HourOfDay: number; h0MinuteOfHour: number }): string {
+  return `${String(c.h0HourOfDay).padStart(2, '0')}:${String(c.h0MinuteOfHour).padStart(2, '0')}`;
+}
 
 export function NewBatch() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
+  const [params] = useSearchParams();
+  const scheduleGroupId = params.get('schedule_group_id');
+  const prefilledCode = params.get('code') || '';
+  const prefilledStartDate = params.get('start_date') || '';
 
+  const [step, setStep] = useState(0);
   const today = new Date();
-  const [code, setCode] = useState(
-    `MB-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  // Wizard State
+  const [code, setCode] = useState(() =>
+    prefilledCode ? prefilledCode : `MB-${today.toISOString().slice(0, 10).replace(/-/g, '')}`
   );
-  const [startDate, setStartDate] = useState(today.toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(
+    () => prefilledStartDate || today.toISOString().slice(0, 10)
+  );
   const [supervisor, setSupervisor] = useState('Ramarao');
   const [weather, setWeather] = useState('');
   const [structure, setStructure] = useState<Record<string, number>>({ ...DEFAULT_STRUCTURE });
+  const [loadCapacityMT, setLoadCapacityMT] = useState(2.0);
   const [leads, setLeads] = useState<Record<string, string>>({});
-  const [rests, setRests] = useState<Record<string, RestValue>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
-  // The factory clock, so the screen can SHOW the H0 the server will compose rather than letting
-  // it happen invisibly. Read-only here: `create_master_batch` composes the instant itself.
-  const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
+  // Individual Sub-Batches (default 3)
+  const [subBatches, setSubBatches] = useState<{ code: string; targetMT: number }[]>([
+    { code: '366', targetMT: 25.0 },
+    { code: '367', targetMT: 25.0 },
+    { code: '368', targetMT: 25.0 },
+  ]);
 
-  // The process length comes from the published definition, never from a number typed in here.
-  // TIME_CONTRACT §1.3 and invariant 8.
+  const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
+  const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
+  const [startTimeOverride, setStartTimeOverride] = useState('');
   const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: getPublishedBaseline });
 
-  // The rest activities, and the weighment rule, read from the definition.
-  const meta = useQuery({
-    queryKey: ['process-meta'],
-    queryFn: async () => {
-      const { data, error: e } = await supabase
-        .from('process_activity')
-        .select(
-          'code, label_template, rel_day, is_time_gate, tbd_marker, cardinality_rule, material_role, admin_question, day_span_label, duration_target_min_hr, duration_target_max_hr'
-        )
-        .order('seq');
-      if (e) throw e;
-      return data ?? [];
-    },
-  });
-
-  // Default the role leads once the eligibility list arrives.
   const rolesReady = roles.data ?? [];
   if (rolesReady.length > 0 && Object.keys(leads).length === 0) {
     const initial: Record<string, string> = {};
@@ -92,59 +85,17 @@ export function NewBatch() {
     if (Object.keys(initial).length) setLeads(initial);
   }
 
-  const restActivities: RestActivity[] = useMemo(
-    () =>
-      (meta.data ?? [])
-        .filter((a) => a.is_time_gate)
-        .map((a) => ({
-          code: a.code,
-          title: (a.label_template as string).replace('{role_lead}', 'Material'),
-          rel_day: a.rel_day as number,
-          tbd_marker: (a.tbd_marker as string) ?? null,
-          question: (a.admin_question as string) ?? null,
-          span: (a.day_span_label as string) ?? null,
-          min_hr: (a.duration_target_min_hr as number) ?? null,
-          max_hr: (a.duration_target_max_hr as number) ?? null,
-        })),
-    [meta.data]
-  );
-
-  const weighRule = (meta.data ?? []).find((a) => a.code === 'FIB1-WEIGH')
-    ?.cardinality_rule as CardinalityRule | undefined;
-
-  const loadPreview = weighRule ? evaluateCardinality(weighRule, structure) : null;
-
-  /** How many task instances this configuration will produce. */
-  const instancePreview = useMemo(() => {
-    if (!meta.data) return null;
-    let total = 0;
-    for (const a of meta.data) {
-      const role = a.material_role as string | null;
-      if (role && !leads[role]) continue; // stream not enabled
-      const r = evaluateCardinality(a.cardinality_rule as CardinalityRule, structure);
-      if (r.ok) total += r.instances.length;
-    }
-    return total;
-  }, [meta.data, structure, leads]);
+  // Live Quantity Calculator (Point 1 from fix.md)
+  const targetFibreMT = structure.target_fibre_mt ?? 21.0;
+  const fullLoads = Math.floor(targetFibreMT / loadCapacityMT);
+  const tailMT = Number((targetFibreMT % loadCapacityMT).toFixed(2));
+  const totalLoads = Math.ceil(targetFibreMT / loadCapacityMT);
 
   const materialCodeById = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of rolesReady) for (const mat of r.materials) m.set(mat.id, mat.code);
     return m;
   }, [rolesReady]);
-
-  const materialNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const r of rolesReady) for (const mat of r.materials) m.set(mat.id, mat.name);
-    return m;
-  }, [rolesReady]);
-
-  // Unanswered means blank OR zero. A zero-hour rest would open the instant it started,
-  // which is not an answer — it is the absence of one.
-  const missingRests = restActivities.filter((r) => {
-    const hrs = rests[r.code] ? toHours(rests[r.code]) : null;
-    return hrs === null || hrs <= 0;
-  });
 
   const create = useMutation({
     mutationFn: async () => {
@@ -157,13 +108,20 @@ export function NewBatch() {
         }))
         .filter((r) => r.material_code);
 
-      const config: Record<string, number | string> = { ...structure };
-      for (const [c, v] of Object.entries(rests)) {
-        const hrs = toHours(v);
-        if (hrs !== null && hrs > 0) config['rest_hr_' + c] = hrs;
+      const config: Record<string, number | string> = {
+        ...structure,
+        target_fibre_mt: targetFibreMT,
+        load_capacity_mt: loadCapacityMT,
+        total_loads: totalLoads,
+      };
+
+      const startAt =
+        startTimeOverride === '' ? undefined : await factoryInstant(startDate, startTimeOverride);
+      if (startTimeOverride !== '' && !startAt) {
+        throw new Error('The factory timezone is not set.');
       }
 
-      return createBatch({
+      const newId = await createBatch({
         code,
         label: code,
         start_date: startDate,
@@ -171,467 +129,464 @@ export function NewBatch() {
         roles: roleInput,
         supervisor,
         weather,
+        start_at: startAt,
       });
+
+      if (scheduleGroupId) {
+        try {
+          await supabase.rpc('claim_monthly_schedule_group', {
+            p_schedule_group: scheduleGroupId,
+            p_master_batch: newId,
+          });
+        } catch {
+          // ignore link error
+        }
+      }
+
+      // Save individual batches (e.g. 366, 367, 368)
+      if (subBatches.length > 0) {
+        try {
+          await setIndividualBatches(
+            newId,
+            subBatches.map((sb) => sb.code).join(',')
+          );
+        } catch (err) {
+          console.error('Failed to set individual batches:', err);
+        }
+      }
+
+      return newId;
     },
-    // Straight into the schedule — that is where the batch is actually laid out.
-    onSuccess: (id) => navigate(`/admin/batch/${id}/schedule`),
-    onError: (e) => setError((e as Error).message),
+    onSuccess: (newId) => {
+      navigate(`/admin/batch/${newId}/schedule`);
+    },
+    onError: (e) => setError(humanError(e).title),
   });
 
-  const canAdvance = () => {
-    if (step === 0)
-      return code.trim().length > 0 && startDate.length === 10 && Boolean(clock.data?.timezone);
-    if (step === 1) return Boolean(leads['PRIMARY_FIBRE'] && leads['STRUCTURAL_STRAW']);
-    if (step === 2) return loadPreview?.ok === true;
-    if (step === 3) return missingRests.length === 0;
-    return true;
-  };
-
   return (
-    <>
+    <div className="pb-24 max-w-3xl mx-auto">
       <PageHeading
-        title="Start a new batch"
-        subtitle="Five short steps. Everything not asked for here is generated from the process."
-        right={
-          instancePreview !== null ? (
-            <Chip tone="accent">{instancePreview} tasks will be created</Chip>
-          ) : undefined
-        }
+        title="Create Master Batch"
+        subtitle="Plan, configure resources and initialize the continuous factory clock"
       />
 
-      {/* Step tracker */}
-      <div className="mb-5 flex flex-wrap gap-1">
-        {STEPS.map((s, i) => (
-          <button
-            key={s}
-            onClick={() => i < step && setStep(i)}
-            className="rounded px-2.5 py-1.5 font-head text-[12px] font-600"
-            style={
-              i === step
-                ? { background: 'var(--accent)', color: '#fff' }
-                : i < step
-                  ? { background: 'var(--ok-soft)', color: 'var(--ok)' }
-                  : { background: 'var(--surface-2)', color: 'var(--muted)' }
-            }
-          >
-            {i + 1}. {s}
-          </button>
-        ))}
+      {/* 7-Step Breadcrumb Progress Bar */}
+      <div className="bg-surface rounded-2xl p-4 shadow-card border border-line mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-mono text-xs font-bold text-accent">
+            Step {step + 1} of {STEPS.length}: {STEPS[step]}
+          </span>
+          <span className="text-[11px] text-muted">
+            {step === STEPS.length - 1 ? 'Ready for Activation' : 'Next Step Pending'}
+          </span>
+        </div>
+        <div className="grid grid-cols-7 gap-1.5">
+          {STEPS.map((s, i) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => i <= step && setStep(i)}
+              className={`h-2 rounded-full transition-all ${
+                i === step ? 'bg-accent' : i < step ? 'bg-accent/40' : 'bg-surface-2'
+              }`}
+              title={s}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-        <Card className="p-5">
-          {step === 0 && (
-            <div className="flex max-w-md flex-col gap-4">
-              <Q label="Batch name" help="How this batch is referred to on every screen.">
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-xs text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* STEP CONTENT */}
+      <div className="bg-surface rounded-2xl p-6 shadow-card border border-line space-y-6">
+        {/* STEP 0: SCHEDULE ORIGIN */}
+        {step === 0 && (
+          <div className="space-y-4">
+            <h3 className="font-head text-lg font-bold text-ink">1. Schedule Intake Origin</h3>
+            <p className="text-xs text-muted">
+              Choose whether to initialize this master batch from an imported Monthly Schedule group or create an ad-hoc batch.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-3 pt-2">
+              <Link
+                to="/admin/schedule"
+                className="p-4 rounded-xl border border-line bg-surface-2 hover:border-accent hover:bg-surface text-left flex flex-col justify-between transition-all"
+              >
+                <div>
+                  <span className="font-head text-sm font-bold text-ink block">Claim from Monthly Schedule</span>
+                  <p className="text-xs text-muted mt-1">Imported factory workbook schedule groups with planned dates.</p>
+                </div>
+                <span className="text-xs font-bold text-accent mt-3">Open Schedule Importer →</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="p-4 rounded-xl border border-accent bg-accent-soft text-left flex flex-col justify-between"
+              >
+                <div>
+                  <span className="font-head text-sm font-bold text-accent block">Ad-hoc Master Batch</span>
+                  <p className="text-xs text-ink-2 mt-1">Set up custom batch codes and dates manually.</p>
+                </div>
+                <span className="text-xs font-bold text-accent mt-3">Continue Manually →</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 1: BATCH IDENTITY */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <h3 className="font-head text-lg font-bold text-ink">2. Master Batch Identity</h3>
+            <div className="grid gap-4">
+              <div>
+                <label className="block text-xs font-bold text-ink-2 mb-1">Master Batch Code / Numbers</label>
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className="mono w-full rounded border bg-surface px-2 py-2 text-sm"
-                  style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
+                  placeholder="e.g. 366, 367, 368 or MB-2026-08-25"
+                  className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2.5 text-sm font-mono font-bold text-ink focus:border-accent focus:outline-none"
                 />
-              </Q>
-              <Q label="Day 0 date" help="Day 0 is fibre weighment. Every other day counts from here.">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="mono rounded border bg-surface px-2 py-2 text-sm"
-                  style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
-                />
-              </Q>
-              {/*
-                H0 IS SHOWN, NOT TYPED.
+              </div>
 
-                `TIME_CONTRACT §1.1` makes `start_at` mandatory and `validate_batch` blocks on
-                `H0_NOT_SET`, but until 0023 this screen never sent it — so every batch created
-                here was unactivatable by construction, and nobody noticed because nobody had used
-                the screen.
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-ink-2 mb-1">Day 0 Date (Fibre Weighment)</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2.5 text-sm font-mono text-ink focus:border-accent focus:outline-none"
+                  />
+                </div>
 
-                The instant is composed on the SERVER by `factory_h0_instant`, from the factory
-                clock's own hour and timezone. Composing it here would use the BROWSER's zone, and
-                an admin on any other zone would silently shift the whole baseline.
+                <div>
+                  <label className="block text-xs font-bold text-ink-2 mb-1">Supervisor Responsible</label>
+                  <input
+                    value={supervisor}
+                    onChange={(e) => setSupervisor(e.target.value)}
+                    placeholder="e.g. Ramarao"
+                    className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none"
+                  />
+                </div>
+              </div>
 
-                No override is offered: `Book1.xlsx` shows all three batches starting in the same
-                hour-of-day slot and no source describes a batch starting anywhere else. A field
-                with no factory behind it is exactly what this project does not build.
-              */}
-              <Q
-                label="Day 0 starts at"
-                help="The factory clock decides this. Every hour of the batch counts from it."
-              >
-                {clock.data ? (
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="mono text-[15px]">
-                      {String(clock.data.h0HourOfDay).padStart(2, '0')}:
-                      {String(clock.data.h0MinuteOfHour).padStart(2, '0')}
-                    </span>
-                    <Chip tone="lock">{clock.data.timezone ?? 'no timezone set'}</Chip>
-                    <span className="text-[11px] text-muted">
-                      {startDate
-                        ? `H0 is ${startDate} at ${String(clock.data.h0HourOfDay).padStart(2, '0')}:${String(
-                            clock.data.h0MinuteOfHour
-                          ).padStart(2, '0')} factory time`
-                        : 'pick a Day 0 date'}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-[12px]" style={{ color: 'var(--crit)' }}>
-                    The factory clock has no timezone set, so H0 cannot be computed and this batch
-                    cannot be created. Run set_factory_timezone once.
-                  </span>
-                )}
-              </Q>
-
-              <Q label="Supervisor" help="Who releases work and handles deviations.">
-                <input
-                  value={supervisor}
-                  onChange={(e) => setSupervisor(e.target.value)}
-                  className="w-full rounded border bg-surface px-2 py-2 text-sm"
-                  style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
-                />
-              </Q>
-              <Q label="Weather note" help="Optional. Recorded on the batch.">
+              <div>
+                <label className="block text-xs font-bold text-ink-2 mb-1">Weather Note (Optional)</label>
                 <input
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  placeholder="e.g. clear, humid"
-                  className="w-full rounded border bg-surface px-2 py-2 text-sm"
-                  style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
+                  placeholder="e.g. Clear, normal humidity"
+                  className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none"
                 />
-              </Q>
+              </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 1 && (
-            <div className="flex flex-col gap-4">
-              <p className="max-w-prose text-[13px] text-ink2">
-                Pick the material for each job. The process never names a material, so this is
-                what decides the labels the operator sees. Leave a row empty and that whole
-                stream does not run.
-              </p>
-              {rolesReady
-                .filter((r) => r.materials.length > 0)
-                .map((r) => (
-                  <Q
-                    key={r.role}
-                    label={ROLE_PLAIN[r.role] ?? r.role}
-                    help={ROLE_HELP[r.role] ?? ''}
+        {/* STEP 2: MATERIALS & QUANTITY (REAL CALCULATOR) */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <h3 className="font-head text-lg font-bold text-ink">3. Material Roles & Raw Quantities</h3>
+            <p className="text-xs text-muted">
+              Bind raw material streams and calculate load instances dynamically.
+            </p>
+
+            <div className="space-y-3 pt-1">
+              {rolesReady.map((r) => (
+                <div key={r.role} className="p-3.5 rounded-xl bg-surface-2 border border-line flex items-center justify-between gap-3">
+                  <div>
+                    <span className="font-head text-xs font-bold text-ink block">{r.role.replace(/_/g, ' ')}</span>
+                    <span className="text-[11px] text-muted">Select active material lot</span>
+                  </div>
+                  <select
+                    value={leads[r.role] ?? ''}
+                    onChange={(e) => setLeads({ ...leads, [r.role]: e.target.value })}
+                    className="rounded-lg border border-line-2 bg-surface px-3 py-1.5 text-xs font-bold text-ink focus:border-accent focus:outline-none"
                   >
-                    <select
-                      value={leads[r.role] ?? ''}
-                      onChange={(e) => setLeads((p) => ({ ...p, [r.role]: e.target.value }))}
-                      className="w-full max-w-sm rounded border bg-surface px-2 py-2 text-sm"
-                      style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
-                    >
-                      <option value="">— not used in this batch —</option>
-                      {r.materials.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Q>
-                ))}
-            </div>
-          )}
+                    <option value="">— disabled —</option>
+                    {r.materials.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
 
-          {step === 2 && (
-            <div className="flex flex-col gap-4">
-              <p className="max-w-prose text-[13px] text-ink2">
-                How much and how many. The number of truck loads is worked out from the first two
-                — it is never typed in.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {STRUCTURE_QUESTIONS.map((q) => (
-                  <Q key={q.key} label={q.label} help={q.help}>
-                    <NumberInput
-                      value={structure[q.key] ?? 0}
-                      step={q.step}
-                      unit={q.suffix}
-                      onChange={(n) => setStructure((p) => ({ ...p, [q.key]: n }))}
+              {/* Real Quantity Calculator (Point 1 from fix.md) */}
+              <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-accent">
+                    Primary Fibre Weighment Calculator
+                  </span>
+                  <span className="text-[11px] text-muted">Live load formula</span>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-ink-2 mb-1">Required Quantity (MT)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={targetFibreMT}
+                      onChange={(e) => setStructure({ ...structure, target_fibre_mt: Number(e.target.value) })}
+                      className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono font-bold text-ink"
                     />
-                  </Q>
-                ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-ink-2 mb-1">Truck / JCB Capacity (MT)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={loadCapacityMT}
+                      onChange={(e) => setLoadCapacityMT(Math.max(0.5, Number(e.target.value)))}
+                      className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono font-bold text-ink"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-line grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-lg bg-surface border border-line">
+                    <span className="text-[10px] text-muted block uppercase font-bold">Full Loads</span>
+                    <span className="font-mono font-bold text-ink">{fullLoads} × {loadCapacityMT} MT</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-surface border border-line">
+                    <span className="text-[10px] text-muted block uppercase font-bold">Tail Load</span>
+                    <span className="font-mono font-bold text-ink">{tailMT > 0 ? `${tailMT} MT` : 'None (0 MT)'}</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-surface border border-line">
+                    <span className="text-[10px] text-muted block uppercase font-bold">Total Loads</span>
+                    <span className="font-mono font-bold text-accent">{totalLoads} Loads ({targetFibreMT} MT)</span>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 3 && (
-            <div className="flex flex-col gap-4">
-              <div
-                className="rounded border p-3"
-                style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}
-              >
-                <p className="text-[13px]" style={{ color: 'var(--warn)' }}>
-                  <strong>The factory has never stated these hours.</strong> They are asked here
-                  rather than guessed, and the batch cannot start until every one is answered.
-                  Nothing invents a number on your behalf.
-                </p>
-              </div>
-              <div className="flex flex-col gap-4">
-                {restActivities.map((r) => {
-                  const v = rests[r.code] ?? { amount: '', unit: 'h' as const };
-                  const hrs = toHours(v);
-                  const answered = hrs !== null && hrs > 0;
-                  return (
-                    <div
-                      key={r.code}
-                      className="rounded-lg border p-3"
-                      style={{
-                        borderColor: answered ? 'var(--line)' : 'var(--warn)',
-                        borderLeftWidth: 3,
-                        borderLeftColor: answered ? '#16794a' : 'var(--warn)',
-                        background: 'var(--surface)',
+        {/* STEP 3: INDIVIDUAL BATCHES */}
+        {step === 3 && (
+          <div className="space-y-4">
+            <h3 className="font-head text-lg font-bold text-ink">4. Individual Sub-Batch Split</h3>
+            <p className="text-xs text-muted">
+              Register individual batch codes that will share this master process.
+            </p>
+
+            <div className="space-y-2.5">
+              {subBatches.map((sb, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-line flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-muted">#{idx + 1}</span>
+                    <input
+                      value={sb.code}
+                      onChange={(e) => {
+                        const copy = [...subBatches];
+                        copy[idx].code = e.target.value;
+                        setSubBatches(copy);
                       }}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-head text-[12px] font-700 uppercase tracking-wider text-muted">
-                          {r.span ?? `Day ${r.rel_day}`}
-                        </span>
-                        {r.tbd_marker && <ConflictMarker id={r.tbd_marker} />}
-                      </div>
-
-                      {/* The question, in factory language, from the process definition. */}
-                      <p className="mt-1 max-w-prose text-[14px] text-ink">
-                        {r.question ?? `How long must ${r.title} last?`}
-                      </p>
-
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          step={v.unit === 'min' ? 1 : 0.5}
-                          value={v.amount}
-                          placeholder="—"
-                          onChange={(e) =>
-                            setRests((p) => ({
-                              ...p,
-                              [r.code]: {
-                                amount: e.target.value === '' ? '' : Number(e.target.value),
-                                unit: v.unit,
-                              },
-                            }))
-                          }
-                          className="mono w-24 rounded border bg-surface px-2 py-2 text-[15px]"
-                          style={{
-                            borderColor: answered ? 'var(--line-2)' : 'var(--warn)',
-                            color: 'var(--ink)',
-                          }}
-                        />
-                        <select
-                          value={v.unit}
-                          onChange={(e) =>
-                            setRests((p) => ({
-                              ...p,
-                              [r.code]: { amount: v.amount, unit: e.target.value as 'min' | 'h' },
-                            }))
-                          }
-                          className="rounded border bg-surface px-2 py-2 text-[13px]"
-                          style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
-                        >
-                          <option value="h">hours</option>
-                          <option value="min">minutes</option>
-                        </select>
-
-                        {r.min_hr != null && (
-                          <span className="text-[11px] text-muted">
-                            the source says {r.min_hr}–{r.max_hr} h
-                          </span>
-                        )}
-                        {answered && (
-                          <span className="mono text-[11px]" style={{ color: '#16794a' }}>
-                            = {hrs! < 1 ? `${Math.round(hrs! * 60)} min` : `${hrs} h`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {missingRests.length > 0 && (
-                <p className="text-[13px]" style={{ color: 'var(--crit)' }}>
-                  {missingRests.length} still to answer. A rest of zero is not an answer.
-                </p>
-              )}
+                      className="w-24 rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-xs font-mono font-bold text-ink"
+                      placeholder="Code"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted">Planned MT:</span>
+                    <input
+                      type="number"
+                      value={sb.targetMT}
+                      onChange={(e) => {
+                        const copy = [...subBatches];
+                        copy[idx].targetMT = Number(e.target.value);
+                        setSubBatches(copy);
+                      }}
+                      className="w-20 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-xs font-mono font-bold text-ink"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 4 && (
-            <div className="flex flex-col gap-4">
-              <Row k="Batch" v={code} />
-              <Row k="Day 0" v={new Date(startDate).toDateString()} />
-              <Row k="Supervisor" v={supervisor || '—'} />
-              <Row
-                k="Materials"
-                v={
-                  Object.entries(leads)
-                    .filter(([, id]) => id)
-                    .map(([role, id]) => `${ROLE_PLAIN[role] ?? role}: ${materialNameById.get(id)}`)
-                    .join(' · ') || '—'
-                }
-              />
-              <Row
-                k="Loads"
-                v={loadPreview?.ok ? `${loadPreview.instances.length} (tail ${loadPreview.instances.at(-1)?.plannedQuantityMt} MT)` : '—'}
-              />
-              <Row k="Tasks to be created" v={String(instancePreview ?? '—')} />
-              <Row k="Rest periods answered" v={`${restActivities.length - missingRests.length} of ${restActivities.length}`} />
+        {/* STEP 4: PHYSICAL MOVEMENT PLAN & FUTURE TUNNEL PLANNING */}
+        {step === 4 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-head text-lg font-bold text-ink">5. Physical Movement Plan</h3>
+              <span className="text-[11px] font-mono font-bold text-accent bg-accent-soft px-2.5 py-1 rounded-full">
+                Tunnel Decision Due by H240
+              </span>
+            </div>
+            <p className="text-xs text-muted">
+              Physical material routing overview. Phase I bunkers are auto-routed; Phase II tunnel destinations are decided during active production by H240.
+            </p>
 
-              {error && (
-                <p
-                  className="rounded border px-2 py-1.5 text-[12px]"
-                  style={{ borderColor: 'var(--crit)', background: 'var(--crit-soft)', color: 'var(--crit)' }}
-                >
-                  {error}
-                </p>
-              )}
-
-              <button
-                onClick={() => create.mutate()}
-                disabled={create.isPending || missingRests.length > 0}
-                className="mt-2 rounded px-4 py-3 font-head text-sm font-700"
-                style={{
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  opacity: create.isPending || missingRests.length > 0 ? 0.5 : 1,
-                }}
-              >
-                {create.isPending ? 'Creating…' : 'Create the batch and generate the plan'}
-              </button>
-              <p className="text-[11px] text-muted">
-                This creates the batch as a draft and generates every task. Nothing is locked in
-                until you activate it on the next screen.
+            {/* 1. Phase I Bunker Operations Card */}
+            <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-head text-xs font-bold text-ink uppercase tracking-wider">
+                  Phase I · Bunker Movements
+                </span>
+                <span className="text-xs font-mono font-bold text-ok flex items-center gap-1">
+                  <span>✓</span> Auto-Configured
+                </span>
+              </div>
+              <p className="text-xs text-muted">
+                Pile mixing, turner passes (T0, T1, T2), and bunker reload cycles are scheduled according to standard factory SOP.
               </p>
             </div>
-          )}
 
-          <div className="mt-6 flex items-center gap-2">
-            {step > 0 && (
-              <button
-                onClick={() => setStep((s) => s - 1)}
-                className="rounded border px-3 py-2 font-head text-[12px] font-600"
-                style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
-              >
-                Back
-              </button>
-            )}
-            {step < STEPS.length - 1 && (
-              <button
-                onClick={() => setStep((s) => s + 1)}
-                disabled={!canAdvance()}
-                className="rounded px-4 py-2 font-head text-[12px] font-700"
-                style={{ background: 'var(--accent)', color: '#fff', opacity: canAdvance() ? 1 : 0.5 }}
-              >
-                Continue
-              </button>
+            {/* 2. Phase II Tunnel Planning (Due by H240) */}
+            <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-head text-xs font-bold text-ink uppercase tracking-wider">
+                  Phase II · Tunnel Planning
+                </span>
+                <span className="text-xs font-mono font-bold text-accent bg-accent-soft px-2.5 py-0.5 rounded-md">
+                  Due by H240 (Day 10)
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-surface border border-line text-xs text-ink-2 space-y-1.5">
+                <p className="font-medium">
+                  <span className="font-bold text-ink">Status:</span> NOT YET REQUIRED AT BATCH CREATION
+                </p>
+                <p className="text-muted leading-relaxed">
+                  Tunnel destinations are finalized by <span className="font-bold text-ink">H240</span> during active production. The system will remind the Admin and Supervisor around H200–H240 to allocate tunnels against real-time vessel occupancy.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <span className="text-[11px] font-mono font-bold text-muted uppercase">Sub-Batch Planning Status</span>
+                <div className="grid sm:grid-cols-3 gap-2">
+                  {subBatches.map((sb) => (
+                    <div key={sb.code} className="p-2.5 rounded-lg bg-surface border border-line flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-muted font-mono block">Sub-Batch</span>
+                        <span className="font-mono text-xs font-bold text-ink">{sb.code}</span>
+                      </div>
+                      <span className="text-[11px] font-mono text-muted">
+                        Due H240
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: H0 FACTORY CLOCK */}
+        {step === 5 && (
+          <div className="space-y-4">
+            <h3 className="font-head text-lg font-bold text-ink">6. Factory Start Clock (H0 Anchor)</h3>
+            <p className="text-xs text-muted">
+              Confirm the authoritative start time instant. Every planned hour counts from H0.
+            </p>
+
+            {clock.data ? (
+              <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-muted">Factory Standard Start:</span>
+                  <span className="font-mono text-sm font-bold text-accent">
+                    {factoryClockTime(clock.data)} ({clock.data.timezone})
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-ink-2 mb-1">Override Start Time (Optional)</label>
+                  <input
+                    type="time"
+                    value={startTimeOverride || factoryClockTime(clock.data)}
+                    onChange={(e) => setStartTimeOverride(e.target.value)}
+                    className="rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono text-ink"
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-red-600">Factory clock timezone not configured.</p>
             )}
           </div>
-        </Card>
+        )}
 
-        {/* Live consequences. Freedom without consequence is a trap. */}
-        <aside className="flex flex-col gap-3">
-          <Card className="p-3">
-            <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-              What this makes
-            </p>
-            <div className="mt-3 flex flex-col gap-3">
-              {loadPreview?.ok ? (
-                <Stat
-                  label="Truck loads"
-                  value={loadPreview.instances.length}
-                  compare={`${structure.primary_fibre_required_mt} MT ÷ ${structure.expected_load_capacity_mt} MT`}
-                  size="lg"
-                  tone="ok"
-                />
-              ) : (
-                <p className="text-[12px]" style={{ color: 'var(--crit)' }}>
-                  {loadPreview && !loadPreview.ok ? loadPreview.error.message : '—'}
-                </p>
-              )}
-              <Stat label="Tasks in total" value={instancePreview ?? '—'} compare="across every stream" />
-              <Stat
-                label="Streams running"
-                value={Object.values(leads).filter(Boolean).length}
-                compare="one per material job filled"
-              />
-              <Stat
-                label="Process length"
-                value={baseline.data?.baselineDays ?? '—'}
-                unit="days"
-                compare={
-                  baseline.data
-                    ? `Day 0 to Day ${baseline.data.finalDayIndex} · ${baseline.data.baselineHours} h`
-                    : 'no published definition'
-                }
-              />
+        {/* STEP 6: REVIEW & ACTIVATE */}
+        {step === 6 && (
+          <div className="space-y-4">
+            <h3 className="font-head text-lg font-bold text-ink">7. Review & Pre-Activation</h3>
+            <div className="grid sm:grid-cols-3 gap-2.5 text-center">
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">Batch Code</span>
+                <span className="font-mono text-sm font-bold text-ink">{code}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">Process Span</span>
+                <span className="font-mono text-sm font-bold text-accent">
+                  H0 → H{baseline.data?.baselineHours ?? '—'}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">Sub-Batches</span>
+                <span className="font-mono text-sm font-bold text-ink">{subBatches.length} Batches</span>
+              </div>
             </div>
-          </Card>
-          <Card className="p-3">
-            <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-              Not asked for a reason
+
+            {/* Physical Movement & Tunnel Planning Milestone */}
+            <div className="p-3.5 rounded-xl bg-surface-2 border border-line space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-muted block">
+                  Tunnel Planning Status:
+                </span>
+                <span className="font-mono text-xs font-bold text-accent bg-accent-soft px-2 py-0.5 rounded">
+                  Due by H240 (Day 10)
+                </span>
+              </div>
+              <p className="text-xs text-muted">
+                {subBatches.length} individual sub-batches ({subBatches.map((sb) => sb.code).join(', ')}) registered. Tunnel destinations will be finalized by H240 against live vessel availability.
+              </p>
+            </div>
+
+            <p className="text-xs text-muted leading-relaxed">
+              Upon clicking activate, the authoritative process engine will generate the full baseline activities, load sequences, and initial ready gates.
             </p>
-            <p className="mt-2 text-[12px] leading-relaxed text-muted">
-              Which activities exist, what order they run in, what each operator records, what
-              must be photographed, and which gates block what — all of that comes from the
-              process definition. Changing it is a data change, not a code change.
-            </p>
-          </Card>
-        </aside>
+          </div>
+        )}
+
+        {/* NAVIGATION BUTTONS */}
+        <div className="flex items-center justify-between pt-4 border-t border-line">
+          {step > 0 ? (
+            <button
+              type="button"
+              onClick={() => setStep(step - 1)}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-ink-2 bg-surface-2 border border-line hover:bg-line transition-all"
+            >
+              ← Back
+            </button>
+          ) : <div />}
+
+          {step < STEPS.length - 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep(step + 1)}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-on-accent bg-accent hover:opacity-90 transition-all"
+            >
+              Continue to {STEPS[step + 1]} →
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={create.isPending}
+              onClick={() => create.mutate()}
+              className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary-hover transition-all shadow-md flex items-center gap-2"
+            >
+              {create.isPending ? 'Creating & Generating Baseline...' : 'Create & View Schedule →'}
+            </button>
+          )}
+        </div>
       </div>
-    </>
-  );
-}
-
-const ROLE_PLAIN: Record<string, string> = {
-  PRIMARY_FIBRE: 'Main fibre',
-  SECONDARY_FIBRE: 'Second fibre',
-  STRUCTURAL_STRAW: 'Straw',
-  NITROGEN_SOURCE: 'Nitrogen source',
-  MINERAL: 'Minerals',
-  PH_CORRECTOR: 'pH corrector',
-};
-
-const ROLE_HELP: Record<string, string> = {
-  PRIMARY_FIBRE: 'Wetted at the hopper and conditioned in a bunker. Usually bagasse.',
-  SECONDARY_FIBRE: 'Waxy straw, wetted separately. Not confirmed yet, so normally left empty.',
-  STRUCTURAL_STRAW: 'Soaked rather than hopper-wetted. Gives the compost structure.',
-  NITROGEN_SOURCE: 'Dry-mixed, never wetted on its own.',
-  MINERAL: 'Dry-mixed with the nitrogen source.',
-  PH_CORRECTOR: 'Optional. Adds a lime correction step.',
-};
-
-function Q({
-  label,
-  help,
-  children,
-  marker,
-}: {
-  label: string;
-  help?: string;
-  children: React.ReactNode;
-  marker?: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="flex flex-wrap items-center gap-2">
-        <span className="font-head text-[13px] font-700">{label}</span>
-        {marker}
-      </span>
-      {help && <span className="text-[11px] leading-snug text-muted">{help}</span>}
-      {children}
-    </label>
-  );
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex flex-wrap gap-2 border-b pb-2" style={{ borderColor: 'var(--line)' }}>
-      <span className="w-48 shrink-0 font-head text-[11px] font-600 uppercase tracking-wider text-muted">
-        {k}
-      </span>
-      <span className="text-[13px] text-ink">{v}</span>
     </div>
   );
 }

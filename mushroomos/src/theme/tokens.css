@@ -1,65 +1,107 @@
-/* Design tokens — docs/UI_DESIGN_SPEC.md §1. Fixed values.
-   Components read tokens, never literals. */
+/* Design tokens.
+   Components read tokens, never literals.
 
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+   ─────────────────────────────────────────────────────────────────────────────
+   THIS PALETTE IS NOT NEW. It is lifted from the Mushroom OS build the factory
+   already has and already likes — the green Material scheme in that app's
+   `tailwind.local.css`, matched value for value:
+
+     primary            #16794a      background          #f7fbf8
+     primary-container  #1a9c62      surface-lowest      #ffffff
+     primary-fixed      #cdf1de      surface-low         #eff6f1
+     on-surface         #171d19      surface-high        #e3ede6
+     on-surface-variant #3f4a43      surface-highest     #dde8e1
+     outline-variant    #bfd0c4      error               #ba1a1a
+
+   The previous tokens here were a warm ochre paper with a probe-teal accent —
+   a considered scheme, and the wrong one: it looked like an instrument readout,
+   not like the product this factory has been looking at. Matching the app they
+   already use costs one file and makes every screen consistent with it at once.
+
+   Typeface is Hanken Grotesk for the same reason — it is what that build uses,
+   for headings and body alike.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* NEUTRALS — warm, ochre-biased. Never a blue-grey. */
-  --paper: #faf7f2;
+  /* NEUTRALS — the green-tinted greys of the Material scheme, not warm paper. */
+  --paper: #f7fbf8;
   --surface: #ffffff;
-  --surface-2: #f4f0e9;
-  --ink: #1b1815;
-  --ink-2: #4a423a;
-  --muted: #7a7066;
-  --line: #e4dcd1;
-  --line-2: #d3c8b9;
+  --surface-2: #eff6f1;
+  --surface-3: #e3ede6;
+  --ink: #171d19;
+  --ink-2: #3f4a43;
+  --muted: #6f7d73;
+  --line: #dde8e1;
+  --line-2: #bfd0c4;
 
-  /* ACCENT — probe teal. Instrumentation, not decoration. */
-  --accent: #0e5d6b;
-  --accent-ink: #08414b;
-  --accent-soft: #e1eef0;
+  /* PRIMARY — the factory's green. */
+  --accent: #16794a;
+  --accent-ink: #16794a;
+  --accent-strong: #1a9c62;
+  --accent-soft: #cdf1de;
+  --on-accent: #ffffff;
 
-  /* SEMANTIC — the working vocabulary of the product. */
-  --ok: #2c7a4b;
-  --ok-soft: #e3f1e8;
-  --warn: #b0700f;
-  --warn-soft: #faeeda;
-  --crit: #a83a2c;
-  --crit-soft: #fae7e3;
-  --inherit: #8a6a2f;
-  --inherit-soft: #f4ebd9;
-  --lock: #5c5248;
-  --lock-soft: #ede9e2;
+  /* SEMANTIC — the working vocabulary, kept inside the same family.
+     `ok` is deliberately a LIGHTER green than the primary, so "on plan" reads as
+     a state rather than as a button. */
+  --ok: #1a9c62;
+  --ok-soft: #cdf1de;
+  --warn: #8a5a00;
+  --warn-soft: #ffeecb;
+  --crit: #ba1a1a;
+  --crit-soft: #ffdad6;
+  /* Resting. Half the process is resting and rest is NOT trouble — it gets the
+     calmest token in the set, never an alarm colour. */
+  --inherit: #636467;
+  --inherit-soft: #e9f2ec;
+  --lock: #55605a;
+  --lock-soft: #e9f2ec;
 
-  --font-head: 'Archivo', system-ui, sans-serif;
-  --font-body: 'Public Sans', system-ui, sans-serif;
+  --font-head: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* One shadow, used everywhere a card lifts off the page. */
+  --shadow-card: 0 1px 3px rgba(23, 29, 25, 0.06), 0 1px 2px rgba(23, 29, 25, 0.04);
+  --shadow-raised: 0 4px 16px rgba(23, 29, 25, 0.1);
+  --radius-card: 16px;
 }
 
+/* Dark stays available — the toggle exists and a GM reading at night should have
+   it — but it is now the same green scheme with the roles swapped, not a
+   different product. */
 [data-theme='dark'] {
-  --paper: #15120f;
-  --surface: #1c1916;
-  --surface-2: #241f1a;
-  --ink: #f4efe7;
-  --ink-2: #cabfb1;
-  --muted: #94897c;
-  --line: #332c25;
-  --line-2: #463d33;
+  --paper: #0f1512;
+  --surface: #171d19;
+  --surface-2: #1d2521;
+  --surface-3: #253029;
+  --ink: #e2e9e4;
+  --ink-2: #bcc7c0;
+  --muted: #8a978e;
+  --line: #2a352e;
+  --line-2: #3a4740;
 
-  --accent: #4aa8b8;
-  --accent-ink: #7cc6d3;
-  --accent-soft: #12333a;
+  --accent: #6fd39b;
+  --accent-ink: #8fdfb1;
+  --accent-strong: #8fdfb1;
+  --accent-soft: #13301f;
+  --on-accent: #06301c;
 
-  --ok: #5cb87e;
-  --ok-soft: #16301f;
-  --warn: #d99a3a;
-  --warn-soft: #34260f;
-  --crit: #d9705f;
-  --crit-soft: #351a15;
-  --inherit: #c2a05c;
-  --inherit-soft: #2e2617;
-  --lock: #948779;
-  --lock-soft: #26221d;
+  --ok: #6fd39b;
+  --ok-soft: #13301f;
+  --warn: #e0b154;
+  --warn-soft: #33270d;
+  --crit: #ffb4ab;
+  --crit-soft: #3b0908;
+  --inherit: #9aa5a0;
+  --inherit-soft: #1d2521;
+  --lock: #9aa5a0;
+  --lock-soft: #1d2521;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -73,11 +115,30 @@ body,
   margin: 0;
 }
 
+/* `overscroll-behavior` belongs on the VIEWPORT SCROLLER, which is <html>.
+   Putting it on <body> makes body a nested scroll container that cannot scroll,
+   and the WebView then refuses to chain the touch up — dead scroll in the APK.
+   Learned from the existing Mushroom OS build, whose own stylesheet carries this
+   note; repeating the mistake here would have been avoidable. */
+html {
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe areas, so the phone's notch and home indicator do not eat controls. */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Non-negotiable: this product is read as columns of numbers. */
@@ -90,4 +151,13 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

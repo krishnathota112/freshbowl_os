@@ -147,3 +147,17 @@ export function isWithinBaseline(hour: number, baselineHours: number): boolean {
   }
   return hour <= baselineHours;
 }
+
+/**
+ * Calculates the planned target instant for pre-batch activities (e.g. pre-batch bagasse weighment).
+ *
+ * Pre-H0 activities precede H0 by a configured offset (e.g. offsetHours = 10).
+ * They are outside the baseline production rail.
+ */
+export function preBatchTargetInstant(startAt: Instant, offsetHours: number): Date {
+  if (offsetHours < 0) {
+    throw new RangeError(`offsetHours must not be negative; received ${offsetHours}`);
+  }
+  return new Date(toEpochMs(startAt, 'startAt') - offsetHours * MS_PER_HOUR);
+}
+

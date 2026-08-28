@@ -114,17 +114,22 @@ describeDb('A5 — the constraint exists, and it is the thing that refuses', () 
       //             these are writable by design. They are the plan, never the utilisation.
       //   CAPABILITY  boolean. `MACHINE_UTILIZATION_MODEL` §3 records whether a machine has an hour
       //             meter FITTED. It holds no reading.
-      const permitted: Record<string, 'AXIS' | 'PLAN' | 'CAPABILITY'> = {
+      //   PROVENANCE  holds no hour at all. It names WHICH register placed the activity on the
+      //             axis — the process standard, or an hour a person chose. Classing these as AXIS
+      //             would say they are coordinates; they are labels about coordinates.
+      const permitted: Record<string, 'AXIS' | 'PLAN' | 'CAPABILITY' | 'PROVENANCE'> = {
         'batch_activity.baseline_start_hour': 'AXIS',
         'batch_activity.baseline_end_hour': 'AXIS',
         'process_activity.standard_start_hour': 'AXIS',
         'process_activity.standard_end_hour': 'AXIS',
-        'process_activity.standard_hour_source': 'AXIS',
         'factory_clock.h0_hour_of_day': 'AXIS',
         'factory_clock.h0_minute_of_hour': 'AXIS',
         'phase2_control_band.from_hr': 'AXIS',
         'phase2_control_band.to_hr': 'AXIS',
         'v_batch_event.batch_hour': 'AXIS',
+        // 0026. The batch's own hour, so a VESSEL reads on the same clock as everything else in
+        // the product. A coordinate, not a quantity of time anyone spent.
+        'v_plant_now.batch_hour': 'AXIS',
         'v_variance_contributor.baseline_start_hour': 'AXIS',
         'batch_activity.day0_duration_hr': 'PLAN',
         'batch_activity.duration_target_min_hr': 'PLAN',
@@ -132,6 +137,17 @@ describeDb('A5 — the constraint exists, and it is the thing that refuses', () 
         'process_activity.duration_target_min_hr': 'PLAN',
         'process_activity.duration_target_max_hr': 'PLAN',
         'machine.meters_hours': 'CAPABILITY',
+        'process_activity.standard_hour_source': 'PROVENANCE',
+        // 0027 — the hourly plan. Admin states the hour for THIS batch; the process states the day.
+        'batch_activity.planned_hour_source': 'PROVENANCE',
+        'v_activity_timing.hour_source': 'PROVENANCE',
+        'v_activity_timing.standard_start_hour': 'AXIS',
+        'v_activity_timing.standard_end_hour': 'AXIS',
+        'v_activity_timing.baseline_start_hour': 'AXIS',
+        'v_activity_timing.baseline_end_hour': 'AXIS',
+        'v_activity_timing.standard_min_hr': 'PLAN',
+        'v_activity_timing.standard_max_hr': 'PLAN',
+        'v_activity_timing.planned_duration_hr': 'PLAN',
       };
 
       const found = await all<{ table_name: string; column_name: string; data_type: string }>(
@@ -157,6 +173,14 @@ describeDb('A5 — the constraint exists, and it is the thing that refuses', () 
         const key = `${c.table_name}.${c.column_name}`;
         if (permitted[key] === 'CAPABILITY') {
           expect(c.data_type, `${key} is classed CAPABILITY but is not a boolean`).toBe('boolean');
+        }
+        // A PROVENANCE column must not be a number. If one ever becomes numeric it has stopped
+        // being a label and started being an hour, and it needs reclassifying.
+        if (permitted[key] === 'PROVENANCE') {
+          expect(
+            ['numeric', 'integer', 'bigint', 'double precision'],
+            `${key} is classed PROVENANCE but holds a number`
+          ).not.toContain(c.data_type);
         }
       }
 

@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { batchDay, batchHour, batchInstant, isWithinBaseline, wallClock } from './time';
+import { batchDay, batchHour, batchInstant, isWithinBaseline, preBatchTargetInstant, wallClock } from './time';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────
 // Fixture loading
@@ -314,6 +314,22 @@ describe('guards', () => {
     const total = batches[0].total_hours;
     expect(isWithinBaseline(total, total)).toBe(true);
     expect(isWithinBaseline(total + 1, total)).toBe(false);
+  });
+});
+
+describe('preBatchTargetInstant — Pre-H0 data-driven target calculation', () => {
+  it('calculates the target instant correctly with configured offset', () => {
+    const h0 = new Date('2026-08-26T18:00:00.000Z');
+    const target10 = preBatchTargetInstant(h0, 10);
+    expect(target10.toISOString()).toBe('2026-08-26T08:00:00.000Z');
+
+    const target12 = preBatchTargetInstant(h0, 12);
+    expect(target12.toISOString()).toBe('2026-08-26T06:00:00.000Z');
+  });
+
+  it('rejects negative offset hours', () => {
+    const h0 = new Date('2026-08-26T18:00:00.000Z');
+    expect(() => preBatchTargetInstant(h0, -1)).toThrow(RangeError);
   });
 });
 

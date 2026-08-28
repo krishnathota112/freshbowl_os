@@ -536,43 +536,57 @@ function ReadingEntry({
   });
 
   return (
-    <Card className="mb-2 p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-head text-[14px] font-700">{parameter}</span>
-        {/*
-          The band, or the stated absence of one. `spec_found` false means TBD-36 left this
-          checkpoint unmapped — the reading will be recorded and its verdict will be `no_spec`.
-        */}
+    <div className="mb-3 rounded-2xl border border-line bg-surface p-4 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h4 className="font-head text-base font-bold text-ink">{parameter}</h4>
         {specFound ? (
-          <span className="mono text-[11px] text-muted">
-            {min ?? '—'}–{max ?? '—'} {unit ?? ''}
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary">
+            TARGET: {min ?? '—'}–{max ?? '—'} {unit ?? ''}
           </span>
         ) : (
-          <span className="text-[11px]" style={{ color: 'var(--warn)' }}>
-            no spec band
+          <span className="px-2 py-0.5 rounded text-xs font-mono font-medium text-amber-700 bg-amber-50">
+            No Spec Bound
           </span>
         )}
       </div>
-      <div className="mt-2 flex gap-2">
-        <input
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={unit ? `value in ${unit}` : 'value'}
-          className="flex-1 rounded border px-3 text-[16px]"
-          style={{ minHeight: 48, borderColor: 'var(--line-2)', background: 'var(--surface)' }}
-        />
-        <button
-          type="button"
-          disabled={value.trim() === '' || save.isPending}
-          onClick={() => save.mutate()}
-          className="rounded px-4 font-head text-[13px] font-800 disabled:opacity-50"
-          style={{ minHeight: 48, background: 'var(--accent)', color: '#fff' }}
-        >
-          {save.isPending ? 'Saving…' : 'Record'}
-        </button>
+
+      {/* Distinct TARGET vs RESULT Sections */}
+      <div className="p-3 bg-surface-2 rounded-xl border border-line/60 flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-[140px]">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted block">
+            Target Specification
+          </span>
+          <span className="font-mono text-sm font-bold text-ink-2">
+            {specFound ? `${min ?? '—'} to ${max ?? '—'} ${unit ?? ''}` : 'Ad-hoc Reading'}
+          </span>
+        </div>
+
+        <div className="flex-1 min-w-[200px]">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">
+            Recorded Result
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={unit ? `Value in ${unit}` : 'Enter value'}
+              className="flex-1 rounded-lg border border-line-2 bg-surface px-3 py-2 text-sm font-mono font-bold text-ink focus:border-accent focus:outline-none"
+              style={{ minHeight: 44 }}
+            />
+            <button
+              type="button"
+              disabled={value.trim() === '' || save.isPending}
+              onClick={() => save.mutate()}
+              className="px-5 rounded-lg font-head text-xs font-bold text-white bg-accent hover:opacity-90 disabled:opacity-50 transition-all shrink-0"
+              style={{ minHeight: 44 }}
+            >
+              {save.isPending ? 'Saving…' : 'Record'}
+            </button>
+          </div>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }
 

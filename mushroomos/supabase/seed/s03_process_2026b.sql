@@ -61,6 +61,27 @@ from pd, (values
 ('STRAW-RECEIPT','{role_lead} Receipt','STRUCTURAL_STRAW','STRUCTURAL_STRAW',4,90,'MASTER',
  '{"kind":"SINGLETON"}',null,null,false,false,null,'W §6.1','TBD-23'),
 
+-- ── CLIENT DECISION 5, 23 Aug 2026 · inspection and weighment as DISTINCT activities ────────
+-- "Keep these as distinct activities: Bunker unloading, Paddy inspection, Paddy weighment,
+-- Hopper pass, Reload." Three of the five already existed. Inspection and weighment did not:
+-- the straw stream went receipt -> bale cutting with nothing in between, so the two operations
+-- the client named could not be recorded or timestamped separately.
+--
+-- SINGLETON, not DERIVED_FROM_QUANTITY. The fibre weighment derives its load count from
+-- `primary_fibre_required_mt` / `expected_load_capacity_mt`; NO source gives either figure for
+-- the straw stream, so a load count here would be an invented number (rule 2). The client asked
+-- for one weighment activity and that is what this is.
+--
+-- TBD-23 is carried rather than a new marker invented: it already asks which day the straw
+-- receipt work falls on, and these sit in that same Day-4 block.
+('STRAW-INSPECT','{role_lead} Inspection','STRUCTURAL_STRAW','STRUCTURAL_STRAW',4,92,'MASTER',
+ '{"kind":"SINGLETON"}',null,null,false,false,null,
+ 'client decision 23 Aug 2026 · lab dictation §4','TBD-23'),
+
+('STRAW-WEIGH','{role_lead} Weighment','STRUCTURAL_STRAW','STRUCTURAL_STRAW',4,94,'MASTER',
+ '{"kind":"SINGLETON"}',null,null,false,false,null,
+ 'client decision 23 Aug 2026 · lab dictation §4.4','TBD-23'),
+
 ('STRAW-BALE-CUT','{role_lead} Bale Cutting','STRUCTURAL_STRAW','STRUCTURAL_STRAW',4,100,'MASTER',
  '{"kind":"SINGLETON"}',null,null,false,false,null,'W §6.2','TBD-23'),
 

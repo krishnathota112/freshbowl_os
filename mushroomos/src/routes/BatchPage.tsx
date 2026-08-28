@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { loadBatchPage } from '../api/batchPage';
+import { loadIndividualBatches, loadMovements } from '../api/movements';
 import type { BatchPageData, BatchVariance } from '../domain/contracts';
 import { EventStream } from '../components/composite/EventStream';
 import { HourRail } from '../components/composite/HourRail';
@@ -215,9 +216,9 @@ function Overview({ data, nowMs }: { data: BatchPageData; nowMs: number }) {
         {/*
           `nowMs` is the moment THIS DATA was fetched, not the moment of this render.
 
-          `Date.now()` inline would be a new value every render, which defeats `railGeometry`'s
+          `nowMs()` inline would be a new value every render, which defeats `railGeometry`'s
           memo and makes the now-marker jitter against segments computed from an older read.
-          `Date.now()` memoised on `[]` has the opposite fault: the marker freezes at mount and the
+          `nowMs()` memoised on `[]` has the opposite fault: the marker freezes at mount and the
           60-second refetch moves the rows underneath it while the clock stays put. The query's own
           `dataUpdatedAt` is stable between renders and advances with the data — the one value that
           keeps the marker and the segments describing the same instant.
@@ -229,6 +230,8 @@ function Overview({ data, nowMs }: { data: BatchPageData; nowMs: number }) {
           onScrubToHour={play.setHour}
         />
       </Card>
+
+      <IndividualBatches batchId={data.bar.batchId} />
 
       <WhereTheTimeWent variance={data.variance} onScrubToHour={play.setHour} />
 
@@ -325,6 +328,67 @@ function WhereTheTimeWent({
           </li>
         )}
       </ul>
+    </Card>
+  );
+}
+
+/**
+ * THE BATCHES INSIDE THIS ONE, and where each of them went.
+ *
+ * A master batch is a group — "366, 367, 368" — and they travel together until tunnel loading,
+ * where each takes its own tunnel and gets its own quality result. Until this was shown, the
+ * chairman could see the master batch was late and could not see which of the three it was late
+ * in, which is the question that decides who to go and ask.
+ */
+function IndividualBatches({ batchId }: { batchId: string }) {
+  const q = useQuery({
+    queryKey: ['batch-individuals', batchId],
+    queryFn: async () => ({
+      individuals: await loadIndividualBatches(batchId),
+      movements: await loadMovements(batchId),
+    }),
+  });
+
+  const d = q.data;
+  if (!d || d.individuals.length === 0) return null;
+
+  // Where each one ends up. Tunnel loading is the movement that splits them.
+  const tunnelOf = new Map<string, string>();
+  for (const m of d.movements) {
+    if (m.individualBatchId !== null && m.toLabel !== null) {
+      tunnelOf.set(m.individualBatchId, m.toLabel);
+    }
+  }
+
+  return (
+    <Card className="p-4">
+      <SectionLabel>The batches inside this one</SectionLabel>
+      <div className="flex flex-wrap gap-2">
+        {d.individuals.map((b) => (
+          <div
+            key={b.id}
+            className="flex-1 border p-3"
+            style={{
+              minWidth: 150,
+              borderRadius: 12,
+              borderColor: 'var(--line)',
+              background: 'var(--surface-2)',
+            }}
+          >
+            <span className="mono block text-[16px] font-700" style={{ color: 'var(--accent-ink)' }}>
+              {b.batchNo}
+            </span>
+            <span className="mt-0.5 block text-[12px]" style={{ color: 'var(--ink-2)' }}>
+              {/* Not yet chosen is a real state and says so, rather than showing a blank. */}
+              {tunnelOf.get(b.id) ?? 'tunnel not chosen yet'}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+        They share the process until tunnel loading, then each takes its own tunnel and its own
+        quality result.
+      </p>
     </Card>
   );
 }

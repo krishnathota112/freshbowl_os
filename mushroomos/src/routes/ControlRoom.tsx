@@ -28,6 +28,7 @@ import {
   Skeleton,
 } from '../components/primitives';
 import { HumanDuration } from '../components/domain/HumanDuration';
+import { nowMs } from '../lib/now';
 
 /**
  * S11 · the Supervisor Control Room.  `UI_IMPLEMENTATION_PLAN §S11`,
@@ -186,7 +187,7 @@ export function ControlRoom() {
   }
 
   const d = q.data!;
-  const now = Date.now();
+  const now = nowMs();
 
   return (
     <>
@@ -209,7 +210,11 @@ export function ControlRoom() {
               <Card key={g.activityId} className="p-3" rail="var(--inherit)">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-head text-[13px] font-700">{g.title}</span>
-                  <Link to={`/batch/${g.batchId}`} className="mono text-[11px] text-muted">
+                  <Link
+                    to={`/batch/${g.batchId}`}
+                    className="mono inline-flex items-center px-2 text-[11px] text-muted"
+                    style={{ minHeight: 44 }}
+                  >
                     {g.batchCode} · {g.scopeLabel}
                   </Link>
                 </div>
@@ -346,7 +351,11 @@ export function ControlRoom() {
               <Card key={a.activityId} className="p-3" rail="var(--warn)">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-head text-[13px] font-700">{a.title}</span>
-                  <Link to={`/batch/${a.batchId}`} className="mono text-[11px] text-muted">
+                  <Link
+                    to={`/batch/${a.batchId}`}
+                    className="mono inline-flex items-center px-2 text-[11px] text-muted"
+                    style={{ minHeight: 44 }}
+                  >
                     {a.batchCode} · {a.scopeLabel}
                   </Link>
                 </div>

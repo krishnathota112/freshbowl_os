@@ -67,7 +67,8 @@ describe('P1 — today is the FACTORY\'s day, and the date logic has one impleme
   it('reuses factoryDate rather than computing a date inline', () => {
     const src = screen();
     expect(src).toMatch(/import \{ factoryDate \}/);
-    expect(src).toMatch(/factoryDate\(Date\.now\(\), clock\.data\.timezone\)/);
+    // The effective clock, not the browser's — the database can be time-travelled for a demo.
+    expect(src).toMatch(/factoryDate\(nowMs\(\), clock\.data\.timezone\)/);
     // A second date implementation is how the two drift apart — and `factoryDate` is the one that
     // already had the September-became-January bug found and fixed in it.
     expect(src).not.toMatch(/toISOString\(\)\.slice\(0, ?10\)/);

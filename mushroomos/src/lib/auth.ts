@@ -135,5 +135,17 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // If network fails, local sign-out still proceeds
+  }
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('sb-') || k.includes('auth-token') || k.includes('supabase'))) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch {}
 }

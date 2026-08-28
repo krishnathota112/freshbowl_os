@@ -66,6 +66,8 @@ export const ACTIVITY_SCOPES = [
 ] as const;
 export type ActivityScope = (typeof ACTIVITY_SCOPES)[number];
 
+export type ProcessPhase = 'PRE_H0' | 'PRODUCTION';
+
 export type AppRole = 'gm' | 'manager' | 'admin' | 'supervisor' | 'operator' | 'lab_tech';
 
 /** docs/STEP_1_2_BUILD_SPEC.md §2.4 — six kinds, no literal counts anywhere. */

@@ -5,6 +5,7 @@ import { getFactoryClock } from '../api/batch';
 import { factoryDate } from '../components/composite/geometry';
 import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../components/primitives';
+import { nowMs } from '../lib/now';
 
 /*
  * C4 HAS LANDED, so these point at `/batch/:id` — the shared management batch page.
@@ -36,7 +37,7 @@ export function AdminToday() {
 
   // Today in the FACTORY's timezone. An admin travelling, or a browser on a different zone, must
   // still see the factory's day — `TIME_CONTRACT §3.2`. `factoryDate` is the one implementation.
-  const today = clock.data?.timezone ? factoryDate(Date.now(), clock.data.timezone).iso : null;
+  const today = clock.data?.timezone ? factoryDate(nowMs(), clock.data.timezone).iso : null;
 
   const q = useQuery({
     queryKey: ['admin-today', today],
@@ -82,7 +83,7 @@ export function AdminToday() {
   const d = q.data!;
   // `FactoryDate` carries the parts rather than a formatted string, deliberately — the ISO date is
   // built from NUMERIC parts so a locale rendering "Sept" cannot corrupt it. Composed here.
-  const f = factoryDate(Date.now(), clock.data.timezone);
+  const f = factoryDate(nowMs(), clock.data.timezone);
   const dayLabel = `${f.weekday} ${f.dayOfMonth} ${f.month}`;
 
   return (
@@ -203,7 +204,12 @@ export function AdminToday() {
                     same mistake this screen was rewritten to remove.
                   */}
                   <span className="text-[13px]">{b.message}</span>
-                  <Link to={`/admin/batch/${b.batchId}/schedule`} className="mono text-[11px] text-muted">
+                  {/* 44 px — this is read on a phone as often as on a desktop now. */}
+                  <Link
+                    to={`/admin/batch/${b.batchId}/schedule`}
+                    className="mono inline-flex items-center px-2 text-[11px] text-muted"
+                    style={{ minHeight: 44 }}
+                  >
                     {b.batchCode}
                   </Link>
                 </div>

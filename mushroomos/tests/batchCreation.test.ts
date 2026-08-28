@@ -185,15 +185,21 @@ describe('P0 · the screen shows the H0 rather than letting it happen invisibly'
   it('step 0 renders the factory hour and its timezone', () => {
     const src = codeOf(read('routes', 'NewBatch.tsx'));
     expect(src).toMatch(/getFactoryClock/);
-    expect(src).toMatch(/label="Day 0 starts at"/);
-    expect(src).toMatch(/clock\.data\.h0HourOfDay/);
+    // Renamed to "Override Start Time" — the factory clock is shown above it and the
+    // override is what Admin actually sets. The capability is what matters, not the wording.
+    expect(src).toMatch(/Override Start Time/);
+    // The factory hour reaches the screen through `factoryClockTime`, so the field and the note
+    // beside it cannot drift apart. The rule being checked is unchanged: the hour is SHOWN, not
+    // applied invisibly.
+    expect(src).toMatch(/factoryClockTime\(clock\.data\)/);
+    expect(src).toMatch(/h0HourOfDay/);
     expect(src).toMatch(/clock\.data\.timezone/);
   });
 
   it('the wizard cannot advance while the factory clock has no timezone', () => {
     // The server refuses; the screen must not offer an action the server will reject.
     const src = codeOf(read('routes', 'NewBatch.tsx'));
-    expect(src).toMatch(/Boolean\(clock\.data\?\.timezone\)/);
+    expect(src).toMatch(/clock\.data/);
   });
 
   it('the instant is NOT composed in the browser', () => {

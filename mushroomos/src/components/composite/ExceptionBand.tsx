@@ -79,8 +79,9 @@ export function ExceptionBand({
                 <button
                   type="button"
                   onClick={() => onOpen(e.batchId, e.activityId)}
-                  className="shrink-0 rounded border px-3 py-2 font-head text-[12px] font-600"
-                  style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }}
+                  className="inline-flex shrink-0 items-center rounded border px-3 font-head text-[12px] font-600"
+                  // 44 px, because the same build ships in the APK and a GM reads this on a phone.
+                  style={{ minHeight: 44, borderColor: 'var(--warn)', color: 'var(--warn)' }}
                 >
                   look at it
                 </button>

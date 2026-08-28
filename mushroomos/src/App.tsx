@@ -38,8 +38,12 @@ const SignIn = lazy(() => import('./routes/SignIn').then((m) => ({ default: m.Si
 // Management.
 const AdminToday = lazy(() => import('./routes/AdminToday').then((m) => ({ default: m.AdminToday })));
 const Batches = lazy(() => import('./routes/Batches').then((m) => ({ default: m.Batches })));
+const MonthlySchedule = lazy(() =>
+  import('./routes/MonthlySchedule').then((m) => ({ default: m.MonthlySchedule }))
+);
 const NewBatch = lazy(() => import('./routes/NewBatch').then((m) => ({ default: m.NewBatch })));
 const BatchPage = lazy(() => import('./routes/BatchPage').then((m) => ({ default: m.BatchPage })));
+const Plant = lazy(() => import('./routes/Plant').then((m) => ({ default: m.Plant })));
 const ScheduleBuilder = lazy(() =>
   import('./routes/ScheduleBuilder').then((m) => ({ default: m.ScheduleBuilder }))
 );
@@ -151,6 +155,7 @@ export default function App() {
 
         <Route path="/admin/today" element={<RoleGuard allow={MGMT}><AdminToday /></RoleGuard>} />
         <Route path="/admin/batches" element={<RoleGuard allow={MGMT}><Batches /></RoleGuard>} />
+        <Route path="/admin/schedule" element={<RoleGuard allow={MGMT}><MonthlySchedule /></RoleGuard>} />
         <Route path="/admin/batch/new" element={<RoleGuard allow={['admin', 'gm']}><NewBatch /></RoleGuard>} />
         <Route path="/admin/batch/:id/schedule" element={<RoleGuard allow={['admin', 'gm', 'supervisor']}><ScheduleBuilder /></RoleGuard>} />
         {/*
@@ -159,6 +164,12 @@ export default function App() {
           `/admin/batch/:id`. The old admin path is a redirect that KEEPS THE QUERY STRING, so a
           link carrying `?h=` or `?activity=` arrives at the right hour rather than at hour 1.
         */}
+        {/*
+          THE PLANT. The factory as a place — every bunker and tunnel, occupied or empty.
+          Management-wide, not GM-only: a supervisor asking which bunker is free is asking the same
+          question as the owner, and the answer is the same screen.
+        */}
+        <Route path="/plant" element={<RoleGuard allow={MGMT}><Plant /></RoleGuard>} />
         <Route path="/batch/:id" element={<RoleGuard allow={MGMT}><BatchPage /></RoleGuard>} />
         <Route path="/admin/batch/:id" element={<RedirectToBatchPage />} />
         <Route path="/admin/process-explorer" element={<RoleGuard allow={MGMT}><ProcessExplorer /></RoleGuard>} />

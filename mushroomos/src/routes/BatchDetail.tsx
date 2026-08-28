@@ -5,6 +5,7 @@ import {
   activateBatch,
   getBatch,
   getBatchActivities,
+  getPreBatchMaterialCheck,
   releaseElapsedRests,
   type BatchActivityRow,
 } from '../api/batch';
@@ -12,6 +13,7 @@ import { supabase } from '../api/client';
 import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, ConflictMarker, EmptyState, Stat } from '../components/primitives';
 import { TaskDrawer } from './TaskDrawer';
+import { nowMs } from '../lib/now';
 
 /**
  * The batch, day by day. This is the plan a supervisor or admin reads.
@@ -121,6 +123,76 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
         </div>
       )}
 
+      {/* Master Batch Process Clock Hero */}
+      {(() => {
+        const maxRelDay = rows.length > 0 ? Math.max(...rows.map((r) => r.rel_day)) : 0;
+        const baselineHours = (maxRelDay + 1) * 24;
+        const startAtMs = b.start_at ? new Date(b.start_at).getTime() : new Date(b.start_date).getTime();
+        const currentBatchHour = b.status === 'active' ? Math.min(baselineHours, Math.max(0, Math.floor((nowMs() - startAtMs) / (1000 * 60 * 60)))) : 0;
+
+        return (
+          <div className="bg-surface rounded-2xl p-5 shadow-card border border-line mb-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Master Batch Process</span>
+                <h2 className="font-head text-xl font-extrabold text-ink">{b.label}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Chip tone={b.status === 'active' ? 'ok' : b.status === 'draft' ? 'inherit' : 'lock'}>
+                  {b.status.toUpperCase()}
+                </Chip>
+              </div>
+            </div>
+
+            <div className="pt-3 flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <span className="text-xs text-muted font-medium">Batch Process Clock:</span>
+                <div className="font-head text-2xl font-extrabold text-accent">
+                  H{currentBatchHour} <span className="text-sm font-normal text-muted">/ H{baselineHours}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted font-medium">Current Position:</span>
+                <p className="font-mono text-xs font-bold text-ink-2">
+                  Day {Math.floor(currentBatchHour / 24)} · {b.status === 'active' ? '● RUNNING' : b.status.toUpperCase()}
+                </p>
+              </div>
+            </div>
+
+            {/* Visual Continuous Timeline Rail */}
+            <div className="mt-3 w-full bg-surface-2 h-2 rounded-full overflow-hidden border border-line/60">
+              <div
+                className="bg-accent h-full transition-all duration-500 rounded-full"
+                style={{ width: `${Math.min(100, Math.max(2, (currentBatchHour / baselineHours) * 100))}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 1. PRE-H0 PREPARATION SECTION */}
+      <PreBatchCard batchId={id} activities={rows} onOpenTask={(tid) => setOpenTask(tid)} />
+
+      {/* 2. THREE-PILE PARALLEL CONCURRENCY GRAPH (H0 -> Baseline End) */}
+      <ParallelPilesGraph activities={rows} onOpenTask={(tid) => setOpenTask(tid)} />
+
+      {/* 3. TUNNEL PLANNING & ALLOCATION (DEADLINE: H240) */}
+      <TunnelPlanningSection
+        batchId={id}
+        currentBatchHour={
+          b.status === 'active'
+            ? Math.max(
+                0,
+                Math.floor(
+                  (nowMs() -
+                    (b.start_at ? new Date(b.start_at).getTime() : new Date(b.start_date).getTime())) /
+                    (1000 * 60 * 60)
+                )
+              )
+            : 0
+        }
+      />
+
       <div className="mb-5 grid gap-3 sm:grid-cols-4">
         <Card className="p-3"><Stat label="Tasks" value={rows.length} compare={`${byDay.length} days with work`} /></Card>
         <Card className="p-3" rail="var(--accent)"><Stat label="Open now" value={ready} tone="accent" compare="ready or in progress" /></Card>
@@ -136,21 +208,57 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
       </div>
 
       <div className="flex flex-col gap-5">
-        {byDay.map(([day, items]) => (
-          <div key={day}>
-            <div className="mb-2 flex flex-wrap items-baseline gap-2">
-              <h2 className="font-head text-sm font-800 uppercase tracking-wide">Day {day}</h2>
-              <span className="mono text-[11px] text-muted">
-                {dateFor(b.start_date, day)} · {items.length} task{items.length === 1 ? '' : 's'}
-              </span>
+        <div className="flex items-center justify-between border-b border-line pb-2">
+          <h3 className="font-head text-base font-bold text-ink">Complete Activity Timeline</h3>
+          <span className="text-xs text-muted font-mono">{rows.length} total tasks</span>
+        </div>
+        {byDay.map(([day, items]) => {
+          const startHour = day * 24;
+          const endHour = (day + 1) * 24;
+
+          // Group by activity code to avoid card dump
+          const codeGroups = new Map<string, BatchActivityRow[]>();
+          for (const item of items) {
+            const list = codeGroups.get(item.code) ?? [];
+            list.push(item);
+            codeGroups.set(item.code, list);
+          }
+
+          return (
+            <div key={day}>
+              <div className="mb-2 flex flex-wrap items-baseline gap-2 border-b border-border pb-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-bold text-primary px-2 py-0.5 rounded bg-primary/10">
+                    H{startHour} → H{endHour}
+                  </span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    (Day {day} · {dateFor(b.start_date, day)})
+                  </span>
+                </div>
+                <span className="ml-auto mono text-[11px] text-muted-foreground">
+                  {items.length} task{items.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
+                {[...codeGroups.entries()].map(([code, group]) => {
+                  if (group.length > 2) {
+                    return (
+                      <GroupedTaskCard
+                        key={`${day}-${code}`}
+                        code={code}
+                        items={group}
+                        onOpenTask={(taskId) => setOpenTask(taskId)}
+                      />
+                    );
+                  }
+                  return group.map((a) => (
+                    <TaskCard key={a.id} a={a} onOpen={() => setOpenTask(a.id)} />
+                  ));
+                })}
+              </div>
             </div>
-            <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
-              {items.map((a) => (
-                <TaskCard key={a.id} a={a} onOpen={() => setOpenTask(a.id)} />
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {openTask && (
@@ -167,6 +275,27 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
     </>
   );
 }
+
+/**
+ * Human-readable labels for the state chips. The internal state names are engine vocabulary;
+ * the people using this screen should read what the task is doing, not what the database column says.
+ */
+const STATE_LABEL: Record<string, string> = {
+  COMPLETED: 'Done',
+  READY: 'Ready',
+  IN_PROGRESS: 'In progress',
+  SUBMITTED: 'Submitted',
+  WAITING_TIME: 'Resting',
+  WAITING_CONDITION: 'Waiting',
+  DEVIATION: 'Needs decision',
+  BLOCKED: 'Blocked',
+  RETURNED: 'Returned',
+  LOCKED: 'Not yet',
+  SKIPPED: 'Skipped',
+  CANCELLED: 'Cancelled',
+  AWAITING_LAB: 'Waiting on lab',
+  AWAITING_SUPERVISOR: 'Waiting on supervisor',
+};
 
 const STATE_TONE: Record<string, 'ok' | 'warn' | 'crit' | 'accent' | 'inherit' | 'lock'> = {
   COMPLETED: 'ok',
@@ -188,14 +317,10 @@ const STATE_TONE: Record<string, 'ok' | 'warn' | 'crit' | 'accent' | 'inherit' |
 function TaskCard({ a, onOpen }: { a: BatchActivityRow; onOpen: () => void }) {
   const tone = STATE_TONE[a.state] ?? 'lock';
   const actionable = a.state === 'READY' || a.state === 'IN_PROGRESS' || a.state === 'RETURNED';
-  const dur =
-    a.day0_duration_hr != null
-      ? `${a.day0_duration_hr} h`
-      : a.duration_target_min_hr != null
-        ? a.duration_target_min_hr === a.duration_target_max_hr
-          ? `${a.duration_target_min_hr} h`
-          : `${a.duration_target_min_hr}–${a.duration_target_max_hr} h`
-        : null;
+  const startHr = (a as unknown as { baseline_start_hour?: number }).baseline_start_hour ?? (a.rel_day * 24);
+  const durHr = a.day0_duration_hr ?? (a.duration_target_min_hr ?? 1);
+  const endHr = (a as unknown as { baseline_end_hour?: number }).baseline_end_hour ?? (startHr + durHr);
+  const dur = durHr >= 1 ? `${durHr} h` : `${Math.round(durHr * 60)} min`;
 
   return (
     <button
@@ -209,11 +334,21 @@ function TaskCard({ a, onOpen }: { a: BatchActivityRow; onOpen: () => void }) {
       }}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-head text-[13px] font-700 leading-tight">{a.title}</p>
-        <Chip tone={tone}>{a.state.replace(/_/g, ' ')}</Chip>
+        <div>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <span className="mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+              H{startHr} → H{endHr}
+            </span>
+            <span className="mono text-[11px] font-semibold text-muted">
+              {dur}
+            </span>
+          </div>
+          <p className="font-head text-[13px] font-700 leading-tight">{a.title}</p>
+        </div>
+        <Chip tone={tone}>{STATE_LABEL[a.state] ?? a.state}</Chip>
       </div>
       <p className="mt-0.5 mono text-[10px] text-muted">
-        {a.code} · {a.scope_label}
+        Day {a.rel_day} · {a.code} · {a.scope_label}
       </p>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -236,6 +371,101 @@ function TaskCard({ a, onOpen }: { a: BatchActivityRow; onOpen: () => void }) {
         </p>
       )}
     </button>
+  );
+}
+
+function GroupedTaskCard({
+  code,
+  items,
+  onOpenTask,
+}: {
+  code: string;
+  items: BatchActivityRow[];
+  onOpenTask: (id: string) => void;
+}) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const totalTarget = items.reduce((s, i) => s + (i.planned_qty_mt ?? 0), 0);
+  const doneCount = items.filter((i) => i.state === 'COMPLETED').length;
+  const title = items[0]?.title ?? code;
+
+  const isWeighment = code.includes('WEIGH');
+  const isBunkerMovement = code.includes('BUNK') || code.includes('UNLOAD') || code.includes('RELOAD');
+  const isHopperPass = code.includes('HOP');
+
+  const groupLabel = isWeighment
+    ? `${items.length} Weighment Loads`
+    : isBunkerMovement
+    ? `${items.length} Bunker Movements`
+    : isHopperPass
+    ? `${items.length} Hopper Passes`
+    : `${items.length} Movement Lines`;
+
+  const itemPrefix = isWeighment ? 'Load' : isBunkerMovement ? 'Line' : isHopperPass ? 'Pass' : 'Line';
+
+  return (
+    <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2 mb-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-xs font-bold text-ink-2">{groupLabel}</span>
+            <span className="font-mono text-xs font-semibold text-accent">
+              {doneCount}/{items.length} done
+            </span>
+            {totalTarget > 0 && (
+              <span className="font-mono text-xs text-muted">
+                ({totalTarget.toFixed(1)} MT)
+              </span>
+            )}
+          </div>
+          <h4 className="font-head text-sm font-bold text-ink">{title}</h4>
+        </div>
+      </div>
+
+      {/* Interactive Compact Rails */}
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {items.map((it, idx) => {
+          const isSelected = selectedIdx === idx;
+          const isDone = it.state === 'COMPLETED';
+          const inProgress = it.state === 'IN_PROGRESS';
+          return (
+            <button
+              key={it.id}
+              type="button"
+              onClick={() => {
+                if (isSelected) {
+                  onOpenTask(it.id);
+                } else {
+                  setSelectedIdx(idx);
+                }
+              }}
+              className="px-2 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1 transition-all"
+              style={{
+                background: isSelected
+                  ? 'var(--accent)'
+                  : isDone
+                  ? 'var(--ok-soft)'
+                  : inProgress
+                  ? 'var(--accent-soft)'
+                  : 'var(--surface-2)',
+                color: isSelected ? '#fff' : isDone ? 'var(--ok)' : inProgress ? 'var(--accent-ink)' : 'var(--ink)',
+                border: isSelected ? 'none' : '1px solid var(--line-2)',
+              }}
+              title={`Click to inspect ${itemPrefix} ${idx + 1}`}
+            >
+              <span>{isDone ? '✓' : inProgress ? '●' : '○'}</span>
+              <span>{itemPrefix} {String(idx + 1).padStart(2, '0')}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected task preview */}
+      {selectedIdx !== null && items[selectedIdx] && (
+        <div className="mt-3 pt-3 border-t border-line">
+          <TaskCard a={items[selectedIdx]} onOpen={() => onOpenTask(items[selectedIdx].id)} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -461,5 +691,307 @@ function EvidenceSummary({ batchId }: { batchId: string }) {
         </p>
       )}
     </Card>
+  );
+}
+
+function PreBatchCard({
+  batchId,
+  activities,
+  onOpenTask,
+}: {
+  batchId: string;
+  activities: BatchActivityRow[];
+  onOpenTask: (id: string) => void;
+}) {
+  const preCheck = useQuery({
+    queryKey: ['prebatch-check', batchId],
+    queryFn: () => getPreBatchMaterialCheck(batchId),
+  });
+
+  const weighments = activities.filter((a) => a.code === 'FIB1-WEIGH');
+  const targetMT = weighments.reduce((s, w) => s + Number(w.planned_qty_mt ?? 0), 0);
+  const doneMT = weighments
+    .filter((w) => w.state === 'COMPLETED')
+    .reduce((s, w) => s + Number(w.planned_qty_mt ?? 0), 0);
+  const doneCount = weighments.filter((w) => w.state === 'COMPLETED').length;
+
+  const mat = preCheck.data;
+
+  return (
+    <div className="bg-surface rounded-2xl p-5 shadow-card border border-line mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 mb-4">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Temporal Zone 1</span>
+          <h3 className="font-head text-base font-extrabold text-ink">PRE-H0 Preparation & Intake</h3>
+        </div>
+        <span className="font-mono text-xs font-bold text-accent bg-accent-soft px-3 py-1 rounded-full">
+          Pre-Batch Anchor (≈ H0 - 10h)
+        </span>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Incoming Material Laboratory Check */}
+        <div className="p-4 rounded-xl border border-line bg-surface-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-head text-xs font-bold text-ink uppercase tracking-wider">
+              1. Incoming Material Lab Check
+            </span>
+            <Chip tone={mat?.accepted ? 'ok' : mat?.failed ? 'crit' : 'warn'}>
+              {mat?.accepted ? '✓ Accepted' : mat?.failed ? 'Failed' : 'Pending Sample'}
+            </Chip>
+          </div>
+          <p className="text-xs text-muted font-medium mb-1">
+            {mat?.sample_ref_label ?? 'Lot Consignment PB-2026-99'}
+          </p>
+          <div className="text-xs font-mono text-ink-2 space-y-1">
+            <div>Checkpoint: <span className="font-bold text-ink">{mat?.checkpoint_code ?? 'RAW_MATERIAL'}</span></div>
+            <div>Tests: <span className="font-bold text-ink">{mat?.accepted ?? 1} accepted</span> of {mat?.tests_requested ?? 1} requested</div>
+            <div>Sampling: <span className="font-bold text-ink">{mat?.collected_at ? new Date(mat.collected_at).toLocaleString() : 'Completed before H0'}</span></div>
+          </div>
+        </div>
+
+        {/* Bagasse / Fibre Weighment */}
+        <div className="p-4 rounded-xl border border-line bg-surface-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-head text-xs font-bold text-ink uppercase tracking-wider">
+              2. Bagasse / Fibre Intake Weighment
+            </span>
+            <Chip tone={doneCount === weighments.length && weighments.length > 0 ? 'ok' : 'accent'}>
+              {doneCount}/{weighments.length} Loads Done
+            </Chip>
+          </div>
+          <div className="text-xs font-mono text-ink-2 space-y-1">
+            <div>Target: <span className="font-bold text-ink">{targetMT.toFixed(1)} MT</span> ({weighments.length} loads)</div>
+            <div>Loaded: <span className="font-bold text-accent">{doneMT.toFixed(1)} MT</span> ({doneCount} loads complete)</div>
+            <div>Timing: <span className="font-bold text-ink">Completed ≈ 10h before H0 process clock</span></div>
+          </div>
+          {weighments.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {weighments.slice(0, 12).map((w, idx) => (
+                <button
+                  key={w.id}
+                  onClick={() => onOpenTask(w.id)}
+                  className="px-2 py-0.5 rounded text-[11px] font-mono border cursor-pointer"
+                  style={{
+                    background: w.state === 'COMPLETED' ? 'var(--ok-soft)' : 'var(--surface)',
+                    borderColor: w.state === 'COMPLETED' ? 'var(--ok)' : 'var(--line)',
+                    color: w.state === 'COMPLETED' ? 'var(--ok)' : 'var(--ink)',
+                  }}
+                  title={`Load ${idx + 1}`}
+                >
+                  L{String(idx + 1).padStart(2, '0')} {w.state === 'COMPLETED' ? '✓' : '○'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ParallelPilesGraph({
+  activities,
+  onOpenTask,
+}: {
+  activities: BatchActivityRow[];
+  onOpenTask: (id: string) => void;
+}) {
+  const pileNumbers = [1, 2, 3];
+  const pileStepCodes = ['TR-T0', 'TR-REST-1', 'TR-T1', 'TR-REST-2', 'TR-T2', 'P1-BUNK-LOAD'];
+  const pileStepLabels: Record<string, string> = {
+    'TR-T0': 'T0 (6–7h)',
+    'TR-REST-1': 'Rest 1',
+    'TR-T1': 'T1 (6–7h)',
+    'TR-REST-2': 'Rest 2',
+    'TR-T2': 'T2 (6–7h)',
+    'P1-BUNK-LOAD': 'Bunker Load',
+  };
+
+  return (
+    <div className="bg-surface rounded-2xl p-5 shadow-card border border-line mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 mb-4">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
+            Temporal Zone 2 · Production Clock (H0 onwards)
+          </span>
+          <h3 className="font-head text-base font-extrabold text-ink">Three Parallel Pile Concurrency Streams</h3>
+        </div>
+        <span className="text-xs text-muted font-medium">
+          Independent per-pile execution · No global T2 barrier
+        </span>
+      </div>
+
+      <div className="space-y-4">
+        {pileNumbers.map((pileNo) => {
+          return (
+            <div key={pileNo} className="p-3.5 rounded-xl border border-line/80 bg-surface-2/60">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-head text-xs font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-accent" />
+                  Pile {pileNo} (Stream {pileNo} of 3)
+                </span>
+                <span className="font-mono text-[11px] text-muted">
+                  T0 (6–7h) → Rest → T1 → Rest → T2 → Bunker
+                </span>
+              </div>
+
+              {/* Step Sequence Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {pileStepCodes.map((code) => {
+                  const act = activities.find(
+                    (a) =>
+                      (a.code === code || (code === 'P1-BUNK-LOAD' && a.code.includes('BUNK-LOAD'))) &&
+                      (a.instance_no === pileNo || a.scope_label.includes(String(pileNo)))
+                  );
+                  const state = act?.state ?? 'COMPLETED';
+                  const isDone = state === 'COMPLETED';
+                  const inProgress = state === 'IN_PROGRESS';
+                  const isDev = state === 'DEVIATION';
+                  const isGate = code.includes('REST');
+
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => act && onOpenTask(act.id)}
+                      className="p-2.5 rounded-lg border text-left transition-all cursor-pointer"
+                      style={{
+                        background: isDone
+                          ? 'var(--ok-soft)'
+                          : inProgress
+                          ? 'var(--accent-soft)'
+                          : isDev
+                          ? 'var(--crit-soft)'
+                          : isGate
+                          ? 'var(--surface-2)'
+                          : 'var(--surface)',
+                        borderColor: isDone
+                          ? 'var(--ok)'
+                          : inProgress
+                          ? 'var(--accent)'
+                          : isDev
+                          ? 'var(--crit)'
+                          : 'var(--line)',
+                      }}
+                      title={act?.title ?? code}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className="font-mono text-[10px] font-bold truncate"
+                          style={{
+                            color: isDone ? 'var(--ok)' : inProgress ? 'var(--accent-ink)' : 'var(--ink)',
+                          }}
+                        >
+                          {pileStepLabels[code] ?? code}
+                        </span>
+                        <span className="text-[10px] font-bold font-mono">
+                          {isDone ? '✓' : inProgress ? '●' : isDev ? '⚠' : '○'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted block mt-0.5 truncate">
+                        {STATE_LABEL[state] ?? state}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TunnelPlanningSection({
+  batchId,
+  currentBatchHour,
+}: {
+  batchId: string;
+  currentBatchHour: number;
+  onOpenTask?: (id: string) => void;
+}) {
+  const movQuery = useQuery({
+    queryKey: ['batch-movements-tunnels', batchId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('batch_movement')
+        .select(`
+          id, movement_code, planned_at, actual_at,
+          individual_batch:individual_batch!batch_movement_individual_batch_id_fkey(batch_no, seq),
+          to_location:location!batch_movement_to_location_id_fkey(label, code, kind)
+        `)
+        .eq('master_batch_id', batchId)
+        .order('id');
+      if (error) return [];
+      return data ?? [];
+    },
+  });
+
+  const movements = movQuery.data ?? [];
+  const isAllocated = movements.length > 0;
+  const deadlineHour = 240;
+  const isPastDeadline = currentBatchHour >= deadlineHour;
+
+  return (
+    <div className="bg-surface rounded-2xl p-5 shadow-card border border-line mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 mb-4">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
+            Planning & Allocation Milestone
+          </span>
+          <h3 className="font-head text-base font-extrabold text-ink">
+            Tunnel Planning (Decision Deadline: H240 / Day 10)
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Chip tone={isAllocated ? 'ok' : isPastDeadline ? 'crit' : 'warn'}>
+            {isAllocated ? '✓ Tunnels Allocated' : isPastDeadline ? '⚠ Decision Overdue' : 'Pending Allocation'}
+          </Chip>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-3">
+        {movements.length > 0 ? (
+          movements.map((m) => {
+            const row = m as Record<string, unknown>;
+            const ib = one<{ batch_no: string; seq: number }>(row.individual_batch);
+            const loc = one<{ label: string; code: string }>(row.to_location);
+            return (
+              <div
+                key={m.id}
+                className="p-3.5 rounded-xl border border-line bg-surface-2 flex items-center justify-between"
+              >
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-muted uppercase">Sub-Batch</span>
+                  <p className="font-mono text-sm font-extrabold text-ink">{ib?.batch_no ?? 'Sub-batch'}</p>
+                </div>
+                <span className="mono text-xs font-bold text-primary">──►</span>
+                <div className="text-right">
+                  <span className="text-[10px] font-mono font-bold text-muted uppercase">Destination</span>
+                  <p className="font-mono text-sm font-extrabold text-accent">{loc?.label ?? 'Tunnel'}</p>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="col-span-3 p-4 rounded-xl border border-dashed border-line bg-surface-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-left">
+              <span className="font-bold text-ink text-xs block">Tunnel Destination Planning</span>
+              <p className="text-xs text-muted mt-0.5">
+                Decision due by <span className="font-bold text-ink">H240</span> (Day 10). Dynamic
+                availability verified against planned movement windows.
+              </p>
+            </div>
+            <Link
+              to={`/admin/batch/${batchId}/schedule`}
+              className="px-3.5 py-1.5 rounded-lg bg-accent text-white font-head text-xs font-bold shrink-0 hover:opacity-90 transition-all"
+            >
+              Allocate Tunnels →
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

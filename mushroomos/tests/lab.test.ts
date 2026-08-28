@@ -606,7 +606,26 @@ describeDb('B5 — C-33 · both checkpoint maps are carried, and neither is pref
           where pd.code = 'PROCESS-2026B' and pa.responsible_role = 'lab_tech'
           order by pa.code`
       );
-      expect(acts.length, 's08 seeded nine lab activities and they are all still here').toBe(9);
+      // ⚠ THE CLAIM IS SURVIVAL, NOT A TOTAL. This asserted `length === 9` and went red at 13 when
+      // client decision 3 added four more Day-1 checkpoints — which is exactly the seed change rule 3
+      // says the process should absorb. A count here would make every legitimate process change look
+      // like a regression, so what is checked is that s08's original nine are all still present.
+      const original = [
+        'LAB-BUNK-FILL',
+        'LAB-BUNK-RELOAD',
+        'LAB-COMPOST-OUT',
+        'LAB-FIB-MOISTURE-1',
+        'LAB-FIB-MOISTURE-2',
+        'LAB-LAGOON-1',
+        'LAB-LAGOON-2',
+        'LAB-LAGOON-3',
+        'LAB-TUNNEL-LOAD',
+      ];
+      const missing = original.filter((c) => !acts.some((a) => a.code === c));
+      expect(missing, 'one of s08 original nine lab activities was retired or renamed').toEqual([]);
+      expect(acts.length, 'the definition should have grown, not shrunk').toBeGreaterThanOrEqual(
+        original.length
+      );
 
       const gates = await all<{ code: string; kind: string }>(
         db,

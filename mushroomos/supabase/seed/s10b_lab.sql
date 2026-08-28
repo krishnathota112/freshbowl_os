@@ -1,5 +1,16 @@
--- s12 · The lab's open questions, both checkpoint maps, and the settings that must not be
+-- s10b · The lab's open questions, both checkpoint maps, and the settings that must not be
 -- code literals.  (B5)
+--
+-- ⚠ RENAMED FROM `s12_lab.sql` ON 23 Aug 2026, and the number is load-bearing.
+--
+-- Everything in this file is REFERENCE data — register rows, policy readings, settings, checkpoint
+-- maps. None of it depends on a batch existing. But `s11_demo_batches.sql` activates the three demo
+-- batches, and after client decision 2 an activation requires an accepted incoming-material check,
+-- which requires the `is_prebatch` checkpoints seeded below. On a fresh database the old ordering
+-- meant s11 tried to activate before the checkpoints existed and the seed failed outright.
+--
+-- `scripts/db.mjs` orders seeds by filename, so reference data must sort BEFORE instance data.
+-- `s10_hour_axis` < `s10b_lab` < `s11_demo_batches` — `_` (0x5F) sorts before `b` (0x62).
 --
 -- docs/BUILD_SEQUENCE_KIRO.md §B5, docs/CONTRACT_AUDIT_2026-08-22.md §2.D · §2.E · §5,
 -- docs/LAB_MODEL.md §3 · §5, lab_technician_batch_process.md §3–§15.
@@ -127,6 +138,22 @@ values
    || '"requested 6 h ago" as illustrative prose, not a specification.',
  'v_lab_queue returns today | retest and carries overdue_unknown_reason naming the gap. No '
    || 'duration is invented.',
+ 'open','Step 8'),
+
+('TBD-57','tbd','blocks_behaviour',
+ 'Is the incoming-material check a pre-batch prerequisite, or the batch''s own Day-0 activity?',
+ 'The lab dictation §3 puts raw-material moisture, pH and dry weight at DAY 0 — inside the '
+   || '552-hour clock, as the batch''s first activity. The client''s operational description '
+   || '(room.md, 23 Aug 2026) puts the same test BEFORE the clock starts, as a prerequisite for '
+   || 'activation: "Material accepted? YES -> ready for batch / NO -> hold". The repository cannot '
+   || 'hold both as one record, because submit_activity refuses an actual before H0 and batchHour() '
+   || 'throws on one.',
+ 'CLIENT DECISION 2, 23 Aug 2026: implemented as a PRE-BATCH prerequisite. 0026 records the check '
+   || 'against the pending draft batch with batch_activity_id null, so it sits outside the hour '
+   || 'axis, and validate_batch blocks activation until its results are accepted. The Day-0 reading '
+   || 'is NOT deleted — LAB_DICTATION.RAW_MATERIAL_WEIGHMENT stays on the dictation map. No '
+   || 'material_lot entity was built, so one delivery feeding three batches is recorded three times '
+   || 'and cannot be queried independently of a batch.',
  'open','Step 8'),
 
 ('TBD-56','tbd','blocks_behaviour',
@@ -439,3 +466,56 @@ where 'ec' = any (cp.parameters) and cp.spec_checkpoint_code is not null
                  and ls.parameter_code = 'ec'
                  and ls.min_value is null and ls.max_value is null)
 on conflict (checkpoint_id, conflict_id) do update set note = excluded.note;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7 · CLIENT DECISION 2, 23 Aug 2026 · which checkpoints are PRE-BATCH.
+--
+-- `0026` added `lab_checkpoint.is_prebatch` so `open_prebatch_sample` does not name a checkpoint
+-- code in a function body. Only the RAW-MATERIAL checkpoint on each carried map is flagged: it is
+-- the only test of material that exists before the batch does.
+--
+-- ⚠ NOT FLAGGED, deliberately, even though their scope is also `material_lot`:
+--   NITROGEN_SOURCE_ARRIVAL / NITROGEN_SOURCE_BUNKER_UNLOAD — the dictation §8 runs these "in
+--     parallel with the paddy-soaking activities", i.e. Days 5-7, well inside the clock.
+--   STRUCTURAL_STRAW_WEIGHMENT — Day 4, inside the clock, and now an activity of its own
+--     (LAB-STRAW-WEIGH, client decision 5).
+-- Flagging those would make three mid-batch tests into activation prerequisites, which is not what
+-- "incoming material" means and would deadlock every batch.
+-- ─────────────────────────────────────────────────────────────────────────────
+update public.lab_checkpoint set is_prebatch = true
+ where code in ('RAW_MATERIAL', 'RAW_MATERIAL_WEIGHMENT');
+
+update public.lab_checkpoint set is_prebatch = false
+ where code not in ('RAW_MATERIAL', 'RAW_MATERIAL_WEIGHMENT');
+
+insert into public.lab_checkpoint_conflict (checkpoint_id, conflict_id, note)
+select cp.id, 'TBD-57',
+       'The dictation puts this test at Day 0, inside the clock. The client put it before the '
+         || 'clock, as an activation prerequisite. Implemented as the latter; both stay on file.'
+from public.lab_checkpoint cp where cp.is_prebatch
+on conflict (checkpoint_id, conflict_id) do update set note = excluded.note;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 8 · CLIENT DECISION 3, 23 Aug 2026 · which Day-1 map the BUILD implements.
+--
+-- C-33 STAYS OPEN. The client selected the lab dictation's four-check Day-1 structure for the
+-- current product, and `s08` now seeds those four activities. That is a decision about what to
+-- BUILD, not an answer to which source is authoritative — S4b's 18 checkpoints are not withdrawn,
+-- both maps remain in `lab_checkpoint`, and every one of the four new Day-1 activities carries the
+-- C-33 marker so `validate_batch` surfaces the question at the point of use.
+--
+-- Recorded in `ship_with_default` rather than by flipping `status`, following the pattern `s01`
+-- established for the five frozen decisions: the interim behaviour is stated, the factory question
+-- stays open.
+-- ─────────────────────────────────────────────────────────────────────────────
+update public.conflict_register
+   set ship_with_default =
+         'BUILD SELECTION, 23 Aug 2026 (client decision 3): PROCESS-2026B implements the lab '
+      || 'dictation''s Day-1 structure — four independently recorded checkpoints at wetting, '
+      || 'hopper 1, hopper 2 and before bunker loading. BOTH maps remain seeded in lab_checkpoint '
+      || 'and neither is authoritative; S4b''s 18 checkpoints are not withdrawn. Every activity '
+      || 'added under this selection carries the C-33 marker. Still unresolved: whether the '
+      || 'dictation''s "Bagasse wetting" and "Hopper 1" are two checks around ONE hopper pass or '
+      || 'around two distinct operations — the repo has two hopper passes and the dictation names '
+      || 'three points before the bunker load.'
+ where conflict_id = 'C-33';

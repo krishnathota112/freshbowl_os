@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import type { BatchBar, BarSegment, BatchFlag, Exception, TowerCounters } from '../domain/contracts';
+import { nowMs } from '../lib/now';
 
 /**
  * The board's data. `UI_DATA_CONTRACTS §2`.
@@ -98,7 +99,8 @@ export async function loadTower(): Promise<TowerData> {
     else byBatch.set(a.master_batch_id, [a]);
   }
 
-  const nowMs = Date.now();
+  // One clock for the whole product — the factory's effective now, not the browser's.
+  const at = nowMs();
   const bars: BatchBar[] = rows.map((r) => {
     const baselineHours = r.process_definition?.baseline_hours ?? 0;
     const acts = byBatch.get(r.id) ?? [];
@@ -108,7 +110,7 @@ export async function loadTower(): Promise<TowerData> {
       code: r.code,
       label: r.label,
       clock: { startAt: r.start_at, baselineHours, timezone, timezoneConflictId },
-      nowHour: hourNow(r.start_at, baselineHours, nowMs),
+      nowHour: hourNow(r.start_at, baselineHours, at),
       segments: segmentsFor(acts, baselineHours),
       flags: flagsFor(acts),
     };

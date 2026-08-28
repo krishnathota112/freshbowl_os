@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { nowMs } from '../../lib/now';
 
 /** Semantic tones. Meaning only — never decoration. docs/UI_DESIGN_SPEC.md §1. */
 export type Tone = 'ok' | 'warn' | 'crit' | 'inherit' | 'lock' | 'accent' | 'muted';
@@ -281,7 +282,7 @@ export function Countdown({ until }: { until: string }) {
   const [, force] = useState(0);
   useEffect(() => subscribeTick(() => force((n) => n + 1)), []);
 
-  const ms = new Date(until).getTime() - Date.now();
+  const ms = new Date(until).getTime() - nowMs();
   if (Number.isNaN(ms)) return <span className="mono text-xs text-muted">—</span>;
 
   // The gate does not open because this hit zero. It opens because the server said so.

@@ -61,19 +61,37 @@ values
 on conflict (process_activity_id, key) do update set
   label = excluded.label, capture_hint = excluded.capture_hint;
 
--- Video permitted on the Day-4 hopper pass only. TBD-35: ~40x the storage of a photo.
+-- Video permitted on the Day-4 hopper pass — TBD-35: ~40x the storage of a photo — and, from
+-- CLIENT DECISION 8 (23 Aug 2026), on the bunker unload: "Unloading supports video where
+-- required." `{photo,video}` PERMITS video, it does not demand it: `min_count` is 1 and either
+-- kind satisfies it, so an operator on a bad connection can still submit with a photo.
 update public.evidence_requirement
    set media_kinds = '{photo,video}'
- where process_activity_id = public._pa('FIB1-HOP-3');
+ where process_activity_id in (public._pa('FIB1-HOP-3'), public._pa('FIB1-UNLOAD'));
 
 insert into public.evidence_requirement
   (process_activity_id, key, label, media_kinds, min_count, gates_submission, ordering)
 values
   (public._pa('FIB1-HOP-3'),'before','Photo or video before pass','{photo,video}',1,true,10),
   (public._pa('FIB1-HOP-3'),'after','Photo or video after pass','{photo,video}',1,true,20),
+  (public._pa('FIB1-UNLOAD'),'before','Photo or video before unload','{photo,video}',1,true,10),
+  (public._pa('FIB1-UNLOAD'),'after','Photo or video after unload','{photo,video}',1,true,20),
   -- One photo per load. TBD-34: 11 loads is a lot of capture on a phone; Day-0 configurable.
-  (public._pa('FIB1-WEIGH'),'load','Load photo — weighbridge slip or loaded vehicle','{photo}',1,true,10)
-on conflict (process_activity_id, key) do update set label = excluded.label;
+  (public._pa('FIB1-WEIGH'),'load','Load photo — weighbridge slip or loaded vehicle','{photo}',1,true,10),
+
+  -- ── CLIENT DECISION 8, 23 Aug 2026 · the Day-4 straw activities ──────────────────────────
+  -- NOT a before/after pair. The pair is seeded on activities that physically TRANSFORM material
+  -- — a hopper pass, a load, a soak — where "before" and "after" are two states of the same heap.
+  -- A delivery, an inspection and a weighment each produce ONE piece of proof, and naming it for
+  -- what it shows beats a pair whose second half means nothing.
+  --
+  -- STRAW-RECEIPT previously had NO evidence requirement at all, so a delivery could be recorded
+  -- with nothing proving it arrived.
+  (public._pa('STRAW-RECEIPT'),'delivery','Photo of the delivery — vehicle and load','{photo}',1,true,10),
+  (public._pa('STRAW-INSPECT'),'condition','Photo of the material as received','{photo}',1,true,10),
+  (public._pa('STRAW-WEIGH'),'slip','Weighbridge slip','{photo}',1,true,10)
+on conflict (process_activity_id, key) do update set
+  label = excluded.label, media_kinds = excluded.media_kinds;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- VARIANTS — the conditional hopper pass.
@@ -123,6 +141,12 @@ from (values
   ('FIB1-HOP-3','FIB1-UNLOAD','ALL_INSTANCES','Locked — {predecessor_label} not complete on all lines'),
   ('FIB1-BUNK-RELOAD','FIB1-HOP-3','ALL_INSTANCES','Locked — {predecessor_label} not complete'),
   ('STRAW-BALE-CUT','STRAW-RECEIPT','ALL_INSTANCES','Locked — {predecessor_label} not complete'),
+  -- CLIENT DECISION 5, 23 Aug 2026. Receipt -> inspection -> weighment, added BESIDE the existing
+  -- receipt -> bale-cutting chain rather than spliced into it. Re-gating bale cutting or the first
+  -- soak behind the weighment would change when existing work unlocks, and no source states that
+  -- order; the client asked for the activities to be distinct, not for the chain to be rerouted.
+  ('STRAW-INSPECT','STRAW-RECEIPT','ALL_INSTANCES','Locked — {predecessor_label} not complete'),
+  ('STRAW-WEIGH','STRAW-INSPECT','ALL_INSTANCES','Locked — {predecessor_label} not complete'),
   ('STRAW-SOAK-1','STRAW-BALE-CUT','ALL_INSTANCES','Locked — {predecessor_label} not complete'),
   ('STRAW-BUNK-STORE','STRAW-SOAK-1','ALL_INSTANCES','Locked — {predecessor_label} not complete'),
   ('STRAW-REST-1','STRAW-BUNK-STORE','ALL_INSTANCES','Locked — {predecessor_label} not complete'),

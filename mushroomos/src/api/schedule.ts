@@ -27,6 +27,13 @@ export type ScheduleRow = {
   planned_qty_mt: number | null;
   planned_qty_override_mt: number | null;
   planned_time: string | null;
+  planned_hour_source?: 'standard' | 'admin_planned';
+  baseline_start_hour?: number | null;
+  baseline_end_hour?: number | null;
+  planned_start_at?: string | null;
+  planned_end_at?: string | null;
+  actual_start?: string | null;
+  actual_end?: string | null;
   assigned_person_id: string | null;
   assigned_machine_id: string | null;
   assigned_vehicle_id: string | null;
@@ -54,7 +61,7 @@ export async function loadSchedule(batchId: string): Promise<ScheduleRow[]> {
   const { data, error } = await supabase
     .from('batch_activity')
     .select(
-      'id, code, title, stream, scope, scope_label, instance_no, rel_day, seq, is_time_gate, responsible_role, lab_parameters, duration_target_min_hr, duration_target_max_hr, day0_duration_hr, planned_qty_mt, planned_qty_override_mt, planned_time, assigned_person_id, assigned_machine_id, assigned_vehicle_id, source_location_id, destination_location_id, variant_code, golden_rule, tbd_marker, state, blocked_reason, process_activity(admin_question, day_span_label)'
+      'id, code, title, stream, scope, scope_label, instance_no, rel_day, seq, is_time_gate, responsible_role, lab_parameters, duration_target_min_hr, duration_target_max_hr, day0_duration_hr, planned_qty_mt, planned_qty_override_mt, planned_time, planned_hour_source, baseline_start_hour, baseline_end_hour, planned_start_at, planned_end_at, actual_start, actual_end, assigned_person_id, assigned_machine_id, assigned_vehicle_id, source_location_id, destination_location_id, variant_code, golden_rule, tbd_marker, state, blocked_reason, process_activity(admin_question, day_span_label)'
     )
     .eq('master_batch_id', batchId)
     .order('rel_day')
@@ -130,6 +137,17 @@ export async function setActivityPlan(activityId: string, patch: Record<string, 
     p_activity: activityId,
     p_patch: patch,
   });
+  if (error) throw error;
+}
+
+/**
+ * Put an activity back on the process standard hour.
+ *
+ * Its own call because `set_activity_plan` merges a patch — an empty `planned_time` there means
+ * "leave it alone", which is right for a partial update and wrong for a deliberate clear.
+ */
+export async function clearPlannedTime(activityId: string) {
+  const { error } = await supabase.rpc('clear_planned_time', { p_activity: activityId });
   if (error) throw error;
 }
 

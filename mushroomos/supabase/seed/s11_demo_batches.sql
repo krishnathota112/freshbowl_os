@@ -398,6 +398,86 @@ begin
 end $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 7b · The incoming-material check. CLIENT DECISION 2, 23 Aug 2026.
+--
+-- `0026` makes an accepted incoming-material check a blocking prerequisite for activation, so
+-- section 8 below cannot run without one. This supplies it for the three demo batches.
+--
+-- ⚠ THE VALUES ARE REAL MEASUREMENTS, NOT PLAUSIBLE ONES.
+--
+-- A Day-0 rest duration is an admin DECISION and staging a demo means standing in for the admin.
+-- A lab reading is a physical FACT about a delivery, and there is no delivery here — so inventing
+-- one would be exactly the fabricated evidence rule 7 forbids, in the place it would do most harm.
+--
+-- `LAB_MODEL §3.2` records a real incoming bagasse assay from S3f: **MC 56.2 %, pH 5.63**. Those two
+-- numbers are used verbatim and cited. They are also genuinely interesting: S4a Table 1 gives
+-- bagasse pH 4.6–5.0, so 5.63 is ABOVE the band — §3.2 notes that "the raw-material gate will flag
+-- real incoming lots, which is the point."
+--
+-- ⚠ DRY WEIGHT IS NOT REQUESTED. The dictation §3 asks for moisture, pH AND dry weight, but no
+-- source anywhere records a dry weight — that is TBD-45, registered during B5. Requesting a test
+-- nobody can answer would leave the check permanently unaccepted and block every demo batch, and
+-- answering it would mean inventing a number. So the check runs on the two parameters that have real
+-- values and TBD-45 stays visible. The demo's material check is therefore NARROWER than the
+-- dictation asks for, and the report says so.
+--
+-- The RAW_MATERIAL checkpoint on the LAB_DICTATION map is used, because client decision 3 selected
+-- that map for the build. C-33 is still open and the S4B map still carries its own RAW_MATERIAL row.
+-- ─────────────────────────────────────────────────────────────────────────────
+do $$
+declare
+  b       record;
+  cp      uuid;
+  sample  uuid;
+  t       uuid;
+  r       uuid;
+begin
+  select id into cp from public.lab_checkpoint
+   where checkpoint_map = 'LAB_DICTATION' and code = 'RAW_MATERIAL_WEIGHMENT' and is_prebatch;
+
+  if cp is null then
+    raise exception
+      'No pre-batch RAW_MATERIAL checkpoint. s10b_lab.sql must run before this file — see its '
+      'header for why it was renamed from s12.';
+  end if;
+
+  for b in
+    select id, code from public.master_batch
+     where code like 'MB-DEMO-%' and status = 'draft'
+     order by code
+  loop
+    -- Idempotent: one check per batch, and the batch stops being `draft` once section 8 runs.
+    if exists (select 1 from public.v_prebatch_material_check c where c.master_batch_id = b.id) then
+      continue;
+    end if;
+
+    -- COLLECTED BEFORE H0, EXPLICITLY. These three batches have BACKDATED H0s — 0, 8 and 16 days
+    -- back — so a check stamped `now()` would sit weeks AFTER the clock it is supposed to precede,
+    -- and `v_prebatch_material_check.before_h0` would correctly report false.
+    -- `least(now(), start_at - 1 h)` is before H0 whichever side of today H0 falls on, and is never
+    -- in the future, which is the one thing `open_prebatch_sample` refuses.
+    sample := public.open_prebatch_sample(
+      b.id, cp,
+      'Incoming assay, recorded before H0 — values from LAB_MODEL §3.2 (S3f)',
+      least(now(), (select mb.start_at - interval '1 hour'
+                      from public.master_batch mb where mb.id = b.id)));
+
+    -- Moisture 56.2 % — S3f, via LAB_MODEL §3.2.
+    t := public.request_lab_test(sample, 'moisture_pct', 'system');
+    r := public.record_lab_result(t, 56.2);
+    perform public.accept_lab_result(
+      r, 'Incoming assay accepted — S3f recorded value, LAB_MODEL §3.2');
+
+    -- pH 5.63 — S3f, via LAB_MODEL §3.2. Above S4a Table 1's 4.6-5.0 band for bagasse, which §3.2
+    -- names as exactly the kind of thing a raw-material check exists to surface.
+    t := public.request_lab_test(sample, 'ph', 'system');
+    r := public.record_lab_result(t, 5.63);
+    perform public.accept_lab_result(
+      r, 'Incoming assay accepted — S3f recorded value, above S4a Table 1 band, accepted on record');
+  end loop;
+end $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 8 · Activate. `activate_batch` refuses while any blocking finding stands, so this line IS the
 --     exit proof: if a destination, an assignee, an H0 or a rest duration were missing, it raises.
 --

@@ -8,6 +8,7 @@ import type {
   LabFailure,
   UrgentGate,
 } from '../domain/contracts';
+import { nowMs } from '../lib/now';
 
 /**
  * S11's data. `UI_IMPLEMENTATION_PLAN §S11`, `ROLE_AND_APPROVAL_MODEL §3.3`.
@@ -36,7 +37,7 @@ const HOURS_AHEAD = 4;
 
 /** `ROLE_AND_APPROVAL_MODEL §3.3` band 1 — "opens or expires within 4 hours". */
 async function loadTimeCritical(): Promise<Band<UrgentGate>> {
-  const horizon = new Date(Date.now() + HOURS_AHEAD * 3_600_000).toISOString();
+  const horizon = new Date(nowMs() + HOURS_AHEAD * 3_600_000).toISOString();
 
   const { data, error } = await supabase
     .from('batch_activity')

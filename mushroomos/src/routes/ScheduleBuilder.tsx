@@ -9,11 +9,19 @@ import {
   loadTemplateMap,
   sendAlert,
   setActivityPlan,
+  clearPlannedTime,
   validateBatch,
   type Finding,
   type ScheduleRow,
 } from '../api/schedule';
 import { activateBatch, getBatch } from '../api/batch';
+import { loadVesselOptions } from '../api/plant';
+import {
+  loadIndividualBatches,
+  loadMovements,
+  setMovementVessel,
+} from '../api/movements';
+import { MovementPlan } from '../components/composite/MovementPlan';
 import { Chip, ConflictMarker, EmptyState } from '../components/primitives';
 
 /**
@@ -31,6 +39,9 @@ export function ScheduleBuilder() {
   const qc = useQueryClient();
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ tone: 'ok' | 'crit'; text: string } | null>(null);
+  // Kept apart from `banner`: a vessel refusal belongs beside the vessel it refused, not at the
+  // top of a page the reader has scrolled away from.
+  const [vesselError, setVesselError] = useState<string | null>(null);
 
   const batch = useQuery({ queryKey: ['batch', id], queryFn: () => getBatch(id) });
   const rows = useQuery({ queryKey: ['schedule', id], queryFn: () => loadSchedule(id) });
@@ -50,6 +61,40 @@ export function ScheduleBuilder() {
       setActivityPlan(rowId, patch),
     onSuccess: refresh,
     onError: (e) => setBanner({ tone: 'crit', text: (e as Error).message }),
+  });
+
+  // Puts one activity back on the process standard hour. Its own mutation because clearing is a
+  // deliberate act, not an empty field in a patch — see `clear_planned_time`.
+  const clearTime = useMutation({
+    mutationFn: (rowId: string) => clearPlannedTime(rowId),
+    onSuccess: refresh,
+    onError: (e) => setBanner({ tone: 'crit', text: (e as Error).message }),
+  });
+
+  /*
+    THE VESSEL PICKER'S DATA LIVES HERE, NOT IN THE COMPONENT.
+
+    `UI_ACCEPTANCE_CRITERIA` A10: nothing below the route layer touches `api/`. A composite that
+    fetched its own rows would render only against a live database, and the gallery would stop being
+    able to exercise it. The route queries; the picker takes props.
+  */
+  const movements = useQuery({ queryKey: ['movements', id], queryFn: () => loadMovements(id) });
+  const individuals = useQuery({
+    queryKey: ['individual-batches', id],
+    queryFn: () => loadIndividualBatches(id),
+  });
+  const vesselOptions = useQuery({ queryKey: ['vessel-options'], queryFn: loadVesselOptions });
+
+  const pickVessel = useMutation({
+    mutationFn: (v: { movement: string; locationId: string; individualBatchId: string | null }) =>
+      setMovementVessel({ batchId: id, ...v }),
+    onSuccess: () => {
+      setVesselError(null);
+      qc.invalidateQueries({ queryKey: ['movements', id] });
+      qc.invalidateQueries({ queryKey: ['vessel-options'] });
+      qc.invalidateQueries({ queryKey: ['plant'] });
+    },
+    onError: (e) => setVesselError((e as Error).message),
   });
 
   const activate = useMutation({
@@ -82,6 +127,10 @@ export function ScheduleBuilder() {
   const bunkersUsed = new Set(
     all.filter((r) => r.destination_location_id).map((r) => r.destination_location_id)
   ).size;
+
+  const maxRelDay = all.length > 0 ? Math.max(...all.map((r) => r.rel_day)) : 0;
+  const baselineDays = all.length > 0 ? maxRelDay + 1 : 0;
+  const baselineHours = baselineDays * 24;
 
   return (
     <div className="pb-24">
@@ -146,7 +195,7 @@ export function ScheduleBuilder() {
 
       {banner && (
         <div
-          className="mb-4 rounded-lg border px-3 py-2 text-[13px]"
+          className="mb-4 rounded-xl border px-4 py-3 text-[13px] shadow-sm"
           style={{
             borderColor: banner.tone === 'ok' ? '#16794a' : 'var(--crit)',
             background: banner.tone === 'ok' ? 'var(--ok-soft)' : 'var(--crit-soft)',
@@ -157,6 +206,43 @@ export function ScheduleBuilder() {
         </div>
       )}
 
+      {/* Master Batch Live Header Card */}
+      <div className="bg-surface rounded-2xl p-5 mb-5 shadow-card border border-line">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Master Batch Layout</span>
+            <h2 className="font-head text-xl font-extrabold text-ink">{b.label}</h2>
+            <p className="text-xs text-muted mt-0.5">
+              Day 0 starts {new Date(b.start_date).toDateString()} · Supervisor {b.supervisor_name ?? '—'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm"
+              style={{
+                background: draft ? 'var(--surface-2)' : 'var(--ok-soft)',
+                color: draft ? 'var(--muted)' : 'var(--ok)',
+              }}
+            >
+              <span
+                className="w-[7px] h-[7px] rounded-full"
+                style={{ background: draft ? 'var(--muted)' : 'var(--ok)' }}
+              />
+              {draft ? 'DRAFT PLAN' : 'ACTIVE'}
+            </span>
+          </div>
+        </div>
+
+        <div className="py-4 text-center">
+          <div className="font-head text-3xl font-extrabold text-accent">
+            H0 → H{baselineHours}
+          </div>
+          <p className="text-xs text-muted mt-1 font-mono">
+            {all.length} Activities · {baselineDays} Total Process Days · Continuous Factory Clock
+          </p>
+        </div>
+      </div>
+
       {/*
         Why every field on this page is greyed out. Activation freezes the baseline on
         purpose — that is the control the paper system has no way to offer — but a screen
@@ -164,7 +250,7 @@ export function ScheduleBuilder() {
       */}
       {!draft && (
         <div
-          className="mb-5 rounded-lg border px-3 py-2.5"
+          className="mb-5 rounded-2xl border px-4 py-3 shadow-sm"
           style={{ borderColor: 'var(--line-2)', background: 'var(--inherit-soft)' }}
         >
           <p className="font-head text-[13px] font-700" style={{ color: 'var(--inherit)' }}>
@@ -182,14 +268,14 @@ export function ScheduleBuilder() {
 
       {draft && blocking.length > 0 && (
         <details
-          className="mb-5 rounded-lg border p-3"
+          className="mb-5 rounded-2xl border p-4 shadow-sm"
           style={{ borderColor: 'var(--crit)', background: 'var(--crit-soft)' }}
           open
         >
           <summary className="cursor-pointer font-head text-[13px] font-700" style={{ color: 'var(--crit)' }}>
-            {blocking.length} thing{blocking.length === 1 ? '' : 's'} to settle before this can start
+            {blocking.length} item{blocking.length === 1 ? '' : 's'} to settle before this batch can start
           </summary>
-          <ul className="mt-2 flex flex-col gap-1">
+          <ul className="mt-2 flex flex-col gap-1 pl-2">
             {blocking.slice(0, 12).map((f, i) => (
               <li key={i} className="text-[12px]" style={{ color: 'var(--ink-2)' }}>
                 • {f.message}
@@ -199,54 +285,122 @@ export function ScheduleBuilder() {
         </details>
       )}
 
+      {/*
+        WHERE THIS BATCH GOES, above the timeline.
+
+        A batch-level decision, so it does not belong on thirty individual rows all saying the same
+        thing. Line 2 of 3 is a SLOT; Bunker 7 is a place; binding them is what lets the plant view
+        and every bunker-wise report exist at all.
+      */}
+      <MovementPlan
+        movements={movements.data ?? []}
+        individuals={individuals.data ?? []}
+        options={vesselOptions.data ?? []}
+        draft={draft}
+        loading={movements.isLoading}
+        busy={pickVessel.isPending}
+        error={vesselError}
+        onPick={(v) => pickVessel.mutate(v)}
+      />
+
       {/* The timeline */}
       <div className="flex flex-col gap-6">
         {days.map((day, di) => {
           const items = all.filter((r) => r.rel_day === day);
           const nextDay = days[di + 1];
-          // The span label comes from the definition where one is given; otherwise it is
-          // derived from the gap to the next day that has work.
+          const startHour = day * 24;
+          const endHour = nextDay ? nextDay * 24 : (day + 1) * 24;
           const seededSpan = items.find((r) => r.day_span_label)?.day_span_label ?? null;
           const isRestSpan = items.every((r) => r.is_time_gate) && nextDay && nextDay - day > 1;
-          const label =
+          const dayLabel =
             seededSpan ?? (isRestSpan ? `Day ${day}–${nextDay - 1}` : `Day ${day}`);
+          const title = dayTitles.data?.[day] ?? '';
+
+          // Group by activity code to avoid repeated wall of cards
+          const codeGroups = new Map<string, ScheduleRow[]>();
+          for (const item of items) {
+            const list = codeGroups.get(item.code) ?? [];
+            list.push(item);
+            codeGroups.set(item.code, list);
+          }
+
           return (
             <section key={day}>
               <div className="mb-2 flex flex-wrap items-baseline gap-2 border-b pb-1" style={{ borderColor: 'var(--line-2)' }}>
-                <h2 className="font-head text-[15px] font-800">{label}</h2>
-                <span className="text-[12px] text-muted">{dayTitles.data?.[day] ?? ''}</span>
-                <span className="ml-auto mono text-[11px] text-muted">{items.length} rows</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-bold text-primary px-2 py-0.5 rounded bg-primary/10">
+                    H{startHour} → H{endHour}
+                  </span>
+                  <span className="text-xs text-muted font-medium">({dayLabel}{title ? ` · ${title}` : ''})</span>
+                </div>
+                <span className="ml-auto mono text-[11px] text-muted">{items.length} activities</span>
               </div>
-              <div className="flex flex-col gap-1.5">
-                {items.map((r) => (
-                  <Row
-                    key={r.id}
-                    row={r}
-                    open={openRow === r.id}
-                    draft={draft}
-                    opts={o}
-                    templateId={templates.get(r.id)}
-                    finding={fs.find((f) => f.activity_id === r.id)}
-                    onToggle={() => setOpenRow(openRow === r.id ? null : r.id)}
-                    onSave={(patch) => save.mutate({ rowId: r.id, patch })}
-                    onAssign={async (pid, reason) => {
-                      try {
-                        await assignActivity(r.id, pid, reason);
-                        refresh();
-                      } catch (e) {
-                        setBanner({ tone: 'crit', text: (e as Error).message });
-                      }
-                    }}
-                    onAlert={async (role, reason) => {
-                      try {
-                        await sendAlert(r.id, role, `${r.title} — ${r.scope_label}`, reason);
-                        setBanner({ tone: 'ok', text: `Alert sent to ${role.replace('_', ' ')}.` });
-                      } catch (e) {
-                        setBanner({ tone: 'crit', text: (e as Error).message });
-                      }
-                    }}
-                  />
-                ))}
+
+              <div className="flex flex-col gap-2">
+                {[...codeGroups.entries()].map(([code, group]) => {
+                  if (group.length > 2) {
+                    return (
+                      <GroupedLoadRow
+                        key={`${day}-${code}`}
+                        code={code}
+                        items={group}
+                        draft={draft}
+                        opts={o}
+                        templates={templates}
+                        findings={fs}
+                        onSave={(rowId, patch) => save.mutate({ rowId, patch })}
+                        onClearTime={(rowId) => clearTime.mutate(rowId)}
+                        onAssign={async (rowId, pid, reason) => {
+                          try {
+                            await assignActivity(rowId, pid, reason);
+                            refresh();
+                          } catch (e) {
+                            setBanner({ tone: 'crit', text: (e as Error).message });
+                          }
+                        }}
+                        onAlert={async (rowId, role, title, reason) => {
+                          try {
+                            await sendAlert(rowId, role, title, reason);
+                            setBanner({ tone: 'ok', text: `Alert sent to ${role.replace('_', ' ')}.` });
+                          } catch (e) {
+                            setBanner({ tone: 'crit', text: (e as Error).message });
+                          }
+                        }}
+                      />
+                    );
+                  }
+
+                  return group.map((r) => (
+                    <Row
+                      key={r.id}
+                      row={r}
+                      open={openRow === r.id}
+                      draft={draft}
+                      opts={o}
+                      templateId={templates.get(r.id)}
+                      finding={fs.find((f) => f.activity_id === r.id)}
+                      onToggle={() => setOpenRow(openRow === r.id ? null : r.id)}
+                      onSave={(patch) => save.mutate({ rowId: r.id, patch })}
+                      onClearTime={() => clearTime.mutate(r.id)}
+                      onAssign={async (pid, reason) => {
+                        try {
+                          await assignActivity(r.id, pid, reason);
+                          refresh();
+                        } catch (e) {
+                          setBanner({ tone: 'crit', text: (e as Error).message });
+                        }
+                      }}
+                      onAlert={async (role, reason) => {
+                        try {
+                          await sendAlert(r.id, role, `${r.title} — ${r.scope_label}`, reason);
+                          setBanner({ tone: 'ok', text: `Alert sent to ${role.replace('_', ' ')}.` });
+                        } catch (e) {
+                          setBanner({ tone: 'crit', text: (e as Error).message });
+                        }
+                      }}
+                    />
+                  ));
+                })}
               </div>
             </section>
           );
@@ -255,9 +409,13 @@ export function ScheduleBuilder() {
         {/* Day 23 · a state page, not an operation. No activity is seeded for it. */}
         <section>
           <div className="mb-2 flex flex-wrap items-baseline gap-2 border-b pb-1" style={{ borderColor: 'var(--line-2)' }}>
-            <h2 className="font-head text-[15px] font-800">Day 23</h2>
-            <span className="text-[12px] text-muted">Batch state</span>
-            <span className="ml-auto mono text-[11px] text-muted">not an operation</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm font-bold text-muted-foreground px-2 py-0.5 rounded bg-muted">
+                H{days.length * 24}
+              </span>
+              <span className="text-xs text-muted font-medium">(Day 23 · Batch Completion)</span>
+            </div>
+            <span className="ml-auto mono text-[11px] text-muted">final state</span>
           </div>
           <div className="rounded-lg border border-dashed p-4" style={{ borderColor: 'var(--line-2)' }}>
             <p className="text-[13px] text-ink2">
@@ -288,6 +446,7 @@ function Row({
   finding,
   onToggle,
   onSave,
+  onClearTime,
   onAssign,
   onAlert,
 }: {
@@ -299,10 +458,12 @@ function Row({
   finding: Finding | undefined;
   onToggle: () => void;
   onSave: (patch: Record<string, string | null>) => void;
+  onClearTime: () => void;
   onAssign: (personId: string, reason?: string) => void;
   onAlert: (role: 'operator' | 'lab_tech' | 'supervisor', reason?: string) => void;
 }) {
   const [menu, setMenu] = useState(false);
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const isLab = row.responsible_role === 'lab_tech';
   const mr = opts.movement.find((m) => m.process_activity_id === templateId);
   const variants = opts.variants.filter((v) => v.process_activity_id === templateId);
@@ -318,6 +479,11 @@ function Row({
 
   const problem = finding?.severity === 'blocking';
 
+  const startHr = row.baseline_start_hour ?? row.rel_day * 24;
+  const durHr = row.day0_duration_hr ?? row.duration_target_min_hr ?? 1;
+  const endHr = row.baseline_end_hour ?? (startHr + durHr);
+  const durText = durHr >= 1 ? `${durHr}h` : `${Math.round(durHr * 60)}m`;
+
   return (
     <div
       className="rounded-lg border"
@@ -332,15 +498,20 @@ function Row({
       <div className="flex items-start gap-2 px-3 py-2.5">
         <button onClick={onToggle} className="flex min-w-0 flex-1 items-start gap-2 text-left">
           <span className="mt-0.5 text-[11px] text-muted">{open ? '▾' : '▸'}</span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">
+                H{startHr} → H{endHr}
+              </span>
+              <span className="font-mono text-xs text-muted-foreground font-semibold">
+                {durText}
+              </span>
               <span className="font-head text-[14px] font-700">{row.title}</span>
               {isLab ? <Chip tone="accent">lab</Chip> : row.is_time_gate ? <Chip tone="inherit">time gate</Chip> : null}
               {row.tbd_marker && <ConflictMarker id={row.tbd_marker} />}
             </span>
             <span className="mt-0.5 block mono text-[11px] text-muted">
-              {row.scope_label}
-              {row.day0_duration_hr != null && ` · ${row.day0_duration_hr} h`}
+              Day {row.rel_day} · {row.scope_label}
               {dest && ` · into ${dest.label}`}
               {machine && ` · ${machine.code}`}
               {person && ` · ${person.display_name.split(' —')[0]}`}
@@ -414,6 +585,32 @@ function Row({
       {/* Expanded settings */}
       {open && (
         <div className="border-t px-3 py-3" style={{ borderColor: 'var(--line)' }}>
+          {/* 4-Register Summary Card */}
+          <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2 p-2.5 rounded-lg border border-border" style={{ background: 'var(--surface-2)' }}>
+            <div>
+              <span className="block text-[10px] uppercase font-mono font-bold text-muted">STANDARD</span>
+              <span className="font-mono text-xs font-semibold text-ink">H{row.rel_day * 24}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-mono font-bold text-muted">ADMIN PLAN</span>
+              <span className="font-mono text-xs font-semibold text-primary">
+                {row.planned_time ? `H${startHr} (${row.planned_time.slice(0, 5)})` : '— Standard'}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-mono font-bold text-muted">ACTUAL</span>
+              <span className="font-mono text-xs font-semibold" style={{ color: '#16794a' }}>
+                {row.actual_start ? new Date(row.actual_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not started'}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-mono font-bold text-muted">FORECAST</span>
+              <span className="font-mono text-xs font-semibold text-ink">
+                {row.planned_end_at ? new Date(row.planned_end_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `H${endHr}`}
+              </span>
+            </div>
+          </div>
+
           {/* What she is actually being asked, in factory language, from the definition. */}
           {row.admin_question && (
             <p className="mb-3 max-w-prose text-[13px] text-ink">{row.admin_question}</p>
@@ -526,34 +723,40 @@ function Row({
 
             {/* Vessel */}
             {destKind && (
-              <Ctl
-                label={destKind === 'TUNNEL' ? 'Into tunnel' : 'Into bunker'}
-                hint={
-                  mr?.requires_distinct_vessel
-                    ? `must differ from the source${src ? ` (${src.label})` : ''}`
-                    : undefined
-                }
-              >
-                <Sel
-                  value={row.destination_location_id ?? ''}
-                  disabled={!draft}
-                  options={[
-                    { v: '', l: '— choose —' },
-                    ...vessels.map((l) => ({
-                      v: l.id,
-                      l: l.label + (l.id === row.source_location_id ? ' (source)' : ''),
-                    })),
-                  ]}
-                  onChange={(v) => onSave({ destination_location_id: v })}
-                />
-              </Ctl>
+              destKind === 'TUNNEL' ? (
+                <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-2.5 text-xs text-muted">
+                  <strong className="text-ink">Phase II Tunnel Loading:</strong> Tunnel allocation is configured per Individual Batch in the Movement Plan above.
+                </div>
+              ) : (
+                <Ctl
+                  label="Into bunker"
+                  hint={
+                    mr?.requires_distinct_vessel
+                      ? `must differ from the source${src ? ` (${src.label})` : ''}`
+                      : undefined
+                  }
+                >
+                  <Sel
+                    value={row.destination_location_id ?? ''}
+                    disabled={!draft}
+                    options={[
+                      { v: '', l: '— choose —' },
+                      ...vessels.map((l) => ({
+                        v: l.id,
+                        l: l.label + (l.id === row.source_location_id ? ' (source)' : ''),
+                      })),
+                    ]}
+                    onChange={(v) => onSave({ destination_location_id: v })}
+                  />
+                </Ctl>
+              )
             )}
 
             {/* Machine */}
             {!isLab && !row.is_time_gate && (
               <Ctl
                 label="Machine"
-                hint={row.code === 'TR-T2' ? 'must differ from the turner on T1' : undefined}
+                hint={row.code === 'TR-T1' ? 'Turner for T1' : row.code === 'TR-T2' ? 'must differ from the turner on T1' : undefined}
               >
                 <Sel
                   value={row.assigned_machine_id ?? ''}
@@ -586,24 +789,56 @@ function Row({
               </Ctl>
             )}
 
-            {/* Start time */}
+            {/* Planned Timing Register */}
             {!row.is_time_gate && (
-              <Ctl label="Planned start">
-                <input
-                  type="time"
-                  defaultValue={row.planned_time?.slice(0, 5) ?? ''}
-                  disabled={!draft}
-                  onBlur={(e) => onSave({ planned_time: e.target.value })}
-                  title={!draft ? 'The baseline is frozen — this cannot be changed' : undefined}
-                  className="mono rounded border px-2 py-1.5 text-[13px]"
-                  style={{
-                    borderColor: 'var(--line-2)',
-                    background: draft ? 'var(--surface)' : 'var(--line)',
-                    color: draft ? 'var(--ink)' : 'var(--muted)',
-                    cursor: draft ? 'text' : 'not-allowed',
-                  }}
-                />
-              </Ctl>
+              <div className="sm:col-span-2 p-3.5 rounded-xl border border-line bg-surface-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-mono uppercase font-bold text-muted block">Planned Timing</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-mono text-sm font-bold text-ink">H{startHr} → H{endHr}</span>
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        background: row.planned_time ? 'var(--accent-soft)' : 'var(--surface)',
+                        color: row.planned_time ? 'var(--accent)' : 'var(--muted)',
+                        border: '1px solid var(--line-2)',
+                      }}
+                    >
+                      {row.planned_time ? 'Admin Adjusted' : 'Standard Process'}
+                    </span>
+                  </div>
+                  {row.planned_time ? (
+                    <span className="text-[11px] text-muted block mt-0.5">
+                      you set this · Planned wall-clock: {row.planned_time.slice(0, 5)}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-muted block mt-0.5">
+                      standard: day {row.rel_day} · default placement
+                    </span>
+                  )}
+                </div>
+
+                {draft && (
+                  <div className="flex items-center gap-2">
+                    {row.planned_time && (
+                      <button
+                        type="button"
+                        onClick={() => onClearTime()}
+                        className="px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-muted hover:text-ink border border-line bg-surface"
+                      >
+                        Reset to Standard
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setAdjustModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-on-accent bg-accent hover:opacity-90 transition-all shadow-sm"
+                    >
+                      {row.planned_time ? 'Change Adjustment' : 'Adjust Planned Time'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -668,6 +903,125 @@ function Row({
           </p>
         </div>
       )}
+
+      {adjustModalOpen && (
+        <AdjustPlannedTimeModal
+          row={row}
+          onClose={() => setAdjustModalOpen(false)}
+          onSave={(newTime, reason) => {
+            onSave({ planned_time: newTime, override_reason: reason });
+          }}
+          onClear={() => onClearTime()}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdjustPlannedTimeModal({
+  row,
+  onClose,
+  onSave,
+  onClear,
+}: {
+  row: ScheduleRow;
+  onClose: () => void;
+  onSave: (newTime: string, reason: string) => void;
+  onClear: () => void;
+}) {
+  const [time, setTime] = useState(row.planned_time?.slice(0, 5) ?? '');
+  const [reason, setReason] = useState('');
+  const standardHour = row.rel_day * 24;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-raised space-y-4 animate-in fade-in zoom-in duration-150">
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <div>
+            <span className="text-[10px] font-mono uppercase font-bold text-muted">Controlled Plan Override</span>
+            <h3 className="font-head text-base font-bold text-ink">Adjust Planned Time</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted hover:text-ink text-sm font-bold p-1"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="font-head text-sm font-bold text-ink">{row.title}</p>
+            <p className="text-xs text-muted">Day {row.rel_day} · {row.scope_label}</p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-surface-2 border border-line flex items-center justify-between">
+            <span className="text-xs text-muted font-mono">Standard Process:</span>
+            <span className="font-mono text-xs font-bold text-ink">
+              H{standardHour} → H{standardHour + (row.day0_duration_hr ?? row.duration_target_min_hr ?? 1)}
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-ink-2 mb-1">New Planned Time (Wall Clock) *</label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono text-ink focus:border-accent focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-ink-2 mb-1">Operational Reason *</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. JCB unavailable until 09:00"
+              className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-line">
+          {row.planned_time ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClear();
+                onClose();
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+            >
+              Reset to Standard
+            </button>
+          ) : <div />}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-ink-2 hover:bg-surface-2 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!time || !reason.trim()}
+              onClick={() => {
+                if (!time || !reason.trim()) return;
+                onSave(time, reason.trim());
+                onClose();
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+            >
+              Save Adjustment
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -766,5 +1120,126 @@ function Num({
       />
       {unit && <span className="mono text-[11px] text-muted">{unit}</span>}
     </span>
+  );
+}
+
+function GroupedLoadRow({
+  code,
+  items,
+  draft,
+  opts,
+  templates,
+  findings,
+  onSave,
+  onClearTime,
+  onAssign,
+  onAlert,
+}: {
+  code: string;
+  items: ScheduleRow[];
+  draft: boolean;
+  opts: Opts;
+  templates: Map<string, string>;
+  findings: Finding[];
+  onSave: (rowId: string, patch: Record<string, string | null>) => void;
+  onClearTime: (rowId: string) => void;
+  onAssign: (rowId: string, personId: string, reason?: string) => Promise<void>;
+  onAlert: (rowId: string, role: 'operator' | 'lab_tech' | 'supervisor', title: string, reason?: string) => Promise<void>;
+}) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const totalTarget = items.reduce((s, i) => s + (i.planned_qty_mt ?? 0), 0);
+  const title = items[0]?.title ?? code;
+  const startHr = items[0]?.baseline_start_hour ?? items[0]?.rel_day * 24;
+  const endHr = items[items.length - 1]?.baseline_end_hour ?? (startHr + items.length);
+
+  const isWeighment = code.includes('WEIGH');
+  const isBunkerMovement = code.includes('BUNK') || code.includes('UNLOAD') || code.includes('RELOAD');
+  const isHopperPass = code.includes('HOP');
+
+  const groupTypeLabel = isWeighment
+    ? `${items.length} Weighment Loads`
+    : isBunkerMovement
+    ? `${items.length} Bunker Movements`
+    : isHopperPass
+    ? `${items.length} Hopper Passes`
+    : `${items.length} Movement Lines`;
+
+  const itemPrefix = isWeighment ? 'Load' : isBunkerMovement ? 'Line' : isHopperPass ? 'Pass' : 'Line';
+
+  return (
+    <div className="bg-surface rounded-xl border border-line p-4 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2 mb-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">
+              H{startHr} → H{endHr}
+            </span>
+            <span className="font-mono text-xs font-bold text-ink-2">{groupTypeLabel}</span>
+            {totalTarget > 0 && (
+              <span className="font-mono text-xs font-semibold text-muted">
+                {isWeighment ? `Target: ${totalTarget.toFixed(1)} MT` : `Total Planned: ${totalTarget.toFixed(1)} MT`}
+              </span>
+            )}
+          </div>
+          <h4 className="font-head text-base font-bold text-ink">{title}</h4>
+        </div>
+        <span className="text-xs text-muted">Select an instance to view/edit:</span>
+      </div>
+
+      {/* Interactive Compact Instance Rail */}
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {items.map((it, idx) => {
+          const isSelected = selectedIdx === idx;
+          const isDone = it.actual_end !== null || it.actual_start !== null;
+          const destLoc = opts.locations.find((l) => l.id === it.destination_location_id);
+          const srcLoc = opts.locations.find((l) => l.id === it.source_location_id);
+          const movementLabel = srcLoc && destLoc ? `${srcLoc.label} → ${destLoc.label}` : destLoc ? `→ ${destLoc.label}` : null;
+          return (
+            <button
+              key={it.id}
+              type="button"
+              onClick={() => setSelectedIdx(isSelected ? null : idx)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
+              style={{
+                background: isSelected ? 'var(--accent)' : isDone ? 'var(--ok-soft)' : 'var(--surface-2)',
+                color: isSelected ? '#fff' : isDone ? 'var(--ok)' : 'var(--ink)',
+                border: isSelected ? 'none' : '1px solid var(--line-2)',
+              }}
+            >
+              <span>{isDone ? '✓' : '●'}</span>
+              <span>{itemPrefix} {String(idx + 1).padStart(2, '0')}</span>
+              {movementLabel && <span className="opacity-80 text-[10px]">{movementLabel}</span>}
+              {it.planned_qty_mt && <span className="opacity-70 text-[10px]">({it.planned_qty_mt}MT)</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected instance detail drawer */}
+      {selectedIdx !== null && items[selectedIdx] && (
+        <div className="mt-3 pt-3 border-t border-line">
+          <Row
+            row={items[selectedIdx]}
+            open={true}
+            draft={draft}
+            opts={opts}
+            templateId={templates.get(items[selectedIdx].id)}
+            finding={findings.find((f) => f.activity_id === items[selectedIdx].id)}
+            onToggle={() => setSelectedIdx(null)}
+            onSave={(patch) => onSave(items[selectedIdx].id, patch)}
+            onClearTime={() => onClearTime(items[selectedIdx].id)}
+            onAssign={(pid, reason) => onAssign(items[selectedIdx].id, pid, reason)}
+            onAlert={(role, reason) =>
+              onAlert(
+                items[selectedIdx].id,
+                role,
+                `${items[selectedIdx].title} — ${items[selectedIdx].scope_label}`,
+                reason
+              )
+            }
+          />
+        </div>
+      )}
+    </div>
   );
 }

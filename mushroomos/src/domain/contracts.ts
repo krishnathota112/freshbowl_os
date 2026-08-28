@@ -346,3 +346,94 @@ export type BatchPageData = {
   variance: BatchVariance;
   events: BatchEvent[];
 };
+
+/* ── the vessel picker (0029) ─────────────────────────────────────────────────────────────── */
+
+/**
+ * One slot a batch has to fill — "BUNKER_LINE 2 of this batch".
+ *
+ * `locationCode` null is an UNFILLED slot, and it is the main thing the picker exists to show.
+ * `workStarted` true means material has physically been in this vessel, and changing it now would
+ * rewrite where the material actually was.
+ */
+export type VesselSlot = {
+  scope: string;
+  needsKind: string;
+  instanceNo: number;
+  activityCount: number;
+  firstDay: number;
+  lastDay: number;
+  locationId: string | null;
+  locationCode: string | null;
+  locationLabel: string | null;
+  conflictId: string | null;
+  allocatedByName: string | null;
+  workStarted: boolean;
+};
+
+/** Every vessel of a kind, and the reason each unavailable one is unavailable. */
+export type VesselOption = {
+  locationId: string;
+  kind: string;
+  code: string;
+  label: string;
+  status: string;
+  /** Physically occupied right now — an open occupancy window. */
+  occupiedByBatch: string | null;
+  occupiedByBatchId: string | null;
+  /** Spoken for by a plan. May be a different batch from the one occupying it. */
+  allocatedToBatch: string | null;
+  allocatedToBatchId: string | null;
+};
+
+/* ── the physical journey (0031) ──────────────────────────────────────────────────────────── */
+
+/**
+ * The batch's physical journey: which vessel it is in at each movement, and which individual batch
+ * goes to which tunnel.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * WHY THIS REPLACED THE PER-BATCH VESSEL PICKER
+ *
+ * The first version bound one bunker to a batch for its whole life. The factory's own records do
+ * something the first version could not express at all:
+ *
+ *     Bunker filling   →  Bunker 3
+ *     Reload 1         →  Bunker 5
+ *     Reload 2         →  Bunker 3      ← back into a bunker it already used
+ *
+ * and then the master batch splits, one tunnel per individual batch:
+ *
+ *     366 → Tunnel 10      367 → Tunnel 8      368 → Tunnel 6
+ *
+ * So a vessel is claimed by a MOVEMENT, not by a batch. Where the material came from is the vessel
+ * of the previous movement, which means the chain draws itself and nobody types it twice.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
+
+export type Movement = {
+  seq: number;
+  code: string;
+  label: string;
+  needsKind: string | null;
+  /** True for tunnel loading: each individual batch chooses its own. */
+  perIndividual: boolean;
+  individualBatchId: string | null;
+  batchNo: string | null;
+  movementId: string | null;
+  fromLabel: string | null;
+  toLocationId: string | null;
+  toLabel: string | null;
+  toCode: string | null;
+  plannedAt: string | null;
+  actualAt: string | null;
+  fillHeightM: number | null;
+  conflictId: string | null;
+  recordedByName: string | null;
+};
+
+export type IndividualBatch = {
+  id: string;
+  batchNo: string;
+  seq: number;
+};

@@ -3,14 +3,26 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   captureEvidence,
   getActivityDetail,
+  loadEvidenceState,
+  signedEvidenceUrl,
   startActivity,
   submitActivity,
   type BatchValueRow,
+  type EvidenceItem,
 } from '../api/batch';
 import { supabase } from '../api/client';
 import { Chip, ConflictMarker, Countdown } from '../components/primitives';
 
-/** What the file picker will accept, from the requirement's own `media_kinds`. */
+/**
+ * Human-readable state labels — same map as BatchDetail.
+ * The internal names are engine vocabulary; a person using this screen reads what the task is doing.
+ */
+const STATE_LABEL: Record<string, string> = {
+  COMPLETED: 'Done', READY: 'Ready', IN_PROGRESS: 'In progress', SUBMITTED: 'Submitted',
+  WAITING_TIME: 'Resting', WAITING_CONDITION: 'Waiting', DEVIATION: 'Needs decision',
+  BLOCKED: 'Blocked', RETURNED: 'Returned', LOCKED: 'Not yet', SKIPPED: 'Skipped',
+  CANCELLED: 'Cancelled', AWAITING_LAB: 'Waiting on lab', AWAITING_SUPERVISOR: 'Waiting on supervisor',
+};
 function acceptFor(kinds: string[] | null): string {
   const set = new Set(kinds ?? ['photo']);
   const accept: string[] = [];
@@ -100,6 +112,7 @@ export function TaskDrawer({
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['activity', activityId] });
     qc.invalidateQueries({ queryKey: ['activity-detail', activityId] });
+    qc.invalidateQueries({ queryKey: ['evidence-full', activityId] });
     onChanged();
   };
 
@@ -148,9 +161,15 @@ export function TaskDrawer({
     },
   });
 
+  const fullEvidence = useQuery({
+    queryKey: ['evidence-full', activityId],
+    queryFn: () => loadEvidenceState(activityId),
+  });
+
   const a = activity.data;
   const vals = detail.data?.values ?? [];
   const evs = detail.data?.evidence ?? [];
+  const fullEvItems = fullEvidence.data ?? [];
   const outstanding = evs.filter((e) => e.gates_submission && e.satisfied_count < e.min_count);
   const editable = a && ['READY', 'IN_PROGRESS', 'RETURNED'].includes(a.state) && batchStatus === 'active';
 
@@ -188,7 +207,7 @@ export function TaskDrawer({
         {a && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Chip tone={a.state === 'COMPLETED' ? 'ok' : a.state === 'DEVIATION' ? 'crit' : 'accent'}>
-              {a.state.replace(/_/g, ' ')}
+              {STATE_LABEL[a.state] ?? a.state.replace(/_/g, ' ')}
             </Chip>
             {a.tbd_marker && <ConflictMarker id={a.tbd_marker} />}
             {a.day0_duration_hr != null && (
@@ -344,73 +363,64 @@ export function TaskDrawer({
           {evs.length === 0 ? (
             <p className="text-[12px] text-muted">Nothing required for this task.</p>
           ) : (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-3">
               {evs.map((e) => {
                 const met = e.satisfied_count >= e.min_count;
+                // Photos already captured for this requirement
+                const captured = fullEvItems.filter(
+                  (f) => f.key === e.key && f.mediaId !== null && f.supersededById === null
+                );
                 return (
-                  <div
-                    key={e.id}
-                    className="flex items-center justify-between gap-2 rounded border px-2 py-1.5"
-                    style={{
-                      borderColor: met ? 'var(--ok)' : 'var(--line-2)',
-                      background: met ? 'var(--ok-soft)' : 'transparent',
-                    }}
-                  >
-                    <span className="min-w-0">
-                      <span className="text-[12px]" style={{ color: met ? 'var(--ok)' : 'var(--ink-2)' }}>
+                  <div key={e.id} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-600" style={{ color: met ? 'var(--ok)' : 'var(--ink)' }}>
                         {met ? '✓ ' : '○ '}
                         {e.label}
                       </span>
-                      {e.capture_hint && (
-                        <span className="block text-[10px] text-muted">{e.capture_hint}</span>
-                      )}
-                    </span>
-                    {!met && editable && (
-                      /*
-                        A real file input with `capture`, which opens the camera on a phone and a file
-                        picker on a desktop. `ARCHITECTURE_V2 §7` wants a client downscale to
-                        <=1600 px before upload; that is not done here yet and is named in the report.
-                      */
-                      <label
-                        className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
-                        style={{
-                          borderColor: 'var(--accent)',
-                          color: 'var(--accent-ink)',
-                          minHeight: 48,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
-                      >
-                        {evidence.isPending ? 'Uploading…' : 'Capture'}
-                        <input
-                          type="file"
-                          accept={acceptFor(e.media_kinds)}
-                          capture="environment"
-                          className="hidden"
-                          disabled={evidence.isPending}
-                          onChange={(ev) => {
-                            const file = ev.target.files?.[0];
-                            ev.target.value = '';
-                            if (!file) return;
-                            evidence.mutate({
-                              requirementKey: e.key,
-                              file,
-                              mediaKind: file.type.startsWith('video/') ? 'video' : 'photo',
-                            });
+                      {!met && editable && (
+                        <label
+                          className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
+                          style={{
+                            borderColor: 'var(--accent)',
+                            color: 'var(--accent-ink)',
+                            minHeight: 44,
+                            display: 'inline-flex',
+                            alignItems: 'center',
                           }}
-                        />
-                      </label>
+                        >
+                          {evidence.isPending ? 'Uploading…' : 'Capture'}
+                          <input
+                            type="file"
+                            accept={acceptFor(e.media_kinds)}
+                            capture="environment"
+                            className="hidden"
+                            disabled={evidence.isPending}
+                            onChange={(ev) => {
+                              const file = ev.target.files?.[0];
+                              ev.target.value = '';
+                              if (!file) return;
+                              evidence.mutate({
+                                requirementKey: e.key,
+                                file,
+                                mediaKind: file.type.startsWith('video/') ? 'video' : 'photo',
+                              });
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    {e.capture_hint && (
+                      <span className="text-[11px] text-muted">{e.capture_hint}</span>
                     )}
+                    {/* Render the actual captured photos */}
+                    {captured.map((f) => (
+                      <PhotoThumb key={f.mediaId!} item={f} />
+                    ))}
                   </div>
                 );
               })}
             </div>
           )}
-          <p className="mt-1.5 text-[10px] text-muted">
-            The file is uploaded first, then bound to the named requirement. If the upload fails
-            nothing is recorded and the requirement stays outstanding — a record of a photograph that
-            is not in storage would be a false record.
-          </p>
         </section>
 
         <section className="mb-4">
@@ -484,5 +494,62 @@ export function TaskDrawer({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One captured photo or video — loads a signed URL and renders it.
+ *
+ * Signed URLs expire (5 min TTL). React Query re-fetches when the component mounts so a closed-and-
+ * reopened drawer always shows a fresh URL. Private bucket: the object is never accessible without a
+ * valid session; the signed URL is short-lived and not stored.
+ */
+function PhotoThumb({ item }: { item: EvidenceItem }) {
+  const url = useQuery({
+    queryKey: ['evidence-url', item.storagePath],
+    queryFn: () => signedEvidenceUrl(item.storagePath!, 300),
+    enabled: !!item.storagePath,
+    staleTime: 240_000, // refresh before the 5-min TTL expires
+  });
+
+  if (!item.storagePath) return null;
+
+  if (url.isLoading) {
+    return (
+      <div
+        className="rounded"
+        style={{ width: '100%', maxWidth: 240, height: 80, background: 'var(--surface-2)' }}
+      />
+    );
+  }
+  if (url.error || !url.data) {
+    return (
+      <p className="text-[11px]" style={{ color: 'var(--warn)' }}>
+        Photo could not be loaded — {(url.error as Error)?.message ?? 'unknown error'}
+      </p>
+    );
+  }
+
+  if (item.mediaKind === 'video') {
+    return (
+      <video
+        src={url.data}
+        controls
+        className="rounded"
+        style={{ width: '100%', maxWidth: 360, maxHeight: 200, background: '#000' }}
+      />
+    );
+  }
+
+  return (
+    <a href={url.data} target="_blank" rel="noopener noreferrer">
+      <img
+        src={url.data}
+        alt={item.label}
+        className="rounded"
+        style={{ width: '100%', maxWidth: 360, maxHeight: 240, objectFit: 'cover' }}
+        loading="lazy"
+      />
+    </a>
   );
 }

@@ -41,8 +41,8 @@ export function Batches() {
         right={
           <Link
             to="/admin/batch/new"
-            className="rounded px-3 py-2 font-head text-[12px] font-700"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            className="inline-flex items-center rounded px-4 font-head text-[12px] font-700"
+            style={{ minHeight: 44, background: 'var(--accent)', color: '#fff' }}
           >
             Start a new batch
           </Link>

@@ -44,6 +44,16 @@ from (values
   ('STRAW-BUNK-STORE','bunker_id','Bunker','text',null,null,null,null,
    'W §6.4 — mandatory field','C-24',true,null,'required','Straw',10),
 
+  -- CLIENT DECISION 5, 23 Aug 2026. No source gives a bound for either, and none is invented:
+  -- the inspection records what was seen and the weighment records what was weighed.
+  ('STRAW-INSPECT','condition','Condition on arrival','text',null,null,null,null,
+   'client decision 23 Aug 2026 — recorded, no bound',null,false,null,'required','Straw',10),
+  -- Actual only. FIB1-WEIGH carries a Day-0 `target_qty_mt` because the fibre requirement is a
+  -- stated Day-0 answer; NO source states a straw target, so there is nothing to compare against
+  -- and a target field here would be a box with no factory behind it.
+  ('STRAW-WEIGH','actual_qty_mt','Actual quantity','numeric','MT',null,null,null,
+   'client decision 23 Aug 2026 — recorded, no bound',null,false,null,'required','Straw',10),
+
   -- Rest durations: NO default. The factory never stated the hours.
   ('FIB1-REST-1','rest_duration_hr','Required rest','duration','h',null,null,null,
    'W §4 — duration not specified by the factory','TBD-21',true,null,'not_collected','Rest',10),

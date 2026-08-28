@@ -245,6 +245,88 @@ export async function satisfyEvidence(db: Db, activityId: string): Promise<void>
 }
 
 /**
+ * The incoming-material check a batch now needs before it can be activated.
+ *
+ * CLIENT DECISION 2, 23 Aug 2026 — `0032` makes an accepted pre-batch material check a BLOCKING
+ * finding, so every batch that wants to run needs one. Driven through the real RPCs rather than by
+ * inserting rows, for the same reason `createActiveBatch` asserts the blocking set is empty: a
+ * helper that forced the state would make every suite using it prove less than it claims.
+ *
+ * The readings are S3f's real recorded bagasse assay via `LAB_MODEL §3.2` — MC 56.2 %, pH 5.63 —
+ * the same two numbers `s11` uses, so the test fixture and the demo tell one story and neither
+ * invents a measurement.
+ *
+ * Runs while the batch is still `draft`. `open_prebatch_sample` refuses once it is active, which is
+ * the point: the check is a prerequisite, not a retrospective note.
+ */
+export async function satisfyPrebatchMaterialCheck(db: Db, batch: string): Promise<void> {
+  const cp = await one<{ id: string }>(
+    db,
+    `select id from lab_checkpoint where is_prebatch order by checkpoint_map limit 1`
+  );
+
+  // ⚠ COLLECTED BEFORE H0, EXPLICITLY, because "before the clock starts" is the whole claim.
+  //
+  // Defaulting to `now()` only happens to be before H0 when the batch is planned for the future. A
+  // demo or test batch whose H0 is BACKDATED would get a check collected weeks after its own H0,
+  // and `v_prebatch_material_check.before_h0` would correctly report false.
+  //
+  // `least(now(), start_at - 1 hour)` is right in both directions: a future H0 keeps the real
+  // current time, and a past H0 places the check an hour ahead of the clock it precedes. It can
+  // never be in the future, which is the one thing `open_prebatch_sample` refuses.
+  const sample = await one<{ id: string }>(
+    db,
+    `select public.open_prebatch_sample(
+              $1, $2, 'Incoming assay — LAB_MODEL §3.2 (S3f)',
+              least(now(), (select mb.start_at - interval '1 hour'
+                              from master_batch mb where mb.id = $1))) as id`,
+    [batch, cp.id]
+  );
+
+  // ⚠ ACCEPTS AS A LAB TECHNICIAN, WHATEVER ROLE THE CALLER WAS WEARING.
+  //
+  // `accept_lab_result` is correctly restricted to the lab technician and the supervisor. Several
+  // suites — `deviations.test.ts` among them — adopt the OPERATOR role before creating a batch, so
+  // the first version of this helper made every one of them fail with "A operator may not accept a
+  // lab result as final". That refusal is right; the helper was wrong to inherit it.
+  //
+  // This is a FIXTURE building a precondition, not the thing under test, so it borrows the role it
+  // needs and puts the caller's back exactly as it was. The authorisation itself is proved
+  // deliberately in `dayZeroToSix.test.ts`, where an operator IS refused.
+  const prior = await one<{ claims: string }>(
+    db,
+    `select coalesce(current_setting('request.jwt.claims', true), '') as claims`
+  );
+  await db.query(`select set_config('request.jwt.claims', $1, true)`, [
+    JSON.stringify({ app_metadata: { app_role: 'lab_tech' } }),
+  ]);
+
+  // Two parameters, not three. The dictation asks for moisture, pH AND dry weight, but no source
+  // records a dry weight (TBD-45) — requesting it would leave the check permanently unaccepted.
+  for (const [parameter, value] of [
+    ['moisture_pct', 56.2],
+    ['ph', 5.63],
+  ] as const) {
+    const test = await one<{ id: string }>(
+      db,
+      `select public.request_lab_test($1, $2, 'system') as id`,
+      [sample.id, parameter]
+    );
+    const result = await one<{ id: string }>(
+      db,
+      `select public.record_lab_result($1, $2) as id`,
+      [test.id, value]
+    );
+    await db.query(`select public.accept_lab_result($1, 'S3f recorded value, accepted as final')`, [
+      result.id,
+    ]);
+  }
+
+  // The caller's role, back as it was — including "none at all".
+  await db.query(`select set_config('request.jwt.claims', $1, true)`, [prior.claims]);
+}
+
+/**
  * A batch that is actually running: H0 set, every row assigned, every destination chosen, then
  * activated. `validate_batch` refuses activation while any blocking finding stands, so this is the
  * shortest HONEST path to an active batch rather than a way around the checks — the blocking set is
@@ -314,6 +396,9 @@ export async function createActiveBatch(
       [batch, turners[1].id]
     );
   }
+
+  // The incoming-material check, which is a blocking prerequisite since 0032.
+  await satisfyPrebatchMaterialCheck(db, batch);
 
   const blocking = await all<{ code: string; message: string }>(
     db,

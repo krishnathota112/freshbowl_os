@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ROLE_LABEL, signOut, useAuth } from '../../lib/auth';
 
 /**
@@ -78,7 +77,6 @@ const TARGET_PX = 48;
 export function FieldShell({ children }: { children: ReactNode }) {
   const { role, displayName } = useAuth();
   const online = useOnline();
-  const navigate = useNavigate();
 
   return (
     <div className="flex min-h-full flex-col" style={{ background: 'var(--paper)' }}>
@@ -110,11 +108,15 @@ export function FieldShell({ children }: { children: ReactNode }) {
         </div>
 
         <button
+          type="button"
           onClick={async () => {
-            await signOut();
-            navigate('/sign-in');
+            try {
+              await signOut();
+            } finally {
+              window.location.href = '/sign-in';
+            }
           }}
-          className="ml-auto rounded-md border px-4 font-head text-[15px] font-600"
+          className="ml-auto rounded-md border px-4 font-head text-[15px] font-600 cursor-pointer"
           style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)', minHeight: TARGET_PX }}
         >
           Sign out

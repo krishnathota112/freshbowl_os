@@ -1,17 +1,23 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { ROLE_LABEL, signOut, useAuth } from '../../lib/auth';
 import { Chip } from '../primitives';
+import { isTimeTravelled, timeTravelOffsetMs } from '../../lib/now';
 
 const NAV: Record<string, { to: string; label: string }[]> = {
   admin: [
     { to: '/admin/today', label: 'Today' },
     { to: '/admin/batches', label: 'Batches' },
+    { to: '/admin/schedule', label: 'Schedule' },
     { to: '/admin/batch/new', label: '+ New Batch' },
     { to: '/operator/my-work', label: 'Tasks' },
     { to: '/admin/process-explorer', label: 'Process' },
     { to: '/admin/reference', label: 'Reference' },
-    { to: '/dev/gallery', label: 'Gallery' },
+    /*
+      `/dev/gallery` used to sit here. It is a component gallery for developers, it is excluded
+      from production builds entirely, and a factory admin clicking it lands on a page of sample
+      widgets. It is reachable by typing the address in a dev build, which is who it is for.
+    */
   ],
   operator: [{ to: '/operator/my-work', label: 'My Work' }],
   lab_tech: [{ to: '/lab/queue', label: 'Lab Queue' }],
@@ -26,12 +32,10 @@ const NAV: Record<string, { to: string; label: string }[]> = {
     { to: '/admin/batches', label: 'Batches' },
   ],
   gm: [
-    // S1's name, and its real route. The nav pointed at `/gm/command-center` — which still
-    // resolves, because it is kept as a redirect for the GM's bookmark — but sending every
-    // in-app click through a redirect, under the screen's PREVIOUS name, is how a rename stays
-    // half-done forever.
     { to: '/gm/control-tower', label: 'Control Tower' },
+    { to: '/plant', label: 'Plant' },
     { to: '/admin/batches', label: 'Batches' },
+    { to: '/admin/schedule', label: 'Schedule' },
     { to: '/admin/process-explorer', label: 'Process' },
   ],
 };
@@ -66,7 +70,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { role, displayName, roleSource } = useAuth();
   const { theme, toggle } = useTheme();
   const online = useOnline();
-  const navigate = useNavigate();
   const nav = role ? NAV[role] ?? [] : [];
 
   return (
@@ -96,18 +99,35 @@ export function AppShell({ children }: { children: ReactNode }) {
         style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
       >
         <span className="font-head text-sm font-800 tracking-tight">MushroomOS</span>
-        <span className="mono text-[11px] text-muted">PROCESS-2026B</span>
+        {/*
+          The header used to print `PROCESS-2026B` beside the name, on every management screen. It
+          is the internal code for the process definition — meaningful to whoever seeds the
+          database and to nobody in the factory. The definition is still named on the Process
+          screen, which is where someone goes to ask about it.
+        */}
+        <span className="text-[11px] text-muted">Fresh Bowl Horticulture</span>
 
+        {/*
+          EVERY ROLE CAN BE ON A PHONE.
+
+          The management shell used to assume a mouse, because management meant a browser. It does
+          not any more: the same build ships inside the APK and the role alone decides which screens
+          a person gets, so a chairman opening the app on a phone lands here.
+
+          These controls were 26 px tall — under half a fingertip. `min-height: 44px` is the touch
+          minimum; the field shell uses 48 because an operator may be wearing gloves, and a chairman
+          is not. Padding is unchanged, so nothing grows on a desktop that was already fine.
+        */}
         <nav className="flex flex-wrap items-center gap-1">
           {nav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
-              className="rounded px-2 py-1 font-head text-[12px] font-600"
+              className="inline-flex items-center rounded px-3 font-head text-[12px] font-600"
               style={({ isActive }) =>
                 isActive
-                  ? { background: 'var(--accent-soft)', color: 'var(--accent-ink)' }
-                  : { color: 'var(--ink-2)' }
+                  ? { minHeight: 44, background: 'var(--accent-soft)', color: 'var(--accent-ink)' }
+                  : { minHeight: 44, color: 'var(--ink-2)' }
               }
             >
               {n.label}
@@ -131,20 +151,43 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Chip>
           )}
           {displayName && <span className="text-[12px] text-muted">{displayName}</span>}
+          {/*
+            THE PRODUCT ADMITS WHEN IT IS NOT SHOWING LIVE TIME.
+
+            The database carries a settable clock so a demo can stand at any hour of a batch's life.
+            That is useful and it is also dangerous: every hour, countdown and variance on screen is
+            then computed against a fabricated instant, and somebody could read a real decision off
+            it. When the clock is moved, the chrome says so on every screen.
+          */}
+          {isTimeTravelled() && (
+            <span
+              className="inline-flex items-center rounded-full px-2.5 font-head text-[10px] font-700 uppercase tracking-wider"
+              style={{ minHeight: 28, background: 'var(--warn-soft)', color: 'var(--warn)' }}
+              title={`The factory clock is set forward or back by ${Math.round(
+                timeTravelOffsetMs() / 3_600_000
+              )} hours. Times on screen are not live.`}
+            >
+              demo clock
+            </span>
+          )}
           <button
             onClick={toggle}
-            className="rounded border px-2 py-1 font-head text-[11px] font-600"
-            style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
+            className="inline-flex items-center rounded border px-3 font-head text-[11px] font-600"
+            style={{ minHeight: 44, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
           >
             {theme === 'light' ? 'Dark' : 'Light'}
           </button>
           <button
+            type="button"
             onClick={async () => {
-              await signOut();
-              navigate('/sign-in');
+              try {
+                await signOut();
+              } finally {
+                window.location.href = '/sign-in';
+              }
             }}
-            className="rounded border px-2 py-1 font-head text-[11px] font-600"
-            style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
+            className="inline-flex items-center rounded border px-3 font-head text-[11px] font-600 cursor-pointer"
+            style={{ minHeight: 44, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
           >
             Sign out
           </button>

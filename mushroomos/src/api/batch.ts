@@ -124,6 +124,44 @@ export async function getBatchActivities(batchId: string): Promise<BatchActivity
   return (data ?? []) as BatchActivityRow[];
 }
 
+export type PreBatchMaterialCheckRow = {
+  master_batch_id: string;
+  batch_code: string;
+  batch_status: string;
+  checkpoint_code: string;
+  checkpoint_map: string;
+  sample_id: string;
+  sample_ref_label: string;
+  collected_at: string;
+  collected_by_name: string | null;
+  tests_requested: number;
+  results_current: number;
+  failed: number;
+  no_spec: number;
+  accepted: number;
+  before_h0: boolean | null;
+};
+
+export async function getPreBatchMaterialCheck(batchId: string): Promise<PreBatchMaterialCheckRow | null> {
+  const { data, error } = await supabase
+    .from('v_prebatch_material_check')
+    .select('*')
+    .eq('master_batch_id', batchId)
+    .maybeSingle();
+  if (error) return null;
+  return data as PreBatchMaterialCheckRow | null;
+}
+
+export function isPreH0Activity(activity: { code: string; rel_day?: number; baseline_start_hour?: number | null }): boolean {
+  return (
+    activity.code === 'FIB1-WEIGH' ||
+    activity.code.startsWith('RAW-') ||
+    activity.code === 'RAW_MATERIAL' ||
+    activity.code === 'RAW_MATERIAL_WEIGHMENT' ||
+    (activity.rel_day != null && activity.rel_day < 0)
+  );
+}
+
 /**
  * The baseline the process states, read from `process_definition`.
  *
@@ -237,6 +275,20 @@ export async function createBatch(input: {
   });
   if (error) throw error;
   return data as string;
+}
+
+/**
+ * A date and a factory-local wall-clock time, as an absolute instant.
+ *
+ * Asked of the database rather than computed in the browser: turning "5 June, 07:00 in
+ * Asia/Kolkata" into an instant needs that zone's offset on that date, and the usual client-side
+ * trick — format to a string and parse it back — is fragile and silently wrong across a DST
+ * boundary. Returns null when the factory timezone is unset, which is a refusal, not a default.
+ */
+export async function factoryInstant(date: string, time: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('factory_instant', { p_date: date, p_time: time });
+  if (error) throw error;
+  return (data as string | null) ?? null;
 }
 
 /** Set or correct H0 on a draft, and repoint every planned instant. Draft only. */

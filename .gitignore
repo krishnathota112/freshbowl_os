@@ -9,3 +9,20 @@ dist
 # over, not source, and 9.7 MB of it. The archive it came from is what belongs in a repo, if
 # anything does.
 MushroomOS-extracted/
+apk_extracted/
+
+# OX Alpha isolated working copy of mushroomos/ — sandbox only, canonical work stays in mushroomos/.
+mushroomos-alpha/
+
+# ── Not source ───────────────────────────────────────────────────────────────
+# A 495 MB working copy and a 201 MB zip of it. Whatever is worth keeping in
+# there belongs in the tree itself, not as a second checkout inside the first.
+mushroomos-codex/
+*.zip
+
+.idea/
+dist-apk/
+mushroomos/scratch/
+mushroomos/.gradle-local/
+mushroomos/gradle-clean.txt
+mushroomos/pa.txt
