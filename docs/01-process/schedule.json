@@ -1,0 +1,925 @@
+{
+ "h0": "2026-08-31T09:00:00",
+ "anchor": 174,
+ "envelope": 470,
+ "h0_wall": "Mon 31 Aug 09:00",
+ "anchor_wall": "Mon 07 Sep 15:00",
+ "envelope_wall": "Sat 19 Sep 23:00",
+ "full_discharge": 474,
+ "full_discharge_wall": "Sun 20 Sep 03:00",
+ "main": [
+  {
+   "stage": "0A",
+   "code": "FIB-WET-1",
+   "title": "Bagasse wetting \u2014 hopper pass 1 (full water, target 69\u201371% moisture)",
+   "start": 0,
+   "dur": 3,
+   "mn": 3,
+   "avg": 3,
+   "kind": "WORK",
+   "end": 3,
+   "ws": "31 Aug 09:00",
+   "we": "31 Aug 12:00",
+   "day": 1
+  },
+  {
+   "stage": "0A",
+   "code": "FIB-REST-1",
+   "title": "Material rest",
+   "start": 3,
+   "dur": 8,
+   "mn": 8,
+   "avg": 8,
+   "kind": "HOLD",
+   "end": 11,
+   "ws": "31 Aug 12:00",
+   "we": "31 Aug 20:00",
+   "day": 1
+  },
+  {
+   "stage": "0A",
+   "code": "FIB-HOP-2",
+   "title": "Hopper pass 2 (dry, or water to reach target moisture)",
+   "start": 11,
+   "dur": 3,
+   "mn": 3,
+   "avg": 3,
+   "kind": "WORK",
+   "end": 14,
+   "ws": "31 Aug 20:00",
+   "we": "31 Aug 23:00",
+   "day": 1
+  },
+  {
+   "stage": "0A",
+   "code": "FIB-HEAP",
+   "title": "Heap formation (height \u22641.5 m) + rest",
+   "start": 14,
+   "dur": 12,
+   "mn": 8,
+   "avg": 10,
+   "kind": "HOLD",
+   "end": 26,
+   "ws": "31 Aug 23:00",
+   "we": "01 Sep 11:00",
+   "day": 1
+  },
+  {
+   "stage": "0B",
+   "code": "FIB-BUNK-LOAD",
+   "title": "Flipping + bunker filling (ht 2.6\u20132.7 m), no water",
+   "start": 26,
+   "dur": 2,
+   "mn": 2,
+   "avg": 2,
+   "kind": "WORK",
+   "end": 28,
+   "ws": "01 Sep 11:00",
+   "we": "01 Sep 13:00",
+   "day": 2
+  },
+  {
+   "stage": "0B",
+   "code": "FIB-COND-1",
+   "title": "Bunker conditioning, 45\u201355 \u00b0C. Unload trigger \u226558 \u00b0C or \u226560 h",
+   "start": 28,
+   "dur": 60,
+   "mn": 48,
+   "avg": 54,
+   "kind": "HOLD",
+   "end": 88,
+   "ws": "01 Sep 13:00",
+   "we": "04 Sep 01:00",
+   "day": 2
+  },
+  {
+   "stage": "0C",
+   "code": "FIB-RELOAD-1",
+   "title": "Loader unload, flipping, reload to new bunker (no water)",
+   "start": 88,
+   "dur": 5,
+   "mn": 5,
+   "avg": 5,
+   "kind": "WORK",
+   "end": 93,
+   "ws": "04 Sep 01:00",
+   "we": "04 Sep 06:00",
+   "day": 5
+  },
+  {
+   "stage": "0C",
+   "code": "FIB-COND-2",
+   "title": "Conditioning. Unload trigger \u226558 \u00b0C or \u226540 h",
+   "start": 93,
+   "dur": 40,
+   "mn": 40,
+   "avg": 40,
+   "kind": "HOLD",
+   "end": 133,
+   "ws": "04 Sep 06:00",
+   "we": "05 Sep 22:00",
+   "day": 5
+  },
+  {
+   "stage": "0C",
+   "code": "FIB-MOIST-DEC",
+   "title": "Unload. If moisture \u226568% proceed; if <67% controlled mist via hopper",
+   "start": 133,
+   "dur": 3,
+   "mn": 3,
+   "avg": 3,
+   "kind": "WORK",
+   "end": 136,
+   "ws": "05 Sep 22:00",
+   "we": "06 Sep 01:00",
+   "day": 6
+  },
+  {
+   "stage": "1B",
+   "code": "MIX-CM-ADD",
+   "title": "Add chicken-manure mix to conditioned bagasse + loader mix + flip 1 + flip 2",
+   "start": 136,
+   "dur": 8,
+   "mn": 8,
+   "avg": 8,
+   "kind": "WORK",
+   "end": 144,
+   "ws": "06 Sep 01:00",
+   "we": "06 Sep 09:00",
+   "day": 7
+  },
+  {
+   "stage": "1B",
+   "code": "MIX-HOP-WATER",
+   "title": "Hopper pass, full water (target 73% moisture, temp <45\u201350 \u00b0C)",
+   "start": 144,
+   "dur": 4,
+   "mn": 4,
+   "avg": 4,
+   "kind": "WORK",
+   "end": 148,
+   "ws": "06 Sep 09:00",
+   "we": "06 Sep 13:00",
+   "day": 7
+  },
+  {
+   "stage": "1B",
+   "code": "MIX-REST",
+   "title": "Rest",
+   "start": 148,
+   "dur": 12,
+   "mn": 8,
+   "avg": 10,
+   "kind": "HOLD",
+   "end": 160,
+   "ws": "06 Sep 13:00",
+   "we": "07 Sep 01:00",
+   "day": 7
+  },
+  {
+   "stage": "1C",
+   "code": "YARD-PILES",
+   "title": "Preparation of 2 equal piles on platform",
+   "start": 160,
+   "dur": 4,
+   "mn": 4,
+   "avg": 4,
+   "kind": "WORK",
+   "end": 164,
+   "ws": "07 Sep 01:00",
+   "we": "07 Sep 05:00",
+   "day": 8
+  },
+  {
+   "stage": "1C",
+   "code": "YARD-ADD",
+   "title": "Add bagasse + CM mix gradually onto the 2 paddy piles",
+   "start": 164,
+   "dur": 2,
+   "mn": 2,
+   "avg": 2,
+   "kind": "WORK",
+   "end": 166,
+   "ws": "07 Sep 05:00",
+   "we": "07 Sep 07:00",
+   "day": 8
+  },
+  {
+   "stage": "1C",
+   "code": "YARD-FLIP",
+   "title": "Flipping 1 + flipping 2, back to back",
+   "start": 166,
+   "dur": 8,
+   "mn": 8,
+   "avg": 8,
+   "kind": "WORK",
+   "end": 174,
+   "ws": "07 Sep 07:00",
+   "we": "07 Sep 15:00",
+   "day": 8
+  }
+ ],
+ "paddy": [
+  {
+   "code": "STR-WEIGH",
+   "title": "Paddy bale weighment + cutting + thread removal",
+   "start": 74,
+   "dur": 12,
+   "end": 86,
+   "ws": "03 Sep 11:00",
+   "we": "03 Sep 23:00",
+   "day": 4
+  },
+  {
+   "code": "STR-SOAK-1",
+   "title": "Soaking 1 \u2014 push in, tilt 1, tilt 2, push out (8\u201310 h) + rest in bunker (10\u201312 h)",
+   "start": 86,
+   "dur": 22,
+   "end": 108,
+   "ws": "03 Sep 23:00",
+   "we": "04 Sep 21:00",
+   "day": 4
+  },
+  {
+   "code": "STR-SOAK-2",
+   "title": "Soaking 2 \u2014 push in, tilt 1, tilt 2, push out (8\u201310 h) + rest in bunker (18 h)",
+   "start": 108,
+   "dur": 28,
+   "end": 136,
+   "ws": "04 Sep 21:00",
+   "we": "06 Sep 01:00",
+   "day": 5
+  },
+  {
+   "code": "STR-SOAK-3",
+   "title": "Soaking 3 \u2014 push in, tilt 1, tilt 2, push out (8\u201310 h) + rest in bunker (12\u201314 h)",
+   "start": 136,
+   "dur": 24,
+   "end": 160,
+   "ws": "06 Sep 01:00",
+   "we": "07 Sep 01:00",
+   "day": 7
+  }
+ ],
+ "nitro": [
+  {
+   "code": "CM-WEIGH",
+   "title": "Chicken manure + gypsum + ammonium sulphate weighment",
+   "start": 130,
+   "dur": 2,
+   "end": 132,
+   "ws": "05 Sep 19:00",
+   "we": "05 Sep 21:00",
+   "day": 6
+  },
+  {
+   "code": "CM-DRYMIX",
+   "title": "Dry mix + rotavator to break manure lumps (no water)",
+   "start": 132,
+   "dur": 4,
+   "end": 136,
+   "ws": "05 Sep 21:00",
+   "we": "06 Sep 01:00",
+   "day": 6
+  }
+ ],
+ "turner": [
+  {
+   "pile": 1,
+   "pas": "T0",
+   "machine": "M1",
+   "start": 174.0,
+   "end": 175.5,
+   "ws": "07 Sep 15:00",
+   "we": "07 Sep 16:30"
+  },
+  {
+   "pile": 1,
+   "pas": "T1",
+   "machine": "M1",
+   "start": 177.0,
+   "end": 178.5,
+   "ws": "07 Sep 18:00",
+   "we": "07 Sep 19:30"
+  },
+  {
+   "pile": 1,
+   "pas": "T2",
+   "machine": "M1",
+   "start": 186.5,
+   "end": 188.0,
+   "ws": "08 Sep 03:30",
+   "we": "08 Sep 05:00"
+  },
+  {
+   "pile": 1,
+   "pas": "T3",
+   "machine": "M1",
+   "start": 192.5,
+   "end": 194.0,
+   "ws": "08 Sep 09:30",
+   "we": "08 Sep 11:00"
+  },
+  {
+   "pile": 2,
+   "pas": "T0",
+   "machine": "M1",
+   "start": 175.5,
+   "end": 177.0,
+   "ws": "07 Sep 16:30",
+   "we": "07 Sep 18:00"
+  },
+  {
+   "pile": 2,
+   "pas": "T1",
+   "machine": "M1",
+   "start": 180.0,
+   "end": 181.5,
+   "ws": "07 Sep 21:00",
+   "we": "07 Sep 22:30"
+  },
+  {
+   "pile": 2,
+   "pas": "T2",
+   "machine": "M1",
+   "start": 189.5,
+   "end": 191.0,
+   "ws": "08 Sep 06:30",
+   "we": "08 Sep 08:00"
+  },
+  {
+   "pile": 2,
+   "pas": "T3",
+   "machine": "M1",
+   "start": 194.0,
+   "end": 195.5,
+   "ws": "08 Sep 11:00",
+   "we": "08 Sep 12:30"
+  },
+  {
+   "pile": 3,
+   "pas": "T0",
+   "machine": "M2",
+   "start": 174.0,
+   "end": 175.5,
+   "ws": "07 Sep 15:00",
+   "we": "07 Sep 16:30"
+  },
+  {
+   "pile": 3,
+   "pas": "T1",
+   "machine": "M1",
+   "start": 178.5,
+   "end": 180.0,
+   "ws": "07 Sep 19:30",
+   "we": "07 Sep 21:00"
+  },
+  {
+   "pile": 3,
+   "pas": "T2",
+   "machine": "M2",
+   "start": 188.0,
+   "end": 189.5,
+   "ws": "08 Sep 05:00",
+   "we": "08 Sep 06:30"
+  },
+  {
+   "pile": 3,
+   "pas": "T3",
+   "machine": "M2",
+   "start": 192.5,
+   "end": 194.0,
+   "ws": "08 Sep 09:30",
+   "we": "08 Sep 11:00"
+  },
+  {
+   "pile": 4,
+   "pas": "T0",
+   "machine": "M2",
+   "start": 175.5,
+   "end": 177.0,
+   "ws": "07 Sep 16:30",
+   "we": "07 Sep 18:00"
+  },
+  {
+   "pile": 4,
+   "pas": "T1",
+   "machine": "M1",
+   "start": 181.5,
+   "end": 183.0,
+   "ws": "07 Sep 22:30",
+   "we": "08 Sep 00:00"
+  },
+  {
+   "pile": 4,
+   "pas": "T2",
+   "machine": "M2",
+   "start": 191.0,
+   "end": 192.5,
+   "ws": "08 Sep 08:00",
+   "we": "08 Sep 09:30"
+  },
+  {
+   "pile": 4,
+   "pas": "T3",
+   "machine": "M2",
+   "start": 194.0,
+   "end": 195.5,
+   "ws": "08 Sep 11:00",
+   "we": "08 Sep 12:30"
+  },
+  {
+   "pile": 5,
+   "pas": "T0",
+   "machine": "M2",
+   "start": 177.0,
+   "end": 178.5,
+   "ws": "07 Sep 18:00",
+   "we": "07 Sep 19:30"
+  },
+  {
+   "pile": 5,
+   "pas": "T1",
+   "machine": "M2",
+   "start": 180.0,
+   "end": 181.5,
+   "ws": "07 Sep 21:00",
+   "we": "07 Sep 22:30"
+  },
+  {
+   "pile": 5,
+   "pas": "T2",
+   "machine": "M2",
+   "start": 189.5,
+   "end": 191.0,
+   "ws": "08 Sep 06:30",
+   "we": "08 Sep 08:00"
+  },
+  {
+   "pile": 5,
+   "pas": "T3",
+   "machine": "M1",
+   "start": 195.5,
+   "end": 197.0,
+   "ws": "08 Sep 12:30",
+   "we": "08 Sep 14:00"
+  },
+  {
+   "pile": 6,
+   "pas": "T0",
+   "machine": "M2",
+   "start": 178.5,
+   "end": 180.0,
+   "ws": "07 Sep 19:30",
+   "we": "07 Sep 21:00"
+  },
+  {
+   "pile": 6,
+   "pas": "T1",
+   "machine": "M2",
+   "start": 181.5,
+   "end": 183.0,
+   "ws": "07 Sep 22:30",
+   "we": "08 Sep 00:00"
+  },
+  {
+   "pile": 6,
+   "pas": "T2",
+   "machine": "M1",
+   "start": 191.0,
+   "end": 192.5,
+   "ws": "08 Sep 08:00",
+   "we": "08 Sep 09:30"
+  },
+  {
+   "pile": 6,
+   "pas": "T3",
+   "machine": "M2",
+   "start": 195.5,
+   "end": 197.0,
+   "ws": "08 Sep 12:30",
+   "we": "08 Sep 14:00"
+  }
+ ],
+ "streams": [
+  {
+   "n": 1,
+   "piles": [
+    1,
+    2
+   ],
+   "fill": [
+    194.0,
+    196.0
+   ],
+   "hold1": [
+    196.0,
+    259.0
+   ],
+   "reload": [
+    259.0,
+    261.0
+   ],
+   "hold2": [
+    261.0,
+    324.0
+   ],
+   "tload": [
+    324.0,
+    326.0
+   ],
+   "tproc": [
+    326.0,
+    470.0
+   ],
+   "gr": 470.0,
+   "ws_fill": "08 Sep 11:00",
+   "ws_reload": "11 Sep 04:00",
+   "ws_tload": "13 Sep 21:00",
+   "ws_gr": "19 Sep 23:00"
+  },
+  {
+   "n": 2,
+   "piles": [
+    3,
+    4
+   ],
+   "fill": [
+    196.0,
+    198.0
+   ],
+   "hold1": [
+    198.0,
+    261.0
+   ],
+   "reload": [
+    261.0,
+    263.0
+   ],
+   "hold2": [
+    263.0,
+    326.0
+   ],
+   "tload": [
+    326.0,
+    328.0
+   ],
+   "tproc": [
+    328.0,
+    472.0
+   ],
+   "gr": 472.0,
+   "ws_fill": "08 Sep 13:00",
+   "ws_reload": "11 Sep 06:00",
+   "ws_tload": "13 Sep 23:00",
+   "ws_gr": "20 Sep 01:00"
+  },
+  {
+   "n": 3,
+   "piles": [
+    5,
+    6
+   ],
+   "fill": [
+    198.0,
+    200.0
+   ],
+   "hold1": [
+    200.0,
+    263.0
+   ],
+   "reload": [
+    263.0,
+    265.0
+   ],
+   "hold2": [
+    265.0,
+    330.0
+   ],
+   "tload": [
+    330.0,
+    332.0
+   ],
+   "tproc": [
+    332.0,
+    474.0
+   ],
+   "gr": 474.0,
+   "ws_fill": "08 Sep 15:00",
+   "ws_reload": "11 Sep 08:00",
+   "ws_tload": "14 Sep 03:00",
+   "ws_gr": "20 Sep 03:00"
+  }
+ ],
+ "tunnel": [
+  [
+   "TN-LEVEL",
+   "Levelling & conditioning 1",
+   19.0,
+   18,
+   20
+  ],
+  [
+   "TN-HEAT",
+   "Heating up",
+   10.0,
+   8,
+   12
+  ],
+  [
+   "TN-PAST",
+   "Pasteurisation",
+   9.5,
+   9,
+   10
+  ],
+  [
+   "TN-COOL-1",
+   "Cooling down 1",
+   13.0,
+   12,
+   14
+  ],
+  [
+   "TN-COND-2",
+   "Conditioning 2",
+   81.5,
+   80,
+   85
+  ],
+  [
+   "TN-COOL-2",
+   "Cooling down 2",
+   11.0,
+   8,
+   14
+  ]
+ ],
+ "lab": [
+  {
+   "code": "LAB-00",
+   "title": "Raw material / bagasse weighment",
+   "h": -10,
+   "hl": "PRE-H0",
+   "params": "Moisture, pH, Dry weight",
+   "note": "ADVISORY \u2014 does not gate H0",
+   "ws": "\u224810 h before H0",
+   "day": 0
+  },
+  {
+   "code": "LAB-01",
+   "title": "Bagasse wetting",
+   "h": 1,
+   "hl": "H1",
+   "params": "Moisture, pH, EC",
+   "note": "",
+   "ws": "31 Aug 10:00",
+   "day": 1
+  },
+  {
+   "code": "LAB-02",
+   "title": "Hopper pass 1",
+   "h": 3,
+   "hl": "H3",
+   "params": "Moisture, pH, EC",
+   "note": "",
+   "ws": "31 Aug 12:00",
+   "day": 1
+  },
+  {
+   "code": "LAB-03",
+   "title": "Hopper pass 2",
+   "h": 14,
+   "hl": "H14",
+   "params": "Moisture, pH, EC",
+   "note": "",
+   "ws": "31 Aug 23:00",
+   "day": 1
+  },
+  {
+   "code": "LAB-04",
+   "title": "Before bunker loading",
+   "h": 26,
+   "hl": "H26",
+   "params": "Moisture, pH, EC",
+   "note": "GATE \u2014 FIB-BUNK-LOAD is locked until approved",
+   "ws": "01 Sep 11:00",
+   "day": 2
+  },
+  {
+   "code": "LAB-05",
+   "title": "Bunker unloading",
+   "h": 88,
+   "hl": "H88",
+   "params": "Moisture, pH, EC",
+   "note": "",
+   "ws": "04 Sep 01:00",
+   "day": 5
+  },
+  {
+   "code": "LAB-06",
+   "title": "Before hopper pass",
+   "h": 90,
+   "hl": "H90",
+   "params": "Moisture, pH, EC",
+   "note": "",
+   "ws": "04 Sep 03:00",
+   "day": 5
+  },
+  {
+   "code": "LAB-07",
+   "title": "Reloading",
+   "h": 93,
+   "hl": "H93",
+   "params": "Moisture, pH, EC",
+   "note": "",
+   "ws": "04 Sep 06:00",
+   "day": 5
+  },
+  {
+   "code": "LAB-08",
+   "title": "Paddy weighment",
+   "h": 74,
+   "hl": "H74",
+   "params": "Moisture, Dry weight",
+   "note": "Parallel stream",
+   "ws": "03 Sep 11:00",
+   "day": 4
+  },
+  {
+   "code": "LAB-09",
+   "title": "Paddy soak 1 \u2014 pit water",
+   "h": 86,
+   "hl": "H86",
+   "params": "pH, EC, TDS",
+   "note": "Parallel stream",
+   "ws": "03 Sep 23:00",
+   "day": 4
+  },
+  {
+   "code": "LAB-10",
+   "title": "Paddy soak 2 \u2014 pit water",
+   "h": 108,
+   "hl": "H108",
+   "params": "pH, EC, TDS",
+   "note": "Parallel stream",
+   "ws": "04 Sep 21:00",
+   "day": 5
+  },
+  {
+   "code": "LAB-11",
+   "title": "Paddy soak 3 \u2014 pit water",
+   "h": 136,
+   "hl": "H136",
+   "params": "pH, EC, TDS",
+   "note": "Parallel stream",
+   "ws": "06 Sep 01:00",
+   "day": 7
+  },
+  {
+   "code": "LAB-12",
+   "title": "Chicken manure \u2014 on arrival",
+   "h": 130,
+   "hl": "H130",
+   "params": "Nitrogen, Ash",
+   "note": "Parallel stream",
+   "ws": "05 Sep 19:00",
+   "day": 6
+  },
+  {
+   "code": "LAB-13",
+   "title": "Chicken manure \u2014 on unload for mixing",
+   "h": 136,
+   "hl": "H136",
+   "params": "Nitrogen, Ash",
+   "note": "GATE \u2014 MIX-CM-ADD locked until approved",
+   "ws": "06 Sep 01:00",
+   "day": 7
+  },
+  {
+   "code": "LAB-14",
+   "title": "Moisture decision point",
+   "h": 133,
+   "hl": "H133",
+   "params": "Moisture",
+   "note": "DECISION \u2014 \u226568% proceed / <67% controlled mist",
+   "ws": "05 Sep 22:00",
+   "day": 6
+  },
+  {
+   "code": "LAB-15",
+   "title": "After flipping 2",
+   "h": 174,
+   "hl": "H174",
+   "params": "Moisture, pH",
+   "note": "+ photo",
+   "ws": "07 Sep 15:00",
+   "day": 8
+  },
+  {
+   "code": "LAB-16",
+   "title": "Moisture after T0",
+   "h": 180,
+   "hl": "H180",
+   "params": "Moisture",
+   "note": "Per pile, 6 records",
+   "ws": "07 Sep 21:00",
+   "day": 8
+  },
+  {
+   "code": "LAB-17",
+   "title": "Moisture after T1",
+   "h": 183,
+   "hl": "H183",
+   "params": "Moisture",
+   "note": "Per pile, 6 records",
+   "ws": "08 Sep 00:00",
+   "day": 9
+  },
+  {
+   "code": "LAB-18",
+   "title": "Moisture after T2",
+   "h": 192.5,
+   "hl": "H192.5",
+   "params": "Moisture",
+   "note": "Per pile, 6 records",
+   "ws": "08 Sep 09:30",
+   "day": 9
+  },
+  {
+   "code": "LAB-19",
+   "title": "Moisture after T3",
+   "h": 197,
+   "hl": "H197",
+   "params": "Moisture",
+   "note": "Per pile, 6 records; batch average recorded",
+   "ws": "08 Sep 14:00",
+   "day": 9
+  },
+  {
+   "code": "LAB-20",
+   "title": "Bunker loading",
+   "h": 194,
+   "hl": "H194",
+   "params": "Bunker height, pH, EC, Moisture, Nitrogen, Ash, C:N",
+   "note": "GATE \u2014 height checked first",
+   "ws": "08 Sep 11:00",
+   "day": 9
+  },
+  {
+   "code": "LAB-21",
+   "title": "Bunker unloading (reload 1)",
+   "h": 259,
+   "hl": "H259",
+   "params": "Shrunken height, Moisture",
+   "note": "Height determines reload height",
+   "ws": "11 Sep 04:00",
+   "day": 12
+  },
+  {
+   "code": "LAB-22",
+   "title": "Bunker reloading",
+   "h": 259,
+   "hl": "H259",
+   "params": "pH, EC, Moisture, Nitrogen, Ash, C:N",
+   "note": "+ conditional water branch",
+   "ws": "11 Sep 04:00",
+   "day": 12
+  },
+  {
+   "code": "LAB-23",
+   "title": "Before tunnel loading",
+   "h": 324,
+   "hl": "H324",
+   "params": "Tunnel height",
+   "note": "Checked first",
+   "ws": "13 Sep 21:00",
+   "day": 14
+  },
+  {
+   "code": "LAB-24",
+   "title": "Tunnel loading",
+   "h": 324,
+   "hl": "H324",
+   "params": "pH, EC, Moisture, Nitrogen, Ash, C:N",
+   "note": "GATE",
+   "ws": "13 Sep 21:00",
+   "day": 14
+  },
+  {
+   "code": "LAB-25",
+   "title": "Tunnel unloading",
+   "h": 470,
+   "hl": "H470",
+   "params": "pH, EC, Moisture, Nitrogen, Ash, C:N, Shrunken height, Actinomycetes",
+   "note": "Final QC",
+   "ws": "19 Sep 23:00",
+   "day": 20
+  }
+ ],
+ "obs": [
+  "Smell test",
+  "Colour",
+  "Spring / squeeze test (too dry \u00b7 normal \u00b7 too wet \u00b7 dripping)"
+ ]
+}

@@ -36,3 +36,12 @@ mushroomos/scratch/
 mushroomos/.gradle-local/
 mushroomos/gradle-clean.txt
 mushroomos/pa.txt
+
+# binaries and extracts — not source
+docs.zip
+mails.zip
+*.apk
+apk_extracted/
+MushroomOS-extracted/
+dist-audit/
+mails/
