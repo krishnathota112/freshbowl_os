@@ -1,3 +1,7 @@
+> **ARCHIVED — historical record, not an instruction.**
+> Superseded by `docs/01-process/LAB-2026A-Laboratory-Process.pdf` (the LAB-2026A laboratory standard).
+> Current: `docs/00-START-HERE.md`
+
 # Lab Technician Batch Process & UI Requirements
 
 ## 1. Purpose
