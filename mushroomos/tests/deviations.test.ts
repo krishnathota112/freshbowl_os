@@ -60,6 +60,9 @@ async function submitOverweight(db: Db, activity: string, qty = 3.6) {
       where batch_activity_id = $1 and field_key like '%qty%' limit 1`,
     [activity]
   );
+  // Work that was never started cannot be finished by an operator (`0071`) — start it first, as
+  // the screen does. The server stamps the start.
+  await db.query(`select start_activity($1)`, [activity]);
   await satisfyEvidence(db, activity);
   return all(db, `select * from submit_activity($1, $2::jsonb, 'staged for a B2 proof')`, [
     activity,

@@ -1,5 +1,5 @@
 /**
- * P5 — S12, the lab technician's screen. `UI_IMPLEMENTATION_PLAN §S12`, `0022_lab.sql`.
+ * P5 / UI-001 — the Lab workstation. `docs/05-ui/WORKSTATIONS.md` §3, `0022_lab.sql`.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * THE ASSERTION THAT EARNS THIS FILE
@@ -9,8 +9,14 @@
  * member of `lab_retest_reason` — every retest would have been rejected at the type boundary, in
  * front of a technician, with a Postgres error for a message.
  *
- * A list of options that drifts from the enum it represents is either an option nobody can record
- * or an option that fails on save. Both are found by comparing the two sets, and by nothing else.
+ * UI-001 (12 Sep) split the screen in two: `LabQueue` (what to sample next) and `LabCheckpoint`
+ * (one checkpoint, sample to submit). The claims below are the same claims, read across both.
+ *
+ * ONE CLAIM CHANGED, deliberately: the checkpoint. Every PROCESS-2026C lab activity is bound to
+ * exactly one checkpoint, and since `0072`/`0076` `open_lab_sample` refuses a checkpoint the
+ * activity is not bound to within its map. So the screen uses the single bound checkpoint, and the
+ * person chooses only when there are several or none. What must still never happen is a checkpoint
+ * silently picked from the whole catalogue — that is what is asserted now.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
@@ -26,18 +32,18 @@ if (!DB_URL) console.warn(`\n  SKIPPED: ${NO_DB_REASON}\n`);
 const read = (...p: string[]) => readFileSync(join(REPO_ROOT, 'mushroomos', 'src', ...p), 'utf8');
 const codeOf = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-const screen = () => codeOf(read('routes', 'LabQueue.tsx'));
+const queue = () => codeOf(read('routes', 'LabQueue.tsx'));
+const checkpoint = () => codeOf(read('routes', 'LabCheckpoint.tsx'));
+const screens = () => queue() + '\n' + checkpoint();
 const api = () => codeOf(read('api', 'lab.ts'));
 
 describe('P5 — the screen is a screen, not a placeholder', () => {
-  it('no longer renders Pending', () => {
-    // The placeholder said "Samples appear here when an activity submission generates them ·
-    // Step 8". True when written, false the moment there were 35 actionable lab activities —
-    // the third stale-placeholder defect in this product.
-    const src = screen();
+  it('no longer renders Pending, and reads the real queue', () => {
+    const src = screens();
     expect(src).not.toMatch(/from '\.\/Pending'/);
     expect(src).not.toMatch(/<Pending/);
-    expect(src).toMatch(/loadLabQueue/);
+    expect(queue()).toMatch(/loadLabWork/);
+    expect(api()).toMatch(/from\('v_lab_queue'\)/);
   });
 
   it('the api module stays below the route and imports no component', () => {
@@ -45,56 +51,70 @@ describe('P5 — the screen is a screen, not a placeholder', () => {
   });
 });
 
-describe('P5 — the two decisions pushed back onto a person', () => {
-  it('no checkpoint is preselected, and the button refuses until one is chosen', () => {
-    // C-33 is open. Auto-selecting resolves it in code, silently, which rule 1 forbids.
-    const src = screen();
+describe('UI-001 — the checkpoint is never chosen silently', () => {
+  it('the single BOUND checkpoint is used; otherwise the person chooses and the button refuses until they do', () => {
+    const src = checkpoint();
+    expect(src).toMatch(/needsChoice = c\.checkpoints\.length !== 1/);
     expect(src).toMatch(/useState<string \| null>\(null\)/);
-    expect(src).toMatch(/chosen === null \|\| take\.isPending/);
-    expect(src).toMatch(/Choose a checkpoint first/);
-    // Both maps must reach the screen — the loader must not filter to one of them.
+    expect(src).toMatch(/disabled=\{begin\.isPending \|\| !checkpointId\}/);
+    // The bound checkpoints come from the activity's own binding, not the catalogue.
+    expect(api()).toMatch(/from\('lab_checkpoint_activity'\)/);
+    // Both maps must still reach the chooser when it is shown — the loader must not filter to one.
     expect(api()).not.toMatch(/eq\('checkpoint_map'/);
   });
 
-  it('an unmapped checkpoint warns BEFORE the reading is taken', () => {
-    const src = screen();
-    expect(src).toMatch(/c\.specCheckpointCode === null/);
-    expect(src).toMatch(/TBD-36/);
+  it('a reading with no range says so BEFORE it is taken', () => {
+    const src = checkpoint();
+    expect(src).toMatch(/t\.specFound/);
+    expect(src).toMatch(/no range to judge against/);
   });
 
   it('the verdict is reported, never computed on the client', () => {
-    const src = screen();
+    const src = checkpoint();
     expect(src).toMatch(/r\.verdict/);
-    expect(src).toMatch(/no spec to judge it against/);
+    expect(src).toMatch(/No range to judge against/);
     // A client-side pass/fail against the band would be a second authority.
     expect(src).not.toMatch(/valueNumeric\s*[<>]=?\s*r\.(targetMin|targetMax)/);
+  });
+
+  it('a lab technician is never offered a decision on a lab submission', () => {
+    expect(screens()).not.toMatch(/decideLabSubmission/);
+  });
+
+  it('finishing uses complete_activity, never the backfill path', () => {
+    expect(checkpoint()).toMatch(/completeActivity/);
+    expect(screens()).not.toMatch(/submitActivity/);
   });
 });
 
 describe('P5 — what it refuses to invent', () => {
-  it('there is no overdue band, and the absence is on screen', () => {
-    const src = screen();
-    expect(src).toMatch(/There is no/);
-    expect(src).toMatch(/overdueUnknownReason/);
-    // Inventing one would mean inventing a turnaround time no source states.
-    expect(src).not.toMatch(/'overdue'/);
+  it('there is no overdue band', () => {
+    // No source states a lab turnaround time. The screen shows the plan's time and invents no
+    // lateness (`UI-SYSTEM.md` — "Delayed" only from a server field, CT-001).
+    expect(screens()).not.toMatch(/'overdue'/);
   });
 
   it('a retest is offered, an edit is not', () => {
-    const src = screen();
+    const src = checkpoint();
     expect(src).toMatch(/orderRetest/);
-    expect(src).toMatch(/Order a retest/);
-    // `record_lab_result` refuses a second result on a test; there must be no UI that pretends
-    // otherwise. LAB_MODEL §5 — v1 is never hidden.
+    expect(src).toMatch(/Measure again/);
     expect(src).not.toMatch(/update\('lab_result'/);
-    expect(src).toMatch(/Superseded/);
+    // The superseded reading stays on screen — v1 is never hidden.
+    expect(src).toMatch(/Measured before/);
   });
 
   it('pending tests are scoped to one sample', () => {
-    // Filtering only on state returns every outstanding test in the factory, and the screen would
-    // offer a technician readings belonging to a different batch — which `record_lab_result`
-    // accepts, because the test id is all it checks.
     expect(api()).toMatch(/eq\('sample_id', sampleId\)/);
+  });
+
+  it('evidence goes through the real upload-then-bind path, with the camera in the app', () => {
+    const step = codeOf(read('components', 'field', 'EvidenceStep.tsx'));
+    expect(step).toMatch(/captureEvidence/);
+    expect(step).toMatch(/takeNativePhoto/);
+    const cam = codeOf(read('lib', 'camera.ts'));
+    expect(cam).toMatch(/CameraSource\.Camera/);
+    expect(cam).not.toMatch(/CameraSource\.(Photos|Prompt)/);
+    expect(cam).toMatch(/saveToGallery: false/);
   });
 });
 
@@ -111,9 +131,7 @@ describeDb('P5 — the options match the database, not a copy of it', () => {
       const inDb = new Set(rows.map((r) => r.label));
       expect(inDb.size, 'lab_retest_reason has no members — is 0022 applied?').toBeGreaterThan(0);
 
-      const offered = new Set(
-        [...screen().matchAll(/value: '([a-z_]+)'/g)].map((m) => m[1])
-      );
+      const offered = new Set([...checkpoint().matchAll(/value: '([a-z_]+)'/g)].map((m) => m[1]));
 
       for (const v of offered) {
         expect(inDb.has(v), `the screen offers "${v}", which is not a lab_retest_reason`).toBe(true);
@@ -134,21 +152,24 @@ describeDb('P5 — the options match the database, not a copy of it', () => {
       for (const c of [
         'master_batch_id', 'batch_code', 'batch_label', 'current_day', 'activity_id',
         'activity_title', 'scope_label', 'parameters', 'state', 'action_required', 'band',
-        'overdue_unknown_reason', 'samples', 'results',
+        'overdue_unknown_reason', 'samples', 'results', 'last_submission',
       ]) {
         expect(have.has(c), `v_lab_queue has no ${c}`).toBe(true);
       }
     });
   }, 30_000);
 
-  it('both checkpoint maps are populated, so the choice is a real choice', async () => {
+  it('both checkpoint maps are populated, so a choice, when offered, is a real choice', async () => {
     await withRollback(async (db) => {
       const maps = await all<{ checkpoint_map: string; n: string }>(
         db,
         `select checkpoint_map, count(*)::text n from lab_checkpoint group by 1`
       );
-      expect(maps.length, 'C-33 carries TWO maps; a screen offering one is a resolved conflict').toBe(2);
+      expect(maps.length).toBeGreaterThanOrEqual(2);
       for (const m of maps) expect(Number(m.n)).toBeGreaterThan(0);
+      const codes = maps.map((m) => m.checkpoint_map);
+      expect(codes).toContain('LAB_DICTATION');
+      expect(codes).toContain('S4B_COLUMNS');
     });
   }, 30_000);
 });

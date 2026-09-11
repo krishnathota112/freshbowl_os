@@ -38,4 +38,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Evidence is photographed at the point of capture (DEC-026). The camera plugin asks for this
+         at runtime the first time a photo is taken; nothing is written to the phone's gallery. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

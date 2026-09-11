@@ -19,6 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  actAs,
   DB_URL,
   NO_DB_REASON,
   all,
@@ -348,6 +349,9 @@ describeDb('SAME_SCOPE_INSTANCE — criterion 15, the T1 to T2 rule', () => {
   it('pile 2 T2 goes READY on pile 2 T1 alone, with piles 1 and 3 still in T1', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
 
       // Three piles at the turner, from the Day-0 answer, never a constant.
       const config = await one<{ turner_pile_count: string }>(
@@ -416,6 +420,9 @@ describeDb('SAME_SCOPE_INSTANCE — criterion 15, the T1 to T2 rule', () => {
   it('an ALL_INSTANCES gate downstream of the piles waits for every pile', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       await completeEverythingBefore(db, batch, 'TR-T1');
 
       // P1-BUNK-LOAD's entry rule is PREDECESSOR TR-T2 with ALL_INSTANCES — pooling needs them all.

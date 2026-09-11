@@ -343,6 +343,7 @@ function fieldBundle(): Set<string> {
     chunkOf('src/components/layout/FieldShell.tsx').key,
     chunkOf('src/routes/MyWork.tsx').key,
     chunkOf('src/routes/LabQueue.tsx').key,
+    chunkOf('src/routes/LabCheckpoint.tsx').key,
   ]);
 }
 
@@ -370,8 +371,11 @@ describe('C-FIELD — an operator lands on the field shell and can reach no mana
     expect(reachableBy('operator')).toEqual(['/operator/my-work']);
   });
 
-  it('a lab technician can open exactly one route, and it is their own', () => {
-    expect(reachableBy('lab_tech')).toEqual(['/lab/queue']);
+  it('a lab technician can open exactly their own two routes — the queue and one checkpoint', () => {
+    // UI-001 gave the lab its own checkpoint screen rather than widening `/operator/my-work` to
+    // lab_tech. Stated positively, as for the operator, so a new management route that forgot to
+    // exclude lab_tech fails here.
+    expect([...reachableBy('lab_tech')].sort()).toEqual(['/lab/checkpoint/:activityId', '/lab/queue']);
   });
 
   it('no route allowing a field role is a management route', () => {
@@ -750,6 +754,7 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
     for (const module of [
       'src/routes/MyWork.tsx',
       'src/routes/LabQueue.tsx',
+      'src/routes/LabCheckpoint.tsx',
       'src/components/layout/FieldShell.tsx',
     ]) {
       const reached = initialBundle([chunkOf(module).key]);

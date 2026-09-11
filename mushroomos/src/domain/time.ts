@@ -102,8 +102,18 @@ export function batchHour(at: Instant, startAt: Instant): number {
  * hour 0 is not a real hour.
  */
 export function batchInstant(h: number, startAt: Instant): Date {
-  if (!Number.isInteger(h)) {
-    throw new RangeError(`h must be a whole number, received ${h}`);
+  // ⚠ HALF HOURS ARE LEGAL HERE, AND WHOLE HOURS ARE NOT ENOUGH.
+  //
+  // This required an integer, and that was correct for as long as the hour axis was `int`.
+  // PROCESS-2026C's Turner runs 1.5-hour passes — sixteen of its twenty-four start or end on a
+  // half hour — so `0042` widened the axis to numeric and constrained it to halves. Any screen
+  // rendering pile 2's T0 at H175.5 would have thrown here.
+  //
+  // The granularity matches the database's own constraint (`process_activity_hour_granularity`),
+  // so what the schema will store is exactly what this will place, and a minute-level value is
+  // still refused in both.
+  if (!Number.isFinite(h) || h * 2 !== Math.floor(h * 2)) {
+    throw new RangeError(`h must be a whole or half hour, received ${h}`);
   }
   if (h < 0) {
     throw new RangeError(`h must not be negative; received ${h}`);
@@ -130,7 +140,16 @@ export function wallClock(hour: number, startAt: Instant): Date {
  * `date_trunc('day', …)` or by a rendered date string is a bug. TIME_CONTRACT §1.4.
  */
 export function batchDay(hour: number): number {
-  assertHour(hour, 'hour');
+  // Half hours, for the same reason `batchInstant` takes them: the process axis carries H187.5
+  // since 0042, and asking which batch-day it falls in is a perfectly ordinary question with an
+  // ordinary answer. `assertHour` stays for the Book1 interval functions, whose index is integral
+  // by construction (`batchHour` returns `floor(...) + 1`).
+  if (!Number.isFinite(hour) || hour * 2 !== Math.floor(hour * 2)) {
+    throw new RangeError(`hour must be a whole or half hour, received ${hour}`);
+  }
+  if (hour < 1) {
+    throw new RangeError(`hour is 1-based; received ${hour}`);
+  }
   return Math.floor((hour - 1) / HOURS_PER_BATCH_DAY);
 }
 
@@ -141,9 +160,17 @@ export function batchDay(hour: number): number {
  * `process_definition`. It is deliberately not a constant in this module — see the header.
  */
 export function isWithinBaseline(hour: number, baselineHours: number): boolean {
-  assertHour(hour, 'hour');
-  if (!Number.isInteger(baselineHours) || baselineHours < 1) {
-    throw new RangeError(`baselineHours must be a positive whole number, received ${baselineHours}`);
+  // Half hours here too — a Turner pass at H175.5 is inside the baseline like anything else, and
+  // asking whether it is must not throw. `assertHour` stays for the Book1 INTERVAL functions,
+  // whose index is integral by construction.
+  if (!Number.isFinite(hour) || hour * 2 !== Math.floor(hour * 2)) {
+    throw new RangeError(`hour must be a whole or half hour, received ${hour}`);
+  }
+  if (hour < 1) {
+    throw new RangeError(`hour is 1-based; received ${hour}`);
+  }
+  if (!Number.isFinite(baselineHours) || baselineHours < 1) {
+    throw new RangeError(`baselineHours must be a positive number, received ${baselineHours}`);
   }
   return hour <= baselineHours;
 }

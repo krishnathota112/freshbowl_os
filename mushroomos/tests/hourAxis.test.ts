@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 
 import { batchDay, batchInstant, isWithinBaseline, wallClock } from '../src/domain/time';
 import {
+  actAs,
   DB_URL,
   NO_DB_REASON,
   REPO_ROOT,
@@ -42,7 +43,7 @@ type Fixture = {
 };
 
 const fixture = JSON.parse(
-  readFileSync(join(REPO_ROOT, 'docs', 'source', 'book1_hour_grid.json'), 'utf8')
+  readFileSync(join(REPO_ROOT, 'docs', '_reference', 'source', 'book1_hour_grid.json'), 'utf8')
 ) as Fixture;
 
 const FIXTURE_TOTAL_HOURS = fixture.batches[0].total_hours;
@@ -94,7 +95,15 @@ describeDb('the baseline length is derived, not typed', () => {
     await withRollback(async (db) => {
       const rows = await all<{ code: string; standard_start_hour: number; standard_end_hour: number | null }>(
         db,
-        `select pa.code, pa.standard_start_hour, pa.standard_end_hour
+      // ⚠ `::float8` IN THE QUERY, because 0042 made the hour axis `numeric` so it could hold the
+      // Turner's half hours — and `pg` returns numeric as a STRING, since a JS number cannot
+      // represent every numeric. The domain functions correctly refuse a string, so the cast is
+      // where the conversion belongs: at the read, once, rather than at every comparison.
+      //
+      // PostgREST is unaffected — it serialises numeric as a JSON number, so `src/` sees numbers.
+      // Verified over HTTP, not assumed.
+        `select pa.code, pa.standard_start_hour::float8 as standard_start_hour,
+                pa.standard_end_hour::float8 as standard_end_hour
            from process_activity pa
            join process_definition pd on pd.id = pa.process_definition_id
           where pd.code = 'PROCESS-2026B'
@@ -122,7 +131,15 @@ describeDb('rel_day is derived from the hour, not the other way round', () => {
     await withRollback(async (db) => {
       const rows = await all<{ code: string; rel_day: number; standard_start_hour: number }>(
         db,
-        `select code, rel_day, standard_start_hour from process_activity
+      // ⚠ `::float8` IN THE QUERY, because 0042 made the hour axis `numeric` so it could hold the
+      // Turner's half hours — and `pg` returns numeric as a STRING, since a JS number cannot
+      // represent every numeric. The domain functions correctly refuse a string, so the cast is
+      // where the conversion belongs: at the read, once, rather than at every comparison.
+      //
+      // PostgREST is unaffected — it serialises numeric as a JSON number, so `src/` sees numbers.
+      // Verified over HTTP, not assumed.
+        `select code, rel_day, standard_start_hour::float8 as standard_start_hour
+           from process_activity
           where standard_start_hour is not null`
       );
       expect(rows.length).toBeGreaterThan(0);
@@ -162,25 +179,39 @@ describeDb('rel_day is derived from the hour, not the other way round', () => {
 
   it('the database refuses an hour that contradicts its rel_day', async () => {
     await withRollback(async (db) => {
+      // ⚠ A DRAFT DEFINITION OF ITS OWN. 0044 freezes a PUBLISHED definition's activities,
+      // and every definition in this database is published — so editing PROCESS-2026B's row
+      // raised the freeze and this probe tested that instead of the CHECK constraint it
+      // names. The constraint is what is under test, so it needs a row it may legally edit.
+      const probeDef = await one<{ id: string }>(
+        db,
+        `insert into process_definition
+           (code, name, version, status, source_ref, anchor_day_label, total_days)
+         values ('TEST-HOURAXIS-' || substr(md5(random()::text), 1, 6), 'axis probe', 1,
+                 'draft', 'tests/hourAxis', 'Day 0', 1)
+         returning id`
+      );
+      await db.query(
+        `insert into process_activity
+           (process_definition_id, code, label_template, stream, rel_day, seq, scope,
+            cardinality_rule, standard_start_hour, standard_hour_source, source_ref)
+         values ($1, 'AXIS-PROBE', 'Probe', 'YARD', 0, 10, 'MASTER',
+                 '{"kind":"SINGLETON"}', 0, 'factory_stated', 'tests/hourAxis')`,
+        [probeDef.id]
+      );
       // A full day's shift, so the derived rel_day genuinely changes. Adding an hour would not:
       // integer division would still land on the same day, and the constraint would rightly pass.
       //
       // Applied to an activity with no end hour, so `process_activity_hours_ordered` cannot fire
       // first and the assertion names the rule that actually caught it.
-      const target = await one<{ code: string }>(
-        db,
-        `select pa.code from process_activity pa
-           join process_definition pd on pd.id = pa.process_definition_id
-          where pd.code = 'PROCESS-2026B'
-            and pa.standard_start_hour is not null and pa.standard_end_hour is null
-          order by pa.seq limit 1`
-      );
-
+      // The probe row created above: hour 0, rel_day 0, no end hour — so
+      // `process_activity_hours_ordered` cannot fire first and the assertion names the rule that
+      // actually caught it.
       await expect(
         db.query(
           `update process_activity set standard_start_hour = standard_start_hour + 24
-            where code = $1`,
-          [target.code]
+            where process_definition_id = $1`,
+          [probeDef.id]
         )
       ).rejects.toThrow(/process_activity_rel_day_derived/);
     });
@@ -188,8 +219,32 @@ describeDb('rel_day is derived from the hour, not the other way round', () => {
 
   it('the database refuses an hour before H0', async () => {
     await withRollback(async (db) => {
+      // ⚠ A DRAFT DEFINITION OF ITS OWN. 0044 freezes a PUBLISHED definition's activities,
+      // and every definition in this database is published — so editing PROCESS-2026B's row
+      // raised the freeze and this probe tested that instead of the CHECK constraint it
+      // names. The constraint is what is under test, so it needs a row it may legally edit.
+      const probeDef = await one<{ id: string }>(
+        db,
+        `insert into process_definition
+           (code, name, version, status, source_ref, anchor_day_label, total_days)
+         values ('TEST-HOURAXIS-' || substr(md5(random()::text), 1, 6), 'axis probe', 1,
+                 'draft', 'tests/hourAxis', 'Day 0', 1)
+         returning id`
+      );
+      await db.query(
+        `insert into process_activity
+           (process_definition_id, code, label_template, stream, rel_day, seq, scope,
+            cardinality_rule, standard_start_hour, standard_hour_source, source_ref)
+         values ($1, 'AXIS-PROBE', 'Probe', 'YARD', 0, 10, 'MASTER',
+                 '{"kind":"SINGLETON"}', 0, 'factory_stated', 'tests/hourAxis')`,
+        [probeDef.id]
+      );
       await expect(
-        db.query(`update process_activity set standard_start_hour = -24 where code = 'FIB1-WEIGH'`)
+        db.query(
+          `update process_activity set standard_start_hour = -24
+            where process_definition_id = $1`,
+          [probeDef.id]
+        )
       ).rejects.toThrow(/process_activity_(hour_not_before_h0|rel_day_derived)/);
     });
   });
@@ -312,6 +367,9 @@ describeDb('the axis, once H0 is known', () => {
   it('every planned instant equals batchInstant(baseline hour, H0) from src/domain/time.ts', async () => {
     await withZone(async (db) => {
       const batch = await createDraftBatch(db, { startDate: '2026-09-20' });
+      // 0058 · setting H0 is admin-or-GM. The claim is about what MOVES, not about who may
+      // move it, so it wears the entitled role.
+      await actAs(db, 'admin');
       const h0 = await one<{ start_at: Date }>(
         db,
         `select start_at from master_batch where id = $1`,
@@ -325,7 +383,8 @@ describeDb('the axis, once H0 is known', () => {
         planned_start_at: Date | null;
       }>(
         db,
-        `select title, baseline_start_hour, planned_start_at
+        // ::float8 — the axis is numeric since 0042 and `pg` returns numeric as a string.
+        `select title, baseline_start_hour::float8 as baseline_start_hour, planned_start_at
            from batch_activity where master_batch_id = $1 order by seq, instance_no`,
         [batch]
       );
@@ -372,6 +431,9 @@ describeDb('the axis, once H0 is known', () => {
   it('changing start_at moves every planned timestamp and no rel_day', async () => {
     await withZone(async (db) => {
       const batch = await createDraftBatch(db, { startDate: '2026-09-20' });
+      // 0058 · setting H0 is admin-or-GM. The claim is about what MOVES when H0 moves, not about
+      // who may move it, so it wears the entitled role.
+      await actAs(db, 'admin');
 
       const before = await all<{ id: string; rel_day: number; planned_start_at: Date }>(
         db,
@@ -416,6 +478,10 @@ describeDb('the axis, once H0 is known', () => {
     await withZone(async (db) => {
       const batch = await createDraftBatch(db);
       await db.query(`update master_batch set status = 'active' where id = $1`, [batch]);
+      // 0058 · setting H0 is admin-or-GM. The claim is about what MOVES, not about who may
+      // move it, so it wears the entitled role.
+      await actAs(db, 'admin');
+
       await expect(
         db.query(`select * from public.set_batch_start_at($1, now())`, [batch])
       ).rejects.toThrow(/H0 is frozen at activation/);
@@ -426,6 +492,12 @@ describeDb('the axis, once H0 is known', () => {
 describeDb('variance is generated, never written', () => {
   it('a direct write to variance_minutes is rejected', async () => {
     await withRollback(async (db) => {
+      // 0058 · setting H0 is admin-or-GM. The claim is about what MOVES, not about who may
+      // move it, so it wears the entitled role.
+      await actAs(db, 'admin');
+      // 0058 · setting H0 is admin-or-GM. The claim is about what MOVES, not about who may
+      // move it, so it wears the entitled role.
+      await actAs(db, 'admin');
       const batch = await createDraftBatch(db);
       await expect(
         db.query(`update batch_activity set variance_minutes = 99 where master_batch_id = $1`, [

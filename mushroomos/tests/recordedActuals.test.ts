@@ -26,6 +26,7 @@ import {
   one,
   refuses,
   satisfyEvidence,
+  actAs,
   withRollback,
   type Db,
 } from './db';
@@ -77,6 +78,16 @@ async function readyActivity(
   );
 
   await satisfyEvidence(db, row.id);
+
+  // ⚠ WEARS THE SUPERVISOR FOR THE REST OF THE TRANSACTION.
+  //
+  // 0058 made `submit_activity` operator-or-supervisor-or-lab_tech, and `createActiveBatch` now
+  // restores the caller's role after borrowing `admin` — so without this every proof here called a
+  // guarded RPC as "an unauthenticated session". A supervisor is the right actor: these suites
+  // state actuals, which 0050 forbids to an operator.
+  //
+  // Not an exemption. The role is adopted, and the server holds it to exactly that role.
+  await actAs(db, 'supervisor');
   return row;
 }
 
@@ -172,13 +183,24 @@ describeDb('the two clocks are separate', () => {
       const act = await readyActivity(db);
       if (act.planned_end_at === null) return; // the activity states no duration — TBD-21
 
-      const stated = await one<{ ended: string }>(
+      // ⚠ BOTH ENDS ARE STATED, AND THAT IS A CORRECTION TO THIS TEST, NOT TO THE PRODUCT.
+      //
+      // It previously stated only the end. With no start stated and none recorded, the RPC
+      // defaults `actual_start` to the entry instant — so the row became "started now, ended three
+      // hours ago" and `batch_activity_actual_end_after_start` refused it. The test could never
+      // have passed; it was one of the suite's standing failures.
+      //
+      // The claim it is making is about `variance_minutes` reading `actual_end`, and stating a
+      // coherent pair proves that without asking the database to store an impossible one.
+      const stated = await one<{ started: string; ended: string }>(
         db,
-        `select (now() - interval '3 hours')::text as ended`
+        `select (now() - interval '5 hours')::text as started,
+                (now() - interval '3 hours')::text as ended`
       );
 
-      await db.query(`select * from public.submit_activity($1, '{}'::jsonb, null, null, $2)`, [
+      await db.query(`select * from public.submit_activity($1, '{}'::jsonb, null, $2, $3)`, [
         act.id,
+        stated.started,
         stated.ended,
       ]);
 
@@ -428,6 +450,10 @@ describeDb('nothing else about submit_activity changed', () => {
           order by ba.seq, ba.instance_no limit 1`,
         [batch]
       );
+
+      // This test builds its own fixture rather than using `readyActivity`, so it adopts the role
+      // itself. Same reason: `submit_activity` is guarded since 0058.
+      await actAs(db, 'supervisor');
 
       const stated = await one<{ started: string }>(
         db,

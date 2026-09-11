@@ -117,11 +117,16 @@ export async function importSchedule(
   return data as string;
 }
 
+/**
+ * Cancel a scheduled group.
+ *
+ * THROUGH THE RPC, NOT THE TABLE. This was the one place in `src/` that wrote a table directly —
+ * `.from('monthly_schedule_group').update({ status: 'cancelled' })` — which rule 5 forbids, and
+ * which duplicated `cancel_monthly_schedule_group` that already existed. It worked only because
+ * `authenticated` still held UPDATE on the table; 0074 took that back on every table in `public`,
+ * so the direct write would now be refused. The RPC does the same thing and writes the audit row.
+ */
 export async function cancelScheduledBatchGroup(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('monthly_schedule_group')
-    .update({ status: 'cancelled' })
-    .eq('id', id)
-    .eq('status', 'scheduled');
+  const { error } = await supabase.rpc('cancel_monthly_schedule_group', { p_group: id });
   if (error) throw error;
 }

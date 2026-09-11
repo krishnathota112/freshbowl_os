@@ -14,6 +14,35 @@ not exist anywhere. So idempotence rests entirely on natural unique keys.
 
 ---
 
+## 11 September — measured, not inferred
+
+The table further down is the 31 August verdict, derived from function bodies. These are the same
+questions **answered by doing it**: duplicate taps fired concurrently, and retries sent after a delay,
+over HTTP as a real person (`mushroomos/scripts/break/`).
+
+| RPC | What was done | What happened | Verdict now |
+|---|---|---|---|
+| `start_activity` | 5 simultaneous taps; a retry after 2.5 s | one `actual_start`, unchanged by the retry; **one** audit row | **SAFE** (`0071` — the audit follows the change, not the call) |
+| `complete_activity` · `submit_activity` | 5 simultaneous finishes; a retry after a lost response | one completion, one `actual_end`, one audit row; the retry refused *"… is COMPLETED, so it cannot be submitted"* | **SAFE** (`0071` row lock) |
+| `bind_evidence` | the same file bound 5 times | one row | **SAFE** (unique `storage_path`) |
+| `accept_lab_result` | 3 people accept one result at once | accepted once | **SAFE** |
+| `gm_decide_extension` | 3 further identical GM approvals | the approved figure did not accumulate | **SAFE** |
+| `activate_batch` | two admin sessions at once; again on an active batch | one activation instant; a repeat changes nothing | **SAFE**; on a **cancelled** batch it now refuses (`0073`) |
+| `generate_activity_plan` | two concurrent regenerations on an active batch | both refused; activity count unchanged | **SAFE** |
+| `open_machine_stint` | a second open stint for the same machine | refused by `EXCLUDE USING gist (machine_id WITH =, during WITH &&)`, with a sentence naming the other commitment | **SAFE for overlap** — was DUPLICATES |
+| `record_occupancy` | a second batch in the same vessel, same window | refused by the `is_exclusive` exclusion constraint | **SAFE for exclusive occupancy** — was DUPLICATES |
+| `decide_lab_submission` | concurrent approvals; approve → reject; reject → approve | each accepted call **appends** a decision; the latest governs and the gate follows it (`0072`) | **A sequence by design**, not idempotent — duplicates are recorded, not merged |
+| `open_lab_sample` · `request_lab_test` · `record_lab_result` · `order_retest` · `raise_deviation` · `add_corrective_action` | not re-measured | no unique key; **no RPC accepts an idempotency key** (probed 11 Sep) | **DUPLICATES — still open** |
+
+**What remains.** The captures a tired person double-taps — start, finish, a photo, an approval —
+are safe. What is not is a **replayed offline queue** for the lab chain and for deviations: a replay
+of `open_lab_sample` fabricates a sample, and of `record_lab_result` a phantom retest. Nothing is
+replayed today, because there is no offline queue. **Design the idempotency key with the offline
+queue, as one shape on every field RPC**, per the proposal at the end of this file — not before it,
+and not as scattered constraints.
+
+---
+
 ## The unique keys that exist
 
 | Table | Unique constraint |

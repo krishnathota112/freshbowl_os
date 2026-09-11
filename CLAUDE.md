@@ -1,7 +1,16 @@
 # MushroomOS — agent entry point
 
 You are working on a production management system for button-mushroom compost at Fresh Bowl
-Horticulture. One batch takes **470 hours**.
+Horticulture.
+
+**470 hours is not a fact about this application.** It is what PROCESS-2026C's own stages,
+durations and dependencies add up to — the current approved standard, and the one the catalogue
+points at. Another process version computes its own number and both can run here at once. The
+system holds a `PROCESS CATALOGUE → PROCESS VERSION → BATCH → H0 → GENERATED BASELINE` chain, and
+the standard for a batch is always the standard of the version that batch was generated from.
+Read it from `v_process_catalogue.standard_hr`; never from a constant, and never from
+`baseline_hours`, which is `(total_days + 1) × 24` — a day grid that reads 480 for the 470-hour
+standard and 552 for a standard whose activities compute 536.
 
 **Read `docs/00-START-HERE.md` before anything else.** It routes you to the four or five files your
 task actually needs. Do not read the repository broadly — `docs/_archive/` holds thousands of lines
@@ -26,7 +35,8 @@ answer, it is the wrong choice however much easier it makes a screen.
    never change, for anyone, by any path. If a feature seems to need a mutable plan, the feature is
    wrong — the answer is a deviation, an override, or an authorised extension.
 2. **Actuals are append-only.** A correction is a new superseding record with a reason, never an
-   overwrite. *(Not yet enforced — this is the first thing being fixed.)*
+   overwrite. *(Enforced — `trg_actual_is_append_only` refuses an overwrite even from a superuser;
+   a correction goes through `correct_actual`.)*
 3. **An extension is a third number, never an edit.** `planned_end` · `approved_extension` ·
    `authorised_end` · `actual_end`. Four numbers, never collapsed.
 4. **The process is data.** No factory rule lives in code or in a screen. No material name appears
@@ -50,20 +60,24 @@ See `docs/01-process/OPEN-QUESTIONS.md`.
 
 ---
 
-## The current mission has a hard stop gate
+## The backend is frozen
 
-`docs/03-mission/MISSION.md`.
+Since 11 September (`DEC-025`). The current work is the **three UI workstations** —
+`docs/05-ui/WORKSTATIONS.md`, tasks in `docs/03-mission/TASK-BOARD.md`.
 
-> **Phase 1 produces a report and changes no code.** A human reads it before anything is fixed.
-> If you are editing a migration during Phase 1, you have left the mission.
+> **A backend change needs a named defect that real UI integration exposed**, recorded in
+> `docs/03-mission/FINDINGS.md` before it is fixed. An idea about what a backend should have is not
+> one. Phase 1 and its "change no code" gate are over; `MISSION.md` is archived.
 
 ## Before you write anything
 
-- **Migration?** Read `docs/02-architecture/ARCHITECTURE.md` and `docs/04-audit/`. Check whether
-  Phase 1 has reported yet.
+- **Migration?** The backend is frozen — see above. If you have a named defect, read
+  `docs/02-architecture/ARCHITECTURE.md` and `docs/04-audit/`, then regenerate `docs/SCHEMA.md`
+  after applying it.
 - **Duration, gate or process value?** Read `docs/01-process/STANDARD.md`. If it is not in the
   standard, it is not yours to change.
-- **Screen?** Read `docs/02-architecture/DATA-CONTRACTS.md`. Compute nothing.
+- **Screen?** Read `docs/02-architecture/DATA-CONTRACTS.md`, then `docs/05-ui/UI-SYSTEM.md` and
+  `docs/05-ui/WORKSTATIONS.md`. Compute nothing.
 - **Anything at all?** `docs/03-mission/FINDINGS.md` — it may already be known and diagnosed.
 
 ## Three habits this codebase is built on

@@ -56,7 +56,15 @@ async function tunnelLoadCheckpoint(db: Db) {
   );
 }
 
-/** A sample on a real lab activity of a real active batch, plus one requested test. */
+/**
+ * A sample on a real lab activity of a real active batch, plus one requested test.
+ *
+ * 0072 gave `open_lab_sample` the role check every other laboratory entry point already had — an
+ * OPERATOR could collect a sample before it, measured over HTTP. This helper had never adopted a
+ * role, so it was reaching the RPC as nobody, and nineteen tests failed at once with
+ * "collect a lab sample requires role lab_tech or supervisor...". Collecting a sample IS
+ * laboratory work, so the fixture says who is doing it, the way the rest of this file does.
+ */
 async function sampleAndTest(db: Db, parameter: string, checkpointId?: string) {
   const batch = await createActiveBatch(db);
   const act = await one<{ id: string }>(
@@ -65,6 +73,7 @@ async function sampleAndTest(db: Db, parameter: string, checkpointId?: string) {
       where master_batch_id = $1 and responsible_role = 'lab_tech' order by seq limit 1`,
     [batch]
   );
+  await beRole(db, 'lab_tech');
   const cp = checkpointId ?? (await tunnelLoadCheckpoint(db)).id;
   const sample = await one<{ id: string }>(db, `select public.open_lab_sample($1, $2) as id`, [
     act.id,
@@ -381,6 +390,8 @@ describeDb('B5 — exit proof 2 · no spec means no_spec, and no_spec never fail
           order by seq limit 1`,
         [batch]
       );
+      // 0072 · collecting a sample is laboratory work and now says so. Same reason as sampleAndTest.
+      await beRole(db, 'lab_tech');
 
       for (const value of [-5, 0, 0.001, 73, 999999]) {
         const sample = await one<{ id: string }>(
@@ -523,7 +534,13 @@ describeDb('B5 — C-33 · both checkpoint maps are carried, and neither is pref
         `select checkpoint_map, count(*)::text as n, count(spec_checkpoint_code)::text as mapped
            from lab_checkpoint group by checkpoint_map order by checkpoint_map`
       );
-      expect(maps.map((m) => m.checkpoint_map)).toEqual(['LAB_DICTATION', 'S4B_COLUMNS']);
+      // ⚠ CONTAINMENT, NOT EQUALITY. This asserted the list was exactly the two C-33 maps, which
+      // was true until LAB-2026A was seeded beside them (0053). The claim being defended is that
+      // the two C-33 maps are BOTH still carried and neither was merged away — adding a third,
+      // separate map does not weaken it, and asserting equality would have forbidden it.
+      const codes = maps.map((m) => m.checkpoint_map);
+      expect(codes).toContain('LAB_DICTATION');
+      expect(codes).toContain('S4B_COLUMNS');
       for (const m of maps) expect(Number(m.n)).toBeGreaterThan(1);
 
       // THE PROOF THAT THEY WERE NOT MERGED: the same physical moment is present in both maps

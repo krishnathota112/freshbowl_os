@@ -47,7 +47,7 @@ const MS_PER_HOUR = 3_600_000;
 /** The hour geometry, read from the factory's own grid. A12's rule applies to these tests too. */
 function book1(): { totalHours: number; cadenceHours: number } {
   const grid = JSON.parse(
-    readFileSync(join(REPO_ROOT, 'docs', 'source', 'book1_hour_grid.json'), 'utf8')
+    readFileSync(join(REPO_ROOT, 'docs', '_reference', 'source', 'book1_hour_grid.json'), 'utf8')
   ) as { batches: { start_date: string; total_hours: number }[] };
   const [first, second] = grid.batches;
   return {

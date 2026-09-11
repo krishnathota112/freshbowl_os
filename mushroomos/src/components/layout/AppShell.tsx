@@ -6,10 +6,11 @@ import { isTimeTravelled, timeTravelOffsetMs } from '../../lib/now';
 
 const NAV: Record<string, { to: string; label: string }[]> = {
   admin: [
+    { to: '/admin', label: 'Home' },
     { to: '/admin/today', label: 'Today' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/schedule', label: 'Schedule' },
-    { to: '/admin/batch/new', label: '+ New Batch' },
+    { to: '/admin/batch/start', label: '+ New Batch' },
     { to: '/operator/my-work', label: 'Tasks' },
     { to: '/admin/process-explorer', label: 'Process' },
     { to: '/admin/reference', label: 'Reference' },

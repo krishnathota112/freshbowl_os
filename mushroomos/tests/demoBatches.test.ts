@@ -24,7 +24,7 @@ import { DB_URL, NO_DB_REASON, REPO_ROOT, all, one, withRollback, type Db } from
 /** The stagger between consecutive batches in the factory's own grid, in hours. */
 function book1CadenceHours(): number {
   const grid = JSON.parse(
-    readFileSync(join(REPO_ROOT, 'docs', 'source', 'book1_hour_grid.json'), 'utf8')
+    readFileSync(join(REPO_ROOT, 'docs', '_reference', 'source', 'book1_hour_grid.json'), 'utf8')
   ) as { batches: { start_date: string }[] };
   const [first, second] = grid.batches;
   return (

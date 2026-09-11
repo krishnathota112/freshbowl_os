@@ -197,6 +197,21 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!ready) return;
 
+  // ⚠ FIRST, EVERYTHING THIS RUN BOUND, WHEREVER IT BOUND IT.
+  //
+  // `sweepDemoEvidence` is scoped to `MB-DEMO-%` on purpose — it must never touch a batch a person
+  // actually worked. But `pickTarget` is NOT so scoped: it takes any outstanding requirement on any
+  // live batch, and the only lab_tech targets in this database are on a real one. So the suite was
+  // binding evidence it could not clean, and each run permanently consumed a target — until the
+  // last one went and `pickTarget` threw "no outstanding lab_tech requirement on a live batch",
+  // failing the whole suite at collection.
+  //
+  // Keyed on `created[]` — the exact paths this process uploaded — so it removes what this run made
+  // and cannot reach anything else. The recount trigger puts the requirement back to outstanding.
+  if (created.length > 0) {
+    await dbExec(`delete from evidence_media where storage_path = any($1)`, [created]);
+  }
+
   // Leave the deployed project as it was found: no rows, no objects, counters back to reality.
   // The recount trigger fires on delete, so the requirements go back to outstanding by themselves.
   const swept = await sweepDemoEvidence();

@@ -28,6 +28,7 @@ import {
   refuses,
   withRollback,
   type Db,
+  actAs,
 } from './db';
 
 const describeDb = DB_URL ? describe : describe.skip;
@@ -54,6 +55,10 @@ async function day0Config(db: Db) {
 async function createTheWayTheUiDoes(db: Db, startDate = '2026-06-15') {
   const cfg = await day0Config(db);
   const roles = await defaultRoleBindings(db);
+  // 0058 · creating a batch is admin-or-GM. These proofs are about H0 and the factory clock, not
+  // about who may create one — that is `roleEnforcement.test.ts`. So they wear the role that
+  // legitimately does it. Adopted, never exempted.
+  await actAs(db, 'admin');
   const row = await one<{ id: string }>(
     db,
     `select public.create_master_batch($1,$2,$3,$4,$5,$6,$7) as id`,
@@ -142,6 +147,7 @@ describeDb('P0 · a batch created the way the UI creates it has an H0', () => {
         await db.query(`update factory_clock set timezone = null where id = 1`);
         const cfg = await day0Config(db);
         const roles = await defaultRoleBindings(db);
+        await actAs(db, 'admin');
         const msg = await refuses(
           db,
           `select public.create_master_batch('P0-NOTZ','no zone','2026-06-15',$1::jsonb,$2::jsonb,'R','C')`,
@@ -163,6 +169,7 @@ describeDb('P0 · a batch created the way the UI creates it has an H0', () => {
         const cfg = await day0Config(db);
         const roles = await defaultRoleBindings(db);
         const stated = '2026-06-15T02:15:00Z';
+        await actAs(db, 'admin');
         const row = await one<{ id: string }>(
           db,
           `select public.create_master_batch('P0-EXPL','explicit','2026-06-15',

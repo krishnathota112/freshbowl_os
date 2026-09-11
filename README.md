@@ -2,7 +2,7 @@
 
 Production management and traceability for button-mushroom compost — Fresh Bowl Horticulture.
 
-One batch runs **470 hours** from H0 to grow-room loading. Every activity records who did it, with
+A batch on the current standard, PROCESS-2026C, runs **470 hours** from H0 to grow-room loading. Every activity records who did it, with
 which machine, in which window, with what measured and what photographed — and the system is built
 so that a late activity cannot be made to look on time afterwards.
 
@@ -17,7 +17,8 @@ Read **`CLAUDE.md`**, then **`docs/00-START-HERE.md`**. Do not read the reposito
 |---|---|
 | **What the factory does** | `docs/01-process/STANDARD.md` — the 470-hour process, hour by hour |
 | **What we are building and why** | `docs/02-architecture/` |
-| **What is happening now** | `docs/03-mission/MISSION.md` and `TASK-BOARD.md` |
+| **What is happening now** | `docs/03-mission/TASK-BOARD.md` — the backend is frozen; the three UI workstations are being built |
+| **How the screens work** | `docs/05-ui/UI-SYSTEM.md` · `WORKSTATIONS.md` |
 | **What is broken** | `docs/03-mission/FINDINGS.md` |
 | **The signed documents** | `docs/_reference/*.docx` |
 | **Why we decided things** | `T:\obsidian\memory` |
@@ -25,7 +26,7 @@ Read **`CLAUDE.md`**, then **`docs/00-START-HERE.md`**. Do not read the reposito
 ## Stack
 
 Supabase / PostgreSQL with row-level security · React 18 + Vite · Capacitor for the field build.
-36 migrations · 50+ tables · ~95 functions · 24 views · 28 test files.
+76 migrations · 97 relations · 302 functions · 38 views — generated in `docs/SCHEMA.md`.
 
 ```bash
 npm install

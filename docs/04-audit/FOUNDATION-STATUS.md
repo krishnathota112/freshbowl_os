@@ -1,85 +1,86 @@
 # Foundation status
 
-**31 August 2026 · red-team Phase 1.** One line per area, one of four words. `GREEN` = a test asserts
-it against a real database. `AMBER` = implemented, proof incomplete. `RED` = broken or bypassable.
-`UNRESOLVED` = needs a factory decision. "The migrations exist" and "the demo works" are not GREEN.
+**11 September 2026 · the backend freeze.** One line per area, one of four words. `GREEN` = proved
+against the deployed database by using it. `AMBER` = implemented, proof incomplete. `RED` = broken or
+bypassable. `UNRESOLVED` = needs a factory decision. "The migrations exist" and "the demo works" are
+not GREEN.
 
-Detail: `WRITE-PATH-MATRIX.md` · `SECURITY-ATTACK-MATRIX.md` · `IDEMPOTENCE.md`.
+The 31 August board — every row RED where it mattered — is at
+`docs/_archive/superseded-2026-09-11/FOUNDATION-STATUS-2026-08-31.md`. Detail:
+`SECURITY-ATTACK-MATRIX.md` §G · `IDEMPOTENCE.md` · `WRITE-PATH-MATRIX.md`.
 
 ---
 
 ## The board
 
-| Area | Status | One line |
+| Area | Status | Proof |
 |---|---|---|
-| **View write-bypass** | **RED** | `anon` writes `master_batch`/`deviation` through `postgres`-owned auto-updatable views — confirmed live over HTTPS. The systemic hole. |
-| **TRUNCATE exposure** | **RED** | `anon`/`authenticated` can truncate `audit_event`, `batch_activity`, `evidence_media`; RLS does not cover TRUNCATE. |
-| **Actual immutability** | **RED** | `submit_activity` overwrites `actual_end` via `coalesce`; no guard, no trigger, no supersession. MISSION §4.1, confirmed. |
-| **Process-definition publish** | **RED** | No publish/freeze; a definition active batches ran on is still editable, and swappable via the view bypass. |
-| **Manager/GM decision integrity** | **RED** | Forgeable through `v_deviation_open` (`state`, `decided_by_role`, `decision_reason`). |
-| **Capture idempotence** | **RED** | `raise_deviation`, `record_occupancy`, lab-capture chain, `open_machine_stint` all duplicate on replay. Urgent for tomorrow's field use. |
-| **Plan / baseline immutability** | **GREEN** | `0034`, 14 tests; base-table writes refused; H0-move and un-activate refused even through the view. |
-| **Role resolution (fail-closed)** | **GREEN** | `0035`, 9 tests; `has_role` is `coalesce(...,false)`. |
-| **Extension register** | **GREEN** | `0036`, 21 tests. Not re-forged this pass. |
-| **Operator/actor identity** | **GREEN** | No RPC takes a caller-supplied actor; all 28 read `auth.uid()`. |
-| **Dev clock isolation** | **GREEN** | Not reachable from any ACTUAL/AUDIT writer; writer gated on dev-mode + admin/gm. *(grep-test still to be written — Phase 2.)* |
-| **Activity state transitions** | **AMBER** | Top-level state guard confirmed; the ten forbidden transitions not each individually forged. |
-| **send_alert authorisation** | **AMBER** | `SECURITY DEFINER`, granted `anon`, no role guard in body — confirmed. |
-| **Audit-event integrity** | **AMBER** | Actor columns nullable/no-default; append-only triggers present but not re-forged; TRUNCATE hole tracked as RED above. |
-| **Resource occupancy** | **AMBER** | Writer sound; no unique key; 3 orphan rows are stale demo data, not a live defect. |
-| **Evidence** | **RED (unproven)** | `storage_path` dedup key and supersession exist, but the end-to-end chain is unproven — storage-key tests skip; direct storage-object delete not probed. |
-| **Lab result / approval (existing `0022`)** | **AMBER** | Writer identity sound; replay creates spurious versions. Distinct from the parallel team's new `lab_*`. |
+| **Views** | **GREEN** | 38 of 38 `security_invoker`; `anon` holds nothing; an event trigger closes the class for new views (`0061`, `0069`) |
+| **Table writes · TRUNCATE** | **GREEN** | 0 write or `TRUNCATE` grants to any client role; an event trigger for new tables (`0074`) |
+| **Function execute** | **GREEN** | 0 functions executable by `anon`; an event trigger for new functions (`0067`) |
+| **Plan / baseline immutability** | **GREEN** | no plan moved after activation, for admin or GM, by any path (Wave 1 T-8, Wave 2) |
+| **Actual immutability** | **GREEN** | `trg_actual_is_append_only` refused a clear from a superuser connection; client timestamps ignored or refused at every entry point |
+| **Process-version freeze** | **GREEN** | published activities, gates, evidence and bindings refuse admin edits; 2026B 536 and 2026C 470 each compute their own standard |
+| **Role resolution · fail-closed** | **GREEN** | wrong-JWT attacks on every important write refused; a lab technician and an operator cannot decide a lab submission |
+| **Lab gate** | **GREEN** | submission leaves the gate shut; approval opens it; **a later rejection shuts it again** (`0072`); proven on the device |
+| **Evidence** | **GREEN** | proven on the device — uploaded, bound, byte-identical in storage, shown through a signed URL; empty files refused; bound objects undeletable by every role |
+| **Duplicate taps · lost responses** | **GREEN** | start, finish, bind, accept, extension decision, activation: one row each (`IDEMPOTENCE.md`) |
+| **Machine and vessel exclusion** | **GREEN** at model and RPC level | exclusion constraints refuse both, with a sentence. **No 2026C activity carries a machine**, so a batch waiting behind one has never been seen on the real process |
+| **Audit trail** | **RED** | every human act attributed; audit rows undeletable — **but `advance_batch` writes 30 untrue `gate_opened` events per poll** (F47, a `0072` regression). Fix `0077` written, **not applied** |
+| **Lab capture replay** | **AMBER** | `open_lab_sample`, `request_lab_test`, `record_lab_result`, `raise_deviation` duplicate on replay; no idempotency key exists (F39). Nothing replays until an offline queue exists |
+| **`request_lab_test` authorisation** | **AMBER** | no role guard (F37) |
+| **File content at upload** | **AMBER** | declared type enforced, bytes not inspected (F40) |
+| **Session revocation** | **AMBER** | a role change or sign-out lags until the access token expires; 1800 s decided, to be set (F41) |
+| **Resource occupancy data** | **RED** | `ARCH-006` — occupancy rows for vessels nobody allocated; diagnosed as stale demo data |
+| **Schema drift** | **AMBER** | `ARCH-008` not run this cycle; `SCHEMA.md` regenerated 11 Sep after its generator was found reporting the opposite of the truth |
+| **Production readiness** | **RED** | dev clock marker, shared demo accounts, demo batches beside real ones (F42, F43) — deployment, not code |
+| **The loader · changeover · receiving bunker · 67–68 %** | **UNRESOLVED** | factory decisions; no gate built on any |
 
 ---
 
 ## Overall
 
-**RED.** The foundation has one systemic authorisation hole (auto-updatable views) and two
-table-level ones (TRUNCATE, actual mutability) that between them let an insider with the shipped anon
-key rewrite a batch's clock authorship, its Day-0 config, its process definition, delete it, forge a
-manager decision, and empty the audit trail. The parts that were hardened in the last pass — plan
-immutability, role resolution, extensions, identity, the dev clock — **held under attack**, including
-through the view layer. The hardening is real; it is just not yet systemic.
+**AMBER, with one RED that is one migration from GREEN.** The foundation held under 195 adversarial
+attacks and a full run of the loop on a device; the systemic holes of 31 August are closed and each
+has an event trigger so the class cannot quietly return. The RED is a regression from this cycle's own
+fix, caught by the existing suite — `0077` corrects it and waits only for approval to apply.
 
-The single highest-value fix is `security_invoker = true` on the views (or revoking view writes from
-client roles): it closes the batch-clock, config, definition-swap, delete, and manager-decision
-forgeries in one move.
+**Ready for the three workstations, subject to `0077` and to the deployment items before any real
+factory use.**
 
 ---
 
-## Ranked, with the one-sentence exploit and the proposed fix (proposed, not applied)
+## The test suite
 
-1. **View write-bypass (RED).** *An insider PATCHes `/rest/v1/v_live_batch` with the anon key and
-   rewrites or deletes any batch.* → `security_invoker=true` on all `public` views (or revoke
-   INSERT/UPDATE/DELETE on views from `anon`/`authenticated`); test that no auto-updatable view lacks
-   it. Coordinate on `v_lab_checkpoint_map` with the lab team.
-2. **Actual mutability (RED).** *A second submit while IN_PROGRESS, or after `return_activity`,
-   overwrites a recorded `actual_end`.* → `BEFORE UPDATE` trigger refusing change to a non-null
-   actual; corrections as superseding records (model on `evidence_media.superseded_by_id`); probe the
-   hold/return/release flows first (MISSION §4.1).
-3. **TRUNCATE (RED).** *`anon` truncates `audit_event` in one call.* → `REVOKE TRUNCATE ON ALL TABLES
-   IN SCHEMA public FROM anon, authenticated`; test no client role holds it.
-4. **Process-definition publish (RED).** *An admin edits, or anon swaps, the definition a live batch
-   ran on.* → publish/freeze flag + activation snapshot; narrow `ref_write` to unpublished (§4.4).
-5. **Capture idempotence (RED, urgent).** *A replayed offline capture creates a second deviation /
-   occupancy / lab sample.* → a per-capture idempotency key on the field RPCs, designed with the lab
-   team (`IDEMPOTENCE.md`). **Report only — do not patch under deadline.**
-6. **send_alert (AMBER).** *Any signed-in user alerts any role.* → add `assert_role`.
-7. **State transitions (AMBER).** *Unproven whether every forbidden transition is refused.* → forge
-   all ten; add tests.
-8. **Evidence end-to-end (RED-unproven).** *"Evidence is real" is asserted, not proven.* → configure a
-   storage service key; run the skipped 20; probe direct storage-object delete.
+`npx vitest run`, 12 September, against the deployed database, after the Lab workstation (UI-001):
+**570 passed · 18 failed · 3 todo · 591 total.** No failure is an unexplained product defect, and
+none was introduced by UI-001/UI-002. The three `resources` failures of 11 Sep have cleared, as
+predicted, now the 9 Sep occupancy is out of their window. (11 Sep: 562 · 21 · 3 · 586.)
+
+| Suite | n | Cause | Kind |
+|---|---|---|---|
+| `demoBatches` | 6 | the demo set was regenerated onto 2026C and never re-staged | fixture state |
+| `hourlyPlan` | 5 | no draft activity at the expected day; the vessel it picks is not the one holding another batch | fixture state |
+| `varianceAttribution` | 3 | no completed work on the demo batches to attribute | fixture state |
+| `plant` | 2 | `ARCH-006` | fixture state, diagnosed |
+| `evidence` | 1 | needs an activity with three outstanding requirements | fixture state |
+| `eventTrail` | 1 | **F47** — passes once `0077` is applied | **product regression** |
+
+**Eleven more were failing this morning** and were fixed on the test side, because the product had
+become stricter than the fixture: nine `deviations` tests submitted work that was never started
+(refused since `0071`); `roleResolution` expected a self-promotion to update zero rows, and since
+`0074` it is refused outright; `extensionRegister` asserted a database-wide expiry count that open
+requests on cancelled batches inflate (F46). **Each assertion still proves the same claim — only the
+mechanism it is proven through changed.**
+
+**Do not delete active demo batches to turn these green.** Re-staging the demo set is `ARCH-011`.
 
 ---
 
-## What could not be probed, stated so the silence is not read as "fine"
+## What could not be proved, stated so the silence is not read as "fine"
 
-- **Direct Supabase Storage object deletion by a client** — no storage service key on this machine.
-  Unproven, not cleared.
-- **The parallel team's `lab_*` tables and the two capture screens** — out of boundary by
-  instruction. Reported where visible; not probed.
-- **The full ten-transition state matrix** — guard confirmed, transitions not each forged.
-- **`audit_event` append-only triggers under UPDATE and DELETE** — present; not re-forged this pass
-  (the live hole is TRUNCATE, which they do not cover).
-- **The A9 manager-decision forge end-to-end** — the write path is open (identical view mechanism to
-  the confirmed A1–A8), but no open deviation was staged to complete the demonstration.
+- **A real Android handset.** The device run was an emulator. The camera behaviour (F32) is the first
+  thing a real phone must confirm.
+- **Machine contention on the real process** — see the board.
+- **Offline capture** — not built, so replay safety is reasoned, not observed.
+- **The migrations-built schema equals the deployed one** — `ARCH-008`.

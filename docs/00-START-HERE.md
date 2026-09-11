@@ -1,61 +1,62 @@
 # START HERE
 
-The router. **Read the row for your task, read those files, ignore the rest.**
+**Two documents. Find your row, read that one, ignore everything else.**
 
-There are eleven live documents in this repository. Everything else is either code, or history in
-`_archive/` which is not an instruction and must not be read as one.
+| If you are… | Read |
+|---|---|
+| **any coding agent** — Kiro, a junior, anyone building | `docs/AGENT-BRIEF.md` |
+| **Claude Code** — foundation, security, backend, contracts | `docs/CLAUDE-CODE.md` |
+
+Both of them tell you to read `docs/SCHEMA.md` before you write a table name or an RPC signature.
+Do that. It is generated from the deployed database by `scripts/schema-snapshot.mjs`, and it exists
+because a table was specified that already existed under a different shape, and nobody found out
+until an agent tried to create it.
 
 ---
 
-## Read only what your task needs
+## Reference — read only what your task needs
 
-| I am about to… | Read, in order |
+| I am about to… | Read |
 |---|---|
-| **start work of any kind** | `03-mission/MISSION.md` |
-| **write a migration or touch the database** | `02-architecture/ARCHITECTURE.md` → `04-audit/WRITE-PATH-MATRIX.md` → `03-mission/FINDINGS.md` |
+| **write a migration or touch the database** | `SCHEMA.md` → `02-architecture/ARCHITECTURE.md` → `04-audit/WRITE-PATH-MATRIX.md` |
 | **change a duration, a gate, or any process value** | `01-process/STANDARD.md` → `01-process/OPEN-QUESTIONS.md`. If it is not in the standard, it is not yours to change. |
-| **build a screen or a component** | `02-architecture/DATA-CONTRACTS.md` → `05-ui/VISUAL-LANGUAGE.md` |
-| **run the red-team audit** | `03-mission/MISSION.md` §3 → `04-audit/WRITE-PATH-MATRIX.md` |
+| **build a screen** | `02-architecture/DATA-CONTRACTS.md` → `05-ui/UI-SYSTEM.md` → `05-ui/WORKSTATIONS.md` → `05-ui/VISUAL-LANGUAGE.md` |
+| **do anything with the laboratory** | `01-process/LAB-2026A-Laboratory-Process.pdf` → `01-process/lab_checkpoints.json` |
 | **understand why something is the way it is** | `02-architecture/DECISIONS.md` |
 | **fix something that looks broken** | `03-mission/FINDINGS.md` — it is probably already diagnosed |
 | **pick up a task** | `03-mission/TASK-BOARD.md` |
-| **finish a session** | `_templates/SESSION-REPORT.md` |
+| **see what every agent has done** | `T:\obsidian\memory\agent-log.md` |
 
 ---
 
-## The whole map
+## The map
 
 ```
-CLAUDE.md                        agent entry — auto-loaded by Claude Code
+CLAUDE.md                        auto-loaded by Claude Code — points here
 README.md                        human entry
 docs/
   00-START-HERE.md               this file
-  01-process/
-    STANDARD.md                  PROCESS-2026C v1 — the 470-hour process, hour by hour
-    OPEN-QUESTIONS.md            four things only the factory can answer
-    schedule.json                the machine-readable standard — SOURCE OF TRUTH for every hour
-  02-architecture/
-    ARCHITECTURE.md              five registers · tables · security · what not to break
-    DATA-CONTRACTS.md            the payload per screen — the screen developer's file
-    DECISIONS.md                 every decision and why
-  03-mission/
-    MISSION.md                   the phased brief, with the red-team stop gate
-    TASK-BOARD.md                claimable work
-    FINDINGS.md                  every known defect and its status
-  04-audit/
-    WRITE-PATH-MATRIX.md         eight rows pre-seeded, all marked UNVERIFIED
-    (SECURITY-ATTACK-MATRIX.md · FOUNDATION-STATUS.md — written in Phase 1)
-  05-ui/
-    VISUAL-LANGUAGE.md           what to keep from the prototype, what never to copy
-    (UI-SYSTEM.md · COMPONENT-INVENTORY.md — written in Phase 5)
-  _templates/SESSION-REPORT.md   the end-of-session format
-  _reference/                    supporting detail · the signed .docx · the source spreadsheets
-  _archive/                      superseded. HISTORY, NOT INSTRUCTION. Do not read as current.
+  AGENT-BRIEF.md                 ← every coding agent. The only brief they need.
+  CLAUDE-CODE.md                 ← Claude Code only.
+  SCHEMA.md                      GENERATED. What is actually deployed. Never hand-edited.
+  01-process/    STANDARD · OPEN-QUESTIONS · schedule.json · the LAB-2026A set
+  02-architecture/  ARCHITECTURE · DATA-CONTRACTS · DECISIONS
+  03-mission/    TASK-BOARD · FINDINGS
+  04-audit/      the red-team output
+  05-ui/         UI-SYSTEM · WORKSTATIONS · VISUAL-LANGUAGE
+  _templates/    SESSION-REPORT
+  _reference/    supporting detail · signed documents · source spreadsheets
+  _archive/      HISTORY, NOT INSTRUCTION. Never read as current.
 mushroomos/                      the code
+scripts/
+  schema-snapshot.mjs            regenerates docs/SCHEMA.md from the live database
+  consolidate-docs.sh            one-shot archive of superseded instruction documents
 ```
 
-**Six folders. Never more than three live files in any of them.** If a folder grows past three,
-something needs merging or archiving.
+**A folder that grows past three live files needs merging or archiving.** `docs/03-mission/`
+reached twelve before this was enforced, and two of them were rival mission documents while this
+router pointed at the stale one. That is how agents end up building against instructions nobody
+believes any more.
 
 ---
 
@@ -63,22 +64,17 @@ something needs merging or archiving.
 
 ```
 the process owner's latest ruling
-   ↓
-01-process/schedule.json          every hour figure, mechanically
-   ↓
-01-process/STANDARD.md            and the signed .docx, both generated from it
-   ↓
-02-architecture/                  how the system implements it
-   ↓
-the two source spreadsheets       for their own regions
-   ↓
-_reference/                       detail; still carries stale numbers in places
-   ↓
-_archive/                         history only, never an instruction
+   ↓  docs/SCHEMA.md              for anything about what exists in the database
+   ↓  01-process/schedule.json    every hour figure, mechanically
+   ↓  01-process/STANDARD.md      and the signed documents, generated from it
+   ↓  02-architecture/            how the system implements it
+   ↓  the two source spreadsheets for their own regions
+   ↓  _reference/                 detail; carries stale numbers in places
+   ↓  _archive/                   history only, never an instruction
 ```
 
-**Do not silently reconcile a disagreement.** Record the conflict, name the source you selected,
-preserve the decision in the vault.
+**Do not silently reconcile a disagreement.** Record the conflict, name the source you chose, and
+if two live documents contradict each other, stop and report rather than choosing.
 
 ---
 
@@ -86,20 +82,11 @@ preserve the decision in the vault.
 
 ```
 this repository        WHAT is implemented
-T:\obsidian\memory     WHY we decided it
+T:\obsidian\memory     WHY we decided it, and WHO did what
 ```
 
-They are not copies of each other. If a fact is in the repository, the vault links to it rather than
-repeating it. Duplication is how two documents come to disagree without anyone noticing.
+Not copies. If a fact is in the repository, the vault links to it. Duplication is how two
+documents come to disagree without anyone noticing.
 
----
-
-## The rule that keeps this small
-
-**A document not listed in the map above is not an instruction.**
-
-When something is superseded it moves to `_archive/` with a header, **in the same commit that
-supersedes it** — not later. Later is how this repository accumulated 10,193 lines of root markdown
-that all described a process the factory no longer runs.
-
-Adding a markdown file to the repository root is how the problem comes back.
+Every agent appends one row to `T:\obsidian\memory\agent-log.md` before finishing. That file is
+the index of all agent work; `sessions/` holds the detail.
