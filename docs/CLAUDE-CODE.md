@@ -1,5 +1,7 @@
 # Claude Code
 
+> **SUPERSEDED AS AN ENTRYPOINT — 13 September 2026.** Start at [AGENT-BRIEF.md](AGENT-BRIEF.md) for all engineering work. This file is retained as a historical foundation report. Its separate-mission, backend-frozen and role-specific reading directives below are not current task instructions. Consult dated technical evidence where relevant; use the new brief and current user scope to decide work.
+
 **Addressed to Claude Code only.** Every other coding agent reads `docs/AGENT-BRIEF.md`; do not
 give them this one, and do not read theirs.
 

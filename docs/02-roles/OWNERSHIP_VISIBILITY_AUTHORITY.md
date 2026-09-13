@@ -1,5 +1,7 @@
 # Ownership, visibility and authority — reconciliation review draft
 
+> **First-release mapping update:** the FINAL library names the production execution surface Operations/Supervisor and forbids a separate Operator UX. This matrix describes distinct backend capabilities, not six required products. Reuse execution actions in one Operations surface without merging privileges; see [library review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) and D15. Independent approvals remain independent.
+
 13 September 2026 · **Proposed product policy, not a permissions migration.** Confirm unresolved authority with the factory before implementation. Current backend permissions are evidence of what works today, not proof of the intended policy.
 
 ## Four independent concepts

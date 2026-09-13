@@ -1,5 +1,17 @@
 # Findings
 
+## 13 September evidence addendum
+
+The [context comparison](../05-ui/CONTEXT_VS_IMPLEMENTATION_2026-09-13.md) and [FINAL library review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) contain later evidence than the historical tables below. Track their G01–G12 and L01–L15 identifiers without renumbering old findings. None is fixed by this documentation handoff. Recheck source/database before implementation.
+
+- G01/G02: primary intake completeness and legacy missing-as-completed rendering.
+- G03–G06/G11: lab completion/decision integrity, historical collection-time inference, ownership/queue routing and incoming-lab access.
+- G07–G10/G12: unknown lab SLA, extension workflow, offline replay, authoring/version isolation and honest onboarding/demo lifecycle.
+- L11: current scripts/db.mjs replays SQL files without applied-migration tracking and defaults to migrations plus seeds. Source reviewed; runner not executed. Correct/verify before use on non-disposable data.
+- L01/L02: supplied library misattributes proposed Stage1B second-pass/26h wording and Paddy soaking rows to the revised workbook. Preserve actual source-cell provenance.
+
+Historical F31/F33 statements below must be read with subsequent implementation notes: lab submission and bulk assignment now have code paths. Their existence does not prove the whole lab/readiness workflow passes acceptance.
+
 **Something looks broken? Check here first — it may already be known, diagnosed and waiting.**
 
 Severity uses the four-word vocabulary: `GREEN` proved · `AMBER` implemented but unproven · `RED`

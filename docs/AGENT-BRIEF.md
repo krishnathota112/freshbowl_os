@@ -4,6 +4,8 @@
 
 ## 1. Product and session scope
 
+**Latest supplied library:** `T:/exisiting_freshbowl/MushroomOS_Agent_Library_FINAL`. Read [FINAL Library Review](04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) before using it. First release is Admin + one Operations/Supervisor workstation + Lab, not separate Operator and management products. Backend role/approval boundaries remain distinct. Stakeholder APK has Supervisor/Lab quick-login choices. Earlier screen detail is reused under this explicit release mapping; inaccurate workbook claims identified in the review must not become process data.
+
 MushroomOS manages button-mushroom compost production at Fresh Bowl Horticulture. It must explain what should have happened, what happened, when it diverged, who did it, what proves it and who authorized a difference.
 
 Published process version → batch → generated plan → activated frozen baseline → actuals + lab/evidence → decisions → server gates → next eligible work → management traceability.

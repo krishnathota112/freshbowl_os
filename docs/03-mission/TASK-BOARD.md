@@ -1,5 +1,11 @@
 # Task board
 
+## Current complete-project handoff — 13 September 2026
+
+Use [Project Delivery](PROJECT-DELIVERY.md) for the current milestone/dependency plan and resume checkpoint. The older UI-only/frozen-backend mission below is retained with its dated task evidence, not as a limit on newly authorized defect fixes. Recheck current behavior before claiming or closing old tasks. The FINAL library targets one Operations/Supervisor experience and a Supervisor/Lab stakeholder APK; see [library review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md).
+
+Documentation handoff: entrypoints unified; authoring/import contract added; library reviewed; application implementation not started in this phase. No M00–M11 milestone is marked complete by these document changes.
+
 **11 September 2026. The backend is frozen (`DEC-025`); the work is the three UI workstations.**
 Every task is self-contained: an agent should be able to act on one without reading the conversation
 that produced it. The previous board, with the full specs of the finished foundation tasks, is at

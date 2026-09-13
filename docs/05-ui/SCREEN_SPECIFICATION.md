@@ -1,5 +1,7 @@
 # Screen specification — reconciliation review draft
 
+> **Later first-release scope:** Admin + Operations/Supervisor + Lab. O01–O05 are reusable execution states within Operations, not a separate Operator interface. Manager/GM screens are supporting authority surfaces, not additional first-release workstations. Stakeholder APK quick login exposes Supervisor and Lab only. Apply the [FINAL library review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) before implementing this registry; the40 entries are contracts, not40 required pages.
+
 13 September 2026 · Product contracts, not new components or routes. Roles/actions refer to the [role model](../02-roles/OWNERSHIP_VISIBILITY_AUTHORITY.md). A proposed action whose backend contract is missing must stay explicitly unavailable until implemented and verified; no browser workaround.
 
 ## Contract applied to every screen

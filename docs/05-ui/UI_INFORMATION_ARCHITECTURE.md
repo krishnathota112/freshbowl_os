@@ -1,5 +1,7 @@
 # UI information architecture — reconciliation review draft
 
+> **Scope update:** the first release now follows the FINAL library's Admin, Operations/Supervisor and Lab surfaces. Consolidate the Operator task navigation below into Operations; keep shared oversight distinct from owned work and preserve supporting Manager/GM decisions. The two-choice Supervisor/Lab APK login does not remove Admin or backend roles. See [library review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) and [delivery plan](../03-mission/PROJECT-DELIVERY.md). The table below remains the earlier conceptual role map, not six required first-release menus.
+
 13 September 2026 · Navigation follows user jobs. This specifies information placement using the existing visual system; it does not redesign components.
 
 ## Proposed primary navigation

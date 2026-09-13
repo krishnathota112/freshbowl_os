@@ -1,5 +1,7 @@
 # Factory end-to-end acceptance — reconciliation review draft
 
+> **First-release adaptation:** execute the production journeys through Operations/Supervisor rather than a separate Operator UX. Retain distinct backend-role and wrong-person tests. The stakeholder APK has two quick-login choices, but Admin preparation and configured independent approvers still participate through supported surfaces. See [FINAL library review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md); two quick logins cannot replace the full authority test matrix.
+
 13 September 2026 · **Specification only; none of these journeys was executed in this phase.** Passing TypeScript or reaching a completed counter is not factory acceptance. Use [screen IDs](../05-ui/SCREEN_SPECIFICATION.md), [roles](../02-roles/OWNERSHIP_VISIBILITY_AUTHORITY.md), [gaps](../00-product/MUSHROOMOS_PRODUCT_MODEL.md#critical-gap-register) and [decision IDs](../01-process/MUSHROOMOS_PROCESS_MODEL.md#reconciliation-and-factory-decision-register).
 
 ## Test conditions and evidence

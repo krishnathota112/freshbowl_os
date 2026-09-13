@@ -32,6 +32,8 @@ The main rail currently includes Stage 0A's two hopper passes, conditioning and 
 
 ## Reconciliation and factory decision register
 
+Later source evidence: [FINAL library review L01–L03](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) checks both included workbooks. The revised Sheet1 C24:D26 contains mixing8 + one hopper4 only; the second-pass/rest proposal has separate provenance. C30:D32 soaking rows belong to Paddy, not Stage1B. D01 remains unresolved; correct source attribution does not approve a new recipe. D06's86/90 distinction depends on including the4-hour pile-preparation row. The supplied library's14 open items map to these existing D IDs in the review; no second factory decision ledger is created.
+
 `CONFIRMED` below applies to the described observation/requirement. A proposed interpretation remains unapproved until a dated process-owner ruling is recorded. Every pending item is **NEEDS FACTORY DECISION**. Decision owner means the factory business owner, not an automatically inferred app permission.
 
 | ID / conflict | Current database | Current documentation | Supplied workbook / notes | Proposed interpretation (not approved) | Factory decision required / owner |
@@ -2429,4 +2431,3 @@ Tunnel discharge to grow-room — stream 3
 Gate relationships:
 
 - exit EVIDENCE_COMPLETE; enabled=true; binding=none; config={}; conflict=none; reason=Cannot submit — {outstanding_count} evidence item(s) outstanding: {outstanding_labels}
-

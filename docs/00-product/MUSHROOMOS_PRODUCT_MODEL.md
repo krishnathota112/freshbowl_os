@@ -1,5 +1,7 @@
 # MushroomOS product model — reconciliation review draft
 
+> **Release-scope update, 13 September:** the later supplied FINAL library targets Admin, one Operations/Supervisor experience and Lab for the first release, with Supervisor/Lab quick-login choices in the stakeholder APK. Reuse this domain model and detailed workflows under the [library applicability review](../04-audit/FINAL-LIBRARY-REVIEW-2026-09-13.md) and [delivery roadmap](../03-mission/PROJECT-DELIVERY.md); do not implement six separate first-release workstations. Backend roles/approvals remain distinct.
+
 13 September 2026 · **Not approved for implementation.** This package records the proposed coherent product model and preserves unresolved factory decisions. It does not publish an SOP, grant permissions or change the application.
 
 ## Purpose
@@ -33,6 +35,8 @@ A plan does not prove work occurred. A result is not an approval. An approval do
 Evidence order is purpose-specific: a dated factory decision establishes intended process; the supplied workbook establishes what its author wrote; the saved deployed catalog establishes observed database behavior; source establishes current client behavior. None silently overrides the others. The chat and context pack propose a model; they are not signed factory rulings. `CONFIRMED` below means supported requirement or observed fact, not a claim that end-to-end enforcement passed. `NEEDS FACTORY DECISION` means no implementation may choose the answer. Proposed product choices are labelled **PROPOSED** until this package is approved.
 
 Inputs: `T:/exisiting_freshbowl/gpt_chat.txt`, `context.txt`, canonical context-pack documents and its `Compost_SOP_31-08-2026_SOURCE.xlsx`, repository standard/schedule/brief/contracts, current source, and [read-only database snapshot](../04-audit/context-comparison-2026-09-13/database-readonly.json). The separately named `MUSHROOMOS_PROCESS_END_TO_END.md` was not found in the workspace or supplied ZIP; no contents are attributed to it. Workbook and supplemental definition details were reread for this phase. No new end-to-end run occurred.
+
+Later source update: the FINAL library supplied the complete end-to-end and master PRD narratives, also located under `T:/exisiting_freshbowl/exisiting_freshbowl/docs_for_reading/`. They were read in the library review. The earlier “not found” statement describes the preceding inspection only. Source corrections and scope differences are recorded in that review, not silently merged.
 
 ## Entities and lifecycle
 
