@@ -46,7 +46,7 @@ export async function loadAdminHome(): Promise<AdminHome> {
  * the server expects, so a person does not have to know that order.
  * ───────────────────────────────────────────────────────────────────────────── */
 
-import { createBatch, factoryInstant, regeneratePlan } from './batch';
+import { createBatch, factoryInstant, regeneratePlan, type RoleBindingInput } from './batch';
 import { assignActivity, loadSchedule, validateBatch, type Finding, type ScheduleRow } from './schedule';
 
 export type Person = { id: string; display_name: string; role: string };
@@ -86,6 +86,7 @@ export async function createAndPlan(input: {
   date: string;
   startAt: string;
   processDefinitionId: string;
+  roles: RoleBindingInput[];
 }): Promise<string> {
   const batchId = await createBatch({
     code: input.code,
@@ -93,11 +94,23 @@ export async function createAndPlan(input: {
     start_date: input.date,
     start_at: input.startAt,
     config: {},
-    roles: [],
+    roles: input.roles,
     process_definition_id: input.processDefinitionId,
   });
   await regeneratePlan(batchId);
   return batchId;
+}
+
+// A mandatory activity whose material role is unbound is silently left out of the plan.
+export async function requiredMaterialRoles(processDefinitionId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('process_activity')
+    .select('material_role')
+    .eq('process_definition_id', processDefinitionId)
+    .eq('is_optional', false)
+    .not('material_role', 'is', null);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((r) => r.material_role as string))];
 }
 
 export type CrewRow = {

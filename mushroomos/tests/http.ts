@@ -14,6 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { assertLocalTarget } from './target';
 
 const APP_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -54,7 +55,7 @@ function envValue(key: string): string | null {
   return null;
 }
 
-export const SUPABASE_URL = envValue('VITE_SUPABASE_URL');
+export const SUPABASE_URL = assertLocalTarget(envValue('VITE_SUPABASE_URL'), 'VITE_SUPABASE_URL');
 export const ANON_KEY = envValue('VITE_SUPABASE_ANON_KEY');
 
 export const HTTP_READY = Boolean(SUPABASE_URL && ANON_KEY);

@@ -125,8 +125,9 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
 
       {/* Master Batch Process Clock Hero */}
       {(() => {
-        const maxRelDay = rows.length > 0 ? Math.max(...rows.map((r) => r.rel_day)) : 0;
-        const baselineHours = (maxRelDay + 1) * 24;
+        // The batch's own planned span (last planned hour), never the day grid (rel_day × 24).
+        const plannedHours = rows.flatMap((r) => [r.baseline_end_hour, r.baseline_start_hour]).filter((h): h is number => h !== null);
+        const baselineHours = plannedHours.length > 0 ? Math.max(1, ...plannedHours.map(Number)) : 1;
         const startAtMs = b.start_at ? new Date(b.start_at).getTime() : new Date(b.start_date).getTime();
         const currentBatchHour = b.status === 'active' ? Math.min(baselineHours, Math.max(0, Math.floor((nowMs() - startAtMs) / (1000 * 60 * 60)))) : 0;
 
@@ -173,25 +174,11 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
       {/* 1. PRE-H0 PREPARATION SECTION */}
       <PreBatchCard batchId={id} activities={rows} onOpenTask={(tid) => setOpenTask(tid)} />
 
-      {/* 2. THREE-PILE PARALLEL CONCURRENCY GRAPH (H0 -> Baseline End) */}
+      {/* 2. TURNER PILES, from this batch's own PILE-scope activities */}
       <ParallelPilesGraph activities={rows} onOpenTask={(tid) => setOpenTask(tid)} />
 
-      {/* 3. TUNNEL PLANNING & ALLOCATION (DEADLINE: H240) */}
-      <TunnelPlanningSection
-        batchId={id}
-        currentBatchHour={
-          b.status === 'active'
-            ? Math.max(
-                0,
-                Math.floor(
-                  (nowMs() -
-                    (b.start_at ? new Date(b.start_at).getTime() : new Date(b.start_date).getTime())) /
-                    (1000 * 60 * 60)
-                )
-              )
-            : 0
-        }
-      />
+      {/* 3. TUNNEL ALLOCATION */}
+      <TunnelPlanningSection batchId={id} />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-4">
         <Card className="p-3"><Stat label="Tasks" value={rows.length} compare={`${byDay.length} days with work`} /></Card>
@@ -790,6 +777,14 @@ function PreBatchCard({
   );
 }
 
+/**
+ * The Turner piles, built from this batch's own PILE-scope activities (G02).
+ *
+ * Nothing about the process is written here: which piles exist, which passes and lab checks each
+ * has, and their order all come from the batch's generated plan. A step one pile has and another
+ * does not is shown on the second pile as "Not in plan" — a missing activity is never drawn as
+ * completed.
+ */
 function ParallelPilesGraph({
   activities,
   onOpenTask,
@@ -797,63 +792,81 @@ function ParallelPilesGraph({
   activities: BatchActivityRow[];
   onOpenTask: (id: string) => void;
 }) {
-  const pileNumbers = [1, 2, 3];
-  const pileStepCodes = ['TR-T0', 'TR-REST-1', 'TR-T1', 'TR-REST-2', 'TR-T2', 'P1-BUNK-LOAD'];
-  const pileStepLabels: Record<string, string> = {
-    'TR-T0': 'T0 (6–7h)',
-    'TR-REST-1': 'Rest 1',
-    'TR-T1': 'T1 (6–7h)',
-    'TR-REST-2': 'Rest 2',
-    'TR-T2': 'T2 (6–7h)',
-    'P1-BUNK-LOAD': 'Bunker Load',
-  };
+  const pileRows = activities.filter((a) => a.scope === 'PILE');
+  if (pileRows.length === 0) return null;
+
+  const when = (a: BatchActivityRow) => a.baseline_start_hour ?? Number.POSITIVE_INFINITY;
+  // The same step on different piles differs only in its pile token (TRN-P1-T0 / TRN-P2-T0).
+  const stepKey = (a: BatchActivityRow) => a.code.replace(/-?P\d+(?=-|$)/, '');
+
+  const piles = new Map<string, BatchActivityRow[]>();
+  for (const a of pileRows) {
+    const list = piles.get(a.scope_label) ?? [];
+    list.push(a);
+    piles.set(a.scope_label, list);
+  }
+  const pileOrder = [...piles.entries()]
+    .map(([label, rows]) => ({ label, rows: [...rows].sort((x, y) => when(x) - when(y) || x.seq - y.seq) }))
+    .sort((x, y) => x.label.localeCompare(y.label, undefined, { numeric: true }));
+
+  const firstSeen = new Map<string, number>();
+  for (const a of pileRows) {
+    const k = stepKey(a);
+    firstSeen.set(k, Math.min(firstSeen.get(k) ?? Number.POSITIVE_INFINITY, when(a)));
+  }
+  const steps = [...firstSeen.entries()].sort((x, y) => x[1] - y[1]).map(([k]) => k);
 
   return (
     <div className="bg-surface rounded-2xl p-5 shadow-card border border-line mb-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 mb-4">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
-            Temporal Zone 2 · Production Clock (H0 onwards)
-          </span>
-          <h3 className="font-head text-base font-extrabold text-ink">Three Parallel Pile Concurrency Streams</h3>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Turner</span>
+          <h3 className="font-head text-base font-extrabold text-ink">
+            {pileOrder.length} pile{pileOrder.length === 1 ? '' : 's'}, each progressing on its own
+          </h3>
         </div>
-        <span className="text-xs text-muted font-medium">
-          Independent per-pile execution · No global T2 barrier
-        </span>
+        <span className="text-xs text-muted font-medium">From this batch's plan · no shared finish barrier</span>
       </div>
 
       <div className="space-y-4">
-        {pileNumbers.map((pileNo) => {
+        {pileOrder.map((pile) => {
+          const byKey = new Map(pile.rows.map((a) => [stepKey(a), a]));
           return (
-            <div key={pileNo} className="p-3.5 rounded-xl border border-line/80 bg-surface-2/60">
-              <div className="flex items-center justify-between mb-2">
+            <div key={pile.label} className="p-3.5 rounded-xl border border-line/80 bg-surface-2/60">
+              <div className="mb-2">
                 <span className="font-head text-xs font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-accent" />
-                  Pile {pileNo} (Stream {pileNo} of 3)
-                </span>
-                <span className="font-mono text-[11px] text-muted">
-                  T0 (6–7h) → Rest → T1 → Rest → T2 → Bunker
+                  {pile.label}
                 </span>
               </div>
 
-              {/* Step Sequence Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                {pileStepCodes.map((code) => {
-                  const act = activities.find(
-                    (a) =>
-                      (a.code === code || (code === 'P1-BUNK-LOAD' && a.code.includes('BUNK-LOAD'))) &&
-                      (a.instance_no === pileNo || a.scope_label.includes(String(pileNo)))
-                  );
-                  const state = act?.state ?? 'COMPLETED';
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                {steps.map((key) => {
+                  const act = byKey.get(key);
+                  if (!act) {
+                    return (
+                      <div
+                        key={key}
+                        className="p-2.5 rounded-lg border border-dashed text-left"
+                        style={{ borderColor: 'var(--line-2)', background: 'var(--surface)' }}
+                        title={`${key} is not in this pile's plan`}
+                      >
+                        <span className="font-mono text-[10px] font-bold text-muted truncate block">{key}</span>
+                        <span className="text-[10px] block mt-0.5" style={{ color: 'var(--warn)' }}>
+                          Not in plan
+                        </span>
+                      </div>
+                    );
+                  }
+                  const state = act.state;
                   const isDone = state === 'COMPLETED';
                   const inProgress = state === 'IN_PROGRESS';
                   const isDev = state === 'DEVIATION';
-                  const isGate = code.includes('REST');
 
                   return (
                     <button
-                      key={code}
-                      onClick={() => act && onOpenTask(act.id)}
+                      key={key}
+                      onClick={() => onOpenTask(act.id)}
                       className="p-2.5 rounded-lg border text-left transition-all cursor-pointer"
                       style={{
                         background: isDone
@@ -862,27 +875,17 @@ function ParallelPilesGraph({
                           ? 'var(--accent-soft)'
                           : isDev
                           ? 'var(--crit-soft)'
-                          : isGate
-                          ? 'var(--surface-2)'
                           : 'var(--surface)',
-                        borderColor: isDone
-                          ? 'var(--ok)'
-                          : inProgress
-                          ? 'var(--accent)'
-                          : isDev
-                          ? 'var(--crit)'
-                          : 'var(--line)',
+                        borderColor: isDone ? 'var(--ok)' : inProgress ? 'var(--accent)' : isDev ? 'var(--crit)' : 'var(--line)',
                       }}
-                      title={act?.title ?? code}
+                      title={act.title}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span
                           className="font-mono text-[10px] font-bold truncate"
-                          style={{
-                            color: isDone ? 'var(--ok)' : inProgress ? 'var(--accent-ink)' : 'var(--ink)',
-                          }}
+                          style={{ color: isDone ? 'var(--ok)' : inProgress ? 'var(--accent-ink)' : 'var(--ink)' }}
                         >
-                          {pileStepLabels[code] ?? code}
+                          {key}
                         </span>
                         <span className="text-[10px] font-bold font-mono">
                           {isDone ? '✓' : inProgress ? '●' : isDev ? '⚠' : '○'}
@@ -890,6 +893,7 @@ function ParallelPilesGraph({
                       </div>
                       <span className="text-[10px] text-muted block mt-0.5 truncate">
                         {STATE_LABEL[state] ?? state}
+                        {act.baseline_start_hour !== null && ` · H${act.baseline_start_hour}`}
                       </span>
                     </button>
                   );
@@ -903,14 +907,7 @@ function ParallelPilesGraph({
   );
 }
 
-function TunnelPlanningSection({
-  batchId,
-  currentBatchHour,
-}: {
-  batchId: string;
-  currentBatchHour: number;
-  onOpenTask?: (id: string) => void;
-}) {
+function TunnelPlanningSection({ batchId }: { batchId: string }) {
   const movQuery = useQuery({
     queryKey: ['batch-movements-tunnels', batchId],
     queryFn: async () => {
@@ -930,24 +927,18 @@ function TunnelPlanningSection({
 
   const movements = movQuery.data ?? [];
   const isAllocated = movements.length > 0;
-  const deadlineHour = 240;
-  const isPastDeadline = currentBatchHour >= deadlineHour;
 
+  // No allocation deadline is shown: tunnel timing is an open factory decision (D05), and a
+  // deadline the process does not state would be an invented rule.
   return (
     <div className="bg-surface rounded-2xl p-5 shadow-card border border-line mb-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 mb-4">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
-            Planning & Allocation Milestone
-          </span>
-          <h3 className="font-head text-base font-extrabold text-ink">
-            Tunnel Planning (Decision Deadline: H240 / Day 10)
-          </h3>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Resources</span>
+          <h3 className="font-head text-base font-extrabold text-ink">Tunnel allocation</h3>
         </div>
         <div className="flex items-center gap-2">
-          <Chip tone={isAllocated ? 'ok' : isPastDeadline ? 'crit' : 'warn'}>
-            {isAllocated ? '✓ Tunnels Allocated' : isPastDeadline ? '⚠ Decision Overdue' : 'Pending Allocation'}
-          </Chip>
+          <Chip tone={isAllocated ? 'ok' : 'warn'}>{isAllocated ? 'Tunnels allocated' : 'Not allocated yet'}</Chip>
         </div>
       </div>
 
@@ -979,8 +970,8 @@ function TunnelPlanningSection({
             <div className="text-left">
               <span className="font-bold text-ink text-xs block">Tunnel Destination Planning</span>
               <p className="text-xs text-muted mt-0.5">
-                Decision due by <span className="font-bold text-ink">H240</span> (Day 10). Dynamic
-                availability verified against planned movement windows.
+                No tunnel is allocated to this batch yet. Availability is checked against planned
+                movement windows.
               </p>
             </div>
             <Link

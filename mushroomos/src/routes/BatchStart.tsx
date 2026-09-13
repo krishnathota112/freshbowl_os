@@ -2,8 +2,10 @@ import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { createAndPlan, resolveH0 } from '../api/intake';
+import { ROLE_ORDER, ROLE_PLAIN } from '../api/batches';
+import { createAndPlan, requiredMaterialRoles, resolveH0 } from '../api/intake';
 import { listSelectableProcessVersions, type ProcessVersion } from '../api/process';
+import { loadMaterialRoles } from '../api/processDefinition';
 import { ErrorPanel } from '../components/field/ErrorPanel';
 import { fmtWhen } from '../components/field/labWords';
 import { Skeleton } from '../components/primitives';
@@ -31,7 +33,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
   const ongoing = mode === 'ongoing';
 
   const versions = useQuery({ queryKey: ['selectable-processes'], queryFn: listSelectableProcessVersions });
-  const [processId, setProcessId] = useState<string | null>(null);
+  const [pickedProcessId, setProcessId] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [label, setLabel] = useState('');
   const today = new Date();
@@ -41,19 +43,42 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
   const [time, setTime] = useState('06:00');
 
   const list = versions.data ?? [];
+  // The current standard is pre-selected; the admin can still choose another published version.
+  const processId = pickedProcessId ?? list.find((v) => v.isCurrent)?.id ?? null;
   const chosen: ProcessVersion | null = list.find((v) => v.id === processId) ?? null;
+
+  const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
+  const required = useQuery({
+    queryKey: ['required-material-roles', processId],
+    queryFn: () => requiredMaterialRoles(processId as string),
+    enabled: processId !== null,
+  });
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const roleList = [...(roles.data ?? [])].sort(
+    (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role)
+  );
+  const materialFor = (role: string) =>
+    role in picked ? picked[role] : (roleList.find((r) => r.role === role)?.leadId ?? '');
+  const requiredRoles = required.data ?? [];
+  const missingRequired = requiredRoles.filter((r) => !materialFor(r));
 
   const start = useMutation({
     mutationFn: async () => {
       if (!chosen) throw new Error('Choose the process this batch follows.');
       if (code.trim() === '') throw new Error('Give the batch a name — the numbers the factory calls it by.');
       const startAt = await resolveH0(date, time);
+      const bindings = roleList.flatMap((r) => {
+        const id = materialFor(r.role);
+        const material = r.materials.find((m) => m.id === id);
+        return material ? [{ role: r.role, material_code: material.code, lead: true }] : [];
+      });
       return createAndPlan({
         code: code.trim(),
         label: label.trim() === '' ? code.trim() : label.trim(),
         date,
         startAt,
         processDefinitionId: chosen.id,
+        roles: bindings,
       });
     },
     onSuccess: (batchId) => nav(`/admin/batch/${batchId}/prepare${ongoing ? '?ongoing=1' : ''}`),
@@ -104,6 +129,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-head text-[16px] font-800">
                     <span className="mono">{v.code}</span> v{v.version}
+                    {v.isCurrent && <span className="ml-2 text-[12px] font-700 text-muted">current</span>}
                   </span>
                   <span className="mono text-[13px]" style={{ color: 'var(--accent-ink)' }}>
                     {v.standardHr !== null ? `standard H${v.standardHr}` : 'no standard'}
@@ -116,7 +142,61 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         )}
       </Step>
 
-      <Step n={2} title="What is this batch called?">
+      {chosen && (
+        <Step n={2} title="What is it made from?">
+          {roles.isLoading || required.isLoading ? (
+            <Skeleton label="Loading materials" lines={3} />
+          ) : roles.error || required.error ? (
+            <ErrorPanel
+              error={roles.error ?? required.error}
+              prefix="The materials could not be loaded."
+              onRetry={() => {
+                roles.refetch();
+                required.refetch();
+              }}
+            />
+          ) : (
+            <div className="grid gap-3">
+              {roleList.map((r) => {
+                const isRequired = requiredRoles.includes(r.role);
+                const plain = ROLE_PLAIN[r.role];
+                return (
+                  <label key={r.role} className="block">
+                    <span className="flex flex-wrap items-baseline gap-2 text-[14px] font-700 text-ink">
+                      {plain?.title ?? r.role}
+                      {isRequired && <span className="text-[12px] font-600 text-muted">needed by this process</span>}
+                    </span>
+                    {plain && <span className="block text-[13px] text-muted">{plain.help}</span>}
+                    <select
+                      value={materialFor(r.role)}
+                      onChange={(e) => setPicked((p) => ({ ...p, [r.role]: e.target.value }))}
+                      className="mt-1 w-full rounded-md border bg-surface px-3 text-[16px]"
+                      style={{ minHeight: 52, borderColor: isRequired && !materialFor(r.role) ? 'var(--crit)' : 'var(--line-2)' }}
+                    >
+                      <option value="" disabled={isRequired}>
+                        {isRequired ? 'Choose a material' : 'Not used'}
+                      </option>
+                      {r.materials.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+              {missingRequired.length > 0 && (
+                <p className="text-[13px]" style={{ color: 'var(--crit)' }}>
+                  Choose a material for {missingRequired.map((r) => ROLE_PLAIN[r]?.title ?? r).join(', ')}.
+                  Without it, that whole stream would be left out of the plan.
+                </p>
+              )}
+            </div>
+          )}
+        </Step>
+      )}
+
+      <Step n={chosen ? 3 : 2} title="What is this batch called?">
         <label className="block text-[13px] text-ink2" htmlFor="batch-code">
           The name the factory uses — often the batch numbers it covers, for example 366,367,368
         </label>
@@ -141,7 +221,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         />
       </Step>
 
-      <Step n={3} title={ongoing ? 'When did it actually start?' : 'When does it start?'}>
+      <Step n={chosen ? 4 : 3} title={ongoing ? 'When did it actually start?' : 'When does it start?'}>
         <p className="mb-2 max-w-[60ch] text-[13px] text-muted">
           H0 is bagasse wetting — the moment the batch clock begins.{' '}
           {ongoing
@@ -183,7 +263,14 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
 
       <button
         type="button"
-        disabled={start.isPending || !chosen || code.trim() === ''}
+        disabled={
+          start.isPending ||
+          !chosen ||
+          code.trim() === '' ||
+          required.isLoading ||
+          roles.isLoading ||
+          missingRequired.length > 0
+        }
         onClick={() => start.mutate()}
         className="w-full rounded-lg font-head text-[17px] font-800 disabled:opacity-50"
         style={{ minHeight: 60, background: 'var(--accent)', color: 'var(--on-accent)' }}

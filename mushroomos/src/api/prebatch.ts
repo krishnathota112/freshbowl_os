@@ -14,7 +14,7 @@
  * WHAT IT DOES NOT DO
  *   It invents no process rule. Which checkpoint is the pre-batch one comes from
  *   `lab_checkpoint.is_prebatch`; the parameters are the two the laboratory model states; and the
- *   collection instant is chosen so it is genuinely before H0 rather than merely now.
+ *   collection instant is the server's clock at the moment the sample is recorded (G05).
  */
 import { supabase } from './client';
 
@@ -44,22 +44,6 @@ export async function listPrebatchCheckpoints(): Promise<PrebatchCheckpoint[]> {
   return (data ?? []) as PrebatchCheckpoint[];
 }
 
-/**
- * When the sample was collected.
- *
- * `least(now, H0 − 1h)`, which is right in both directions: a batch planned for the future keeps
- * the real current time, and a backdated H0 places the assay an hour ahead of the clock it is
- * supposed to precede. It can never be in the future, which is the one thing
- * `open_prebatch_sample` refuses outright.
- */
-export function collectionInstant(h0: string | null): string {
-  const now = Date.now();
-  if (h0 === null) return new Date(now).toISOString();
-  const anHourBeforeH0 = Date.parse(h0) - 3_600_000;
-  if (Number.isNaN(anHourBeforeH0)) return new Date(now).toISOString();
-  return new Date(Math.min(now, anHourBeforeH0)).toISOString();
-}
-
 export type PrebatchReading = { parameter: string; value: number };
 
 /**
@@ -76,15 +60,14 @@ export type PrebatchReading = { parameter: string; value: number };
 export async function takePrebatchMaterialCheck(input: {
   batchId: string;
   checkpointId: string;
-  h0: string | null;
   label: string;
   readings: PrebatchReading[];
 }): Promise<{ sampleId: string; accepted: number }> {
+  // No collection time is sent: the server stamps the moment the sample is recorded (G05).
   const sample = await supabase.rpc('open_prebatch_sample', {
     p_batch: input.batchId,
     p_checkpoint: input.checkpointId,
     p_label: input.label,
-    p_at: collectionInstant(input.h0),
   });
   if (sample.error) throw sample.error;
   const sampleId = (Array.isArray(sample.data) ? sample.data[0] : sample.data) as string;

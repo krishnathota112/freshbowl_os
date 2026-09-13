@@ -1,5 +1,7 @@
 # MushroomOS — Claude Code entry
 
+**Continuing on a new machine? Read [docs/03-mission/NEXT-SESSION-HANDOFF.md](docs/03-mission/NEXT-SESSION-HANDOFF.md) first.** Its user rulings (13 Sep 2026) override older documents.
+
 Read [docs/AGENT-BRIEF.md](docs/AGENT-BRIEF.md) first. It is the single engineering entry point for every agent, including Claude Code. Follow its routing, authority rules and complete-project delivery roadmap.
 
 The user intends these documents to support building the entire project. This handoff does not approve unresolved factory timings, permissions or production mutations. Follow the current user instruction and its authorized scope; do not restart reconciliation by default.

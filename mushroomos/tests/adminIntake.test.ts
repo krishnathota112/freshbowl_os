@@ -66,6 +66,41 @@ d('SCENARIO B · a new batch is created, prepared and activated', () => {
     });
   }, 120_000);
 
+  it('every required stream is in the plan, and a stream with no material blocks activation', async () => {
+    await withRollback(async (db) => {
+      const batch = await createDraftBatch(db, { processCode: PROCESS });
+
+      const missing = await all<{ code: string }>(
+        db,
+        `select pa.code
+           from master_batch mb
+           join process_activity pa on pa.process_definition_id = mb.process_definition_id
+          where mb.id = $1 and not pa.is_optional and pa.material_role is not null
+            and not exists (select 1 from batch_activity ba
+                             where ba.master_batch_id = mb.id and ba.process_activity_id = pa.id)`,
+        [batch]
+      );
+      expect(missing).toEqual([]);
+
+      const before = await all<{ code: string }>(
+        db,
+        `select code from validate_batch($1) where code = 'MATERIAL_ROLE_UNBOUND'`,
+        [batch]
+      );
+      expect(before).toEqual([]);
+
+      await db.query(`delete from batch_material_role where master_batch_id = $1 and role = 'STRUCTURAL_STRAW'`, [batch]);
+      const after = await all<{ severity: string; message: string }>(
+        db,
+        `select severity, message from validate_batch($1) where code = 'MATERIAL_ROLE_UNBOUND'`,
+        [batch]
+      );
+      expect(after).toHaveLength(1);
+      expect(after[0].severity).toBe('blocking');
+      expect(after[0].message).toContain('structural straw');
+    });
+  }, 120_000);
+
   it('activation is refused while the incoming material check is missing, and allowed once it is accepted', async () => {
     await withRollback(async (db) => {
       const batch = await createDraftBatch(db, { processCode: PROCESS });

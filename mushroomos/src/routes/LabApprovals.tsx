@@ -117,10 +117,11 @@ export function LabApprovals() {
             You are not one of the deciding roles
           </span>
           <p className="mt-1 text-[13px] text-ink">
-            While C-32 is open, a lab submission is decided by{' '}
+            A lab submission is decided by{' '}
             <strong>{approverRoles.join(' or ') || 'a role the server names'}</strong>. You can read
             this queue; the server will refuse a decision from{' '}
-            <strong>{role ?? 'a session with no role'}</strong>.
+            <strong>{role ?? 'a session with no role'}</strong>, and from anyone who recorded or
+            submitted the package themselves.
           </p>
         </Card>
       )}
@@ -346,7 +347,10 @@ function DecisionSheet({
   // The server requires a reason in BOTH directions. Mirroring that here is a courtesy, not the
   // rule — pressing through it still gets refused.
   const hasReason = reason.trim().length > 0;
-  const noReading = row.result_count === 0;
+  const noReading = row.result_count === 0 || row.sample_count === 0;
+  // A reading outside its band may still be approved, but only as a stated "approve anyway" that
+  // the server records as approved_out_of_range and keeps on the decision permanently (0080).
+  const failing = (results.data ?? []).filter((x) => x.isCurrent && x.verdict === 'fail');
 
   return (
     <>
@@ -442,11 +446,23 @@ function DecisionSheet({
       {noReading && (
         <Card className="p-4 mt-3" rail="var(--warn)">
           <span className="text-[10px] font-bold uppercase tracking-widest text-warn">
-            No reading was recorded
+            No sample or reading on record
           </span>
           <p className="mt-1 text-[13px] text-ink">
-            This submission carries no lab result. A decision is still possible and will be recorded
-            against your name — but it is a decision about nothing measured.
+            This submission has no complete lab package, so it cannot be decided. The lab must take the
+            sample and record every reading first.
+          </p>
+        </Card>
+      )}
+
+      {failing.length > 0 && (
+        <Card className="p-4 mt-3" rail="var(--danger)">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-danger">
+            {failing.length} reading{failing.length === 1 ? '' : 's'} outside the allowed range
+          </span>
+          <p className="mt-1 text-[13px] text-ink">
+            Reject it so the lab retests, or approve anyway with a written reason. An approval here is
+            recorded as <strong>approved out of range</strong> and stays flagged on the batch permanently.
           </p>
         </Card>
       )}
@@ -489,15 +505,15 @@ function DecisionSheet({
 
       <div className="mt-3 flex gap-2">
         <button
-          className="flex-1 rounded-xl bg-ok text-white font-bold py-3 text-sm disabled:opacity-50"
-          disabled={!mayDecide || !hasReason || decide.isPending}
+          className={`flex-1 rounded-xl text-white font-bold py-3 text-sm disabled:opacity-50 ${failing.length > 0 ? 'bg-danger' : 'bg-ok'}`}
+          disabled={!mayDecide || !hasReason || noReading || decide.isPending}
           onClick={() => decide.mutate('approved')}
         >
-          {decide.isPending ? 'Recording…' : 'Approve'}
+          {decide.isPending ? 'Recording…' : failing.length > 0 ? 'Approve anyway' : 'Approve'}
         </button>
         <button
           className="flex-1 rounded-xl border border-danger text-danger font-bold py-3 text-sm disabled:opacity-50"
-          disabled={!mayDecide || !hasReason || decide.isPending}
+          disabled={!mayDecide || !hasReason || noReading || decide.isPending}
           onClick={() => decide.mutate('rejected')}
         >
           Reject

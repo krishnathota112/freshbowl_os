@@ -83,8 +83,7 @@ export function ScheduleBuilder() {
       takePrebatchMaterialCheck({
         batchId: id,
         checkpointId: prebatchCps.data![0].id,
-        h0: batch.data?.start_at ?? null,
-        label: 'Incoming material assay, recorded before H0',
+        label: 'Incoming material assay',
         readings: PREBATCH_PARAMETERS.map((p) => ({
           parameter: p.code,
           value: Number(assay[p.code]),

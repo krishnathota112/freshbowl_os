@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { activateBatch, getPreBatchMaterialCheck } from '../api/batch';
-import { listActivePeople, loadPrepare } from '../api/intake';
+import { loadPrepare } from '../api/intake';
 import {
   PREBATCH_PARAMETERS,
   acceptOutstandingPrebatchResults,
@@ -11,7 +11,6 @@ import {
   takePrebatchMaterialCheck,
 } from '../api/prebatch';
 import { getBatchContext } from '../api/work';
-import { BulkAssign } from '../components/admin/BulkAssign';
 import { ErrorPanel } from '../components/field/ErrorPanel';
 import { fmtWhen } from '../components/field/labWords';
 import { Chip, Skeleton } from '../components/primitives';
@@ -20,8 +19,9 @@ import { Chip, Skeleton } from '../components/primitives';
  * A4 · A5 · Prepare the batch, then activate it. `WORKSTATIONS.md` §4.
  *
  *   1 · incoming material check   the one thing that stands between a plan and a running batch
- *   2 · the crew                  assigned in one action per role (UI-004)
- *   3 · check and activate        the server's own findings, then the one-way door
+ *   2 · check and activate        the server's own findings, then the one-way door
+ *
+ * No crew step: work is open to the authorised squad and the server records who did it (0080).
  *
  * EVERY RULE HERE IS THE SERVER'S. `validate_batch` decides what blocks activation and says why in
  * its own words; `activate_batch` refuses if anything still blocks. This screen renders those
@@ -38,7 +38,6 @@ export function PrepareBatch() {
 
   const batch = useQuery({ queryKey: ['batch-context', id], queryFn: () => getBatchContext(id) });
   const prepare = useQuery({ queryKey: ['prepare', id], queryFn: () => loadPrepare(id) });
-  const people = useQuery({ queryKey: ['people'], queryFn: listActivePeople });
   const check = useQuery({ queryKey: ['prebatch', id], queryFn: () => getPreBatchMaterialCheck(id) });
 
   const refresh = () => {
@@ -145,18 +144,14 @@ export function PrepareBatch() {
       ) : (
         <>
           <Step n={1} title="Incoming material check" done={(check.data?.accepted ?? 0) > 0 && (check.data?.accepted ?? 0) >= (check.data?.tests_requested ?? 1)}>
-            <MaterialCheck batchId={id} h0={b.h0} row={check.data ?? null} loading={check.isLoading} onDone={refresh} />
+            <MaterialCheck batchId={id} row={check.data ?? null} loading={check.isLoading} onDone={refresh} />
           </Step>
 
-          <Step n={2} title="Who is doing the work?" done={p.crew.every((c) => c.activityIds.length === 0)}>
-            {people.isLoading ? (
-              <Skeleton label="Loading people" lines={2} />
-            ) : (
-              <BulkAssign crew={p.crew} people={people.data ?? []} batchIsActive={isActive} onDone={refresh} />
-            )}
-          </Step>
-
-          <Step n={3} title="Check and activate" done={false}>
+          <Step n={2} title="Check and activate" done={false}>
+            <p className="mb-3 max-w-[60ch] text-[14px] text-ink2">
+              Nobody is assigned in advance. Production work is open to every supervisor and lab work
+              to every lab technician; the record shows who actually did each step.
+            </p>
             {blocking.length > 0 && (
               <div
                 className="mb-3 rounded-lg border px-4 py-3 text-[14px]"
@@ -216,13 +211,11 @@ export function PrepareBatch() {
  */
 function MaterialCheck({
   batchId,
-  h0,
   row,
   loading,
   onDone,
 }: {
   batchId: string;
-  h0: string | null;
   row: Awaited<ReturnType<typeof getPreBatchMaterialCheck>>;
   loading: boolean;
   onDone: () => void;
@@ -243,7 +236,6 @@ function MaterialCheck({
       return takePrebatchMaterialCheck({
         batchId,
         checkpointId: cps[0].id,
-        h0,
         label: 'Incoming material',
         readings,
       });

@@ -19,6 +19,7 @@ import pg from 'pg';
 // harness needs the matcher. A helper that silently forced activation would make every suite that
 // used it prove less than it claims.
 import { expect } from 'vitest';
+import { assertLocalTarget } from './target';
 
 export type Db = InstanceType<typeof pg.Client>;
 
@@ -56,7 +57,7 @@ export function databaseUrl(): string | null {
   return null;
 }
 
-export const DB_URL = databaseUrl();
+export const DB_URL = assertLocalTarget(databaseUrl(), 'SUPABASE_DB_URL');
 export const NO_DB_REASON =
   'SUPABASE_DB_URL is not set (checked the environment and mushroomos/.env.local), ' +
   'so the database proofs cannot run';

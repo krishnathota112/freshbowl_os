@@ -18,6 +18,18 @@ if (!url) {
   process.exit(1);
 }
 
+// F49: this runner has no ledger and re-executes every file, so it must never reach a shared database.
+const host = new URL(url).hostname;
+if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
+  console.error(
+    `Refusing to run: SUPABASE_DB_URL points at ${host}.\n` +
+      'This script re-runs every migration and seed and keeps no record of what already ran (F49).\n' +
+      'For the local stack use `npx supabase db reset`. Apply a reviewed migration to a shared\n' +
+      'database one file at a time with scripts/apply.mjs.'
+  );
+  process.exit(1);
+}
+
 const only = process.argv[2]; // 'migrations' | 'seed' | undefined = both
 
 function filesIn(dir) {
