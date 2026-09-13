@@ -14,7 +14,14 @@ import {
   type Finding,
   type ScheduleRow,
 } from '../api/schedule';
-import { activateBatch, getBatch } from '../api/batch';
+import { activateBatch, getBatch, getPreBatchMaterialCheck } from '../api/batch';
+import { getBatchProcessVersion } from '../api/process';
+import {
+  listPrebatchCheckpoints,
+  takePrebatchMaterialCheck,
+  acceptOutstandingPrebatchResults,
+  PREBATCH_PARAMETERS,
+} from '../api/prebatch';
 import { loadVesselOptions } from '../api/plant';
 import {
   loadIndividualBatches,
@@ -50,6 +57,64 @@ export function ScheduleBuilder() {
   const findings = useQuery({ queryKey: ['validate', id], queryFn: () => validateBatch(id) });
   // Day headings come from process_day, not from a map in this file. A2.
   const dayTitles = useQuery({ queryKey: ['day-titles', id], queryFn: () => loadDayTitles(id) });
+  // The standard of the version THIS batch was generated from — see `baselineHours` below.
+  const processVersion = useQuery({
+    queryKey: ['batch-process-version', id],
+    queryFn: () => getBatchProcessVersion(id),
+  });
+
+  /*
+    THE INCOMING-MATERIAL CHECK.
+
+    `activate_batch` refuses while this is not on record — "the material must be sampled and its
+    results accepted before the batch clock starts". Every RPC behind it has existed since 0032 and
+    none had a caller in the application, so an Admin could plan a batch and never start it.
+  */
+  const prebatch = useQuery({
+    queryKey: ['prebatch', id],
+    queryFn: () => getPreBatchMaterialCheck(id),
+  });
+  const prebatchCps = useQuery({ queryKey: ['prebatch-checkpoints'], queryFn: listPrebatchCheckpoints });
+  const [assay, setAssay] = useState<Record<string, string>>({});
+  const [assayError, setAssayError] = useState<string | null>(null);
+
+  const takeCheck = useMutation({
+    mutationFn: () =>
+      takePrebatchMaterialCheck({
+        batchId: id,
+        checkpointId: prebatchCps.data![0].id,
+        h0: batch.data?.start_at ?? null,
+        label: 'Incoming material assay, recorded before H0',
+        readings: PREBATCH_PARAMETERS.map((p) => ({
+          parameter: p.code,
+          value: Number(assay[p.code]),
+        })),
+      }),
+    onSuccess: () => {
+      setAssayError(null);
+      qc.invalidateQueries({ queryKey: ['prebatch', id] });
+      refresh();
+    },
+    // The server's own sentence. It names the roles that may accept when this one may not.
+    onError: (e) => setAssayError((e as Error).message),
+  });
+
+  /**
+   * Finish a check somebody else started and could not accept.
+   *
+   * The panel already withheld the form once a sample existed, so a second one could not be
+   * recorded on top of the first. That left the only screen naming the problem with nothing for
+   * the person who can solve it to press, and the batch could not be activated by anyone.
+   */
+  const acceptOutstanding = useMutation({
+    mutationFn: () => acceptOutstandingPrebatchResults(id),
+    onSuccess: () => {
+      setAssayError(null);
+      qc.invalidateQueries({ queryKey: ['prebatch', id] });
+      refresh();
+    },
+    onError: (e) => setAssayError((e as Error).message),
+  });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['schedule', id] });
@@ -130,7 +195,22 @@ export function ScheduleBuilder() {
 
   const maxRelDay = all.length > 0 ? Math.max(...all.map((r) => r.rel_day)) : 0;
   const baselineDays = all.length > 0 ? maxRelDay + 1 : 0;
-  const baselineHours = baselineDays * 24;
+
+  /**
+   * THE STANDARD, NOT THE DAY GRID.
+   *
+   * This line read `baselineDays * 24`, which is `(total_days + 1) × 24` — the same generated
+   * figure `process_definition.baseline_hours` holds, and the one CLAUDE.md names explicitly:
+   * "never from `baseline_hours` … a day grid that reads 480 for the 470-hour standard".
+   *
+   * So this header announced `H0 → H480` for a PROCESS-2026C batch while the wizard's own review
+   * step, two taps earlier, had correctly said 470. Seen on the handset run.
+   *
+   * It also computed it here, which the same file forbids: "Screen? Compute nothing." The standard
+   * belongs to the process version THIS batch was generated from — not to the current catalogue
+   * pointer, which may have moved since — so it is read per batch.
+   */
+  const baselineHours = processVersion.data?.standardHr ?? null;
 
   return (
     <div className="pb-24">
@@ -169,7 +249,7 @@ export function ScheduleBuilder() {
             {/* Always reachable. Once a plan is frozen, a new batch is the only way to
                 change targets — so the way out has to be on this screen. */}
             <Link
-              to="/admin/batch/new"
+              to="/admin/batch/start"
               className="rounded-lg px-4 py-2.5 font-head text-[13px] font-700"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
@@ -235,7 +315,7 @@ export function ScheduleBuilder() {
 
         <div className="py-4 text-center">
           <div className="font-head text-3xl font-extrabold text-accent">
-            H0 → H{baselineHours}
+            H0 → {baselineHours === null ? '—' : `H${baselineHours}`}
           </div>
           <p className="text-xs text-muted mt-1 font-mono">
             {all.length} Activities · {baselineDays} Total Process Days · Continuous Factory Clock
@@ -263,6 +343,149 @@ export function ScheduleBuilder() {
             so the plan the operators worked to stays the plan on the record. To lay out a
             different batch, start a new one.
           </p>
+        </div>
+      )}
+
+      {/*
+        THE INCOMING-MATERIAL CHECK — shown only while the batch is a draft, because
+        `open_prebatch_sample` refuses once it is active. That refusal is the point: the check is a
+        precondition, not a retrospective note.
+      */}
+      {draft && (
+        <div
+          className="mb-5 rounded-2xl border p-4 shadow-sm"
+          style={{
+            borderColor: prebatch.data?.accepted ? 'var(--ok)' : 'var(--warn)',
+            background: prebatch.data?.accepted ? 'var(--surface)' : 'var(--warn-soft)',
+          }}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="font-head text-[13px] font-700" style={{ color: 'var(--ink)' }}>
+              Incoming material check
+            </h3>
+            <span className="mono text-[11px]" style={{ color: 'var(--muted)' }}>
+              required before H0
+            </span>
+          </div>
+
+          {/*
+            THREE STATES, NOT TWO.
+
+            A sample whose results were recorded but never ACCEPTED blocks activation just as
+            firmly as no sample at all — "0 of 1 result(s) accepted as final" — and an admin
+            looking at a screen that only counted acceptances would see nothing to explain it.
+            Recording a second sample makes it worse, so the form is deliberately withheld in that
+            state and the screen names who has to finish the first one.
+
+            Found by leaving exactly that state behind while testing an admin's refusal.
+          */}
+          {prebatch.data && prebatch.data.results_current > prebatch.data.accepted ? (
+            <div className="mt-2 text-[12px]" style={{ color: 'var(--ink-2)' }}>
+              <p>
+                <span className="mono">{prebatch.data.checkpoint_code}</span> has{' '}
+                {prebatch.data.accepted} of {prebatch.data.results_current} result
+                {prebatch.data.results_current === 1 ? '' : 's'} accepted as final.
+              </p>
+              <p className="mt-1" style={{ color: 'var(--warn)' }}>
+                A lab technician or supervisor must accept the rest before this batch can start.
+                Do not record a second sample — it will not clear this one.
+              </p>
+              {/*
+                The way out. Shown to everyone, because the server decides: a role that may not
+                accept gets the refusal that names who may, which is more useful than a hidden
+                button that leaves them wondering what to do next.
+              */}
+              <button
+                type="button"
+                className="mt-2 rounded-lg px-4 py-2.5 font-head text-[13px] font-700"
+                style={{
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  opacity: acceptOutstanding.isPending ? 0.5 : 1,
+                }}
+                disabled={acceptOutstanding.isPending}
+                onClick={() => acceptOutstanding.mutate()}
+              >
+                {acceptOutstanding.isPending
+                  ? 'Accepting…'
+                  : `Accept the ${prebatch.data.results_current - prebatch.data.accepted} outstanding reading${
+                      prebatch.data.results_current - prebatch.data.accepted === 1 ? '' : 's'
+                    }`}
+              </button>
+            </div>
+          ) : prebatch.data && prebatch.data.accepted > 0 ? (
+            <div className="mt-2 text-[12px]" style={{ color: 'var(--ink-2)' }}>
+              <p>
+                {prebatch.data.accepted} of {prebatch.data.tests_requested} reading
+                {prebatch.data.tests_requested === 1 ? '' : 's'} accepted ·{' '}
+                <span className="mono">{prebatch.data.checkpoint_code}</span>
+              </p>
+              <p className="mt-1" style={{ color: 'var(--muted)' }}>
+                Collected {new Date(prebatch.data.collected_at).toLocaleString()}
+                {prebatch.data.before_h0 === false && (
+                  <span style={{ color: 'var(--warn)' }}> — after H0, which the record will show</span>
+                )}
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--ink-2)' }}>
+                The material must be sampled and its result accepted before the batch clock starts.
+                Activation is refused until it is.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {PREBATCH_PARAMETERS.map((p) => (
+                  <label key={p.code} className="flex flex-col gap-1">
+                    <span
+                      className="text-[10px] font-700 uppercase tracking-wider"
+                      style={{ color: 'var(--muted)' }}
+                    >
+                      {p.label} {p.unit}
+                    </span>
+                    <input
+                      className="mono w-28 rounded-lg border px-3 py-2 text-[14px]"
+                      style={{ borderColor: 'var(--line-2)', background: 'var(--surface)', color: 'var(--ink)' }}
+                      inputMode="decimal"
+                      value={assay[p.code] ?? ''}
+                      onChange={(e) => setAssay({ ...assay, [p.code]: e.target.value })}
+                      placeholder="—"
+                    />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  className="self-end rounded-lg px-4 py-2.5 font-head text-[13px] font-700"
+                  style={{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    opacity:
+                      takeCheck.isPending ||
+                      PREBATCH_PARAMETERS.some((p) => !Number.isFinite(Number(assay[p.code])) || !assay[p.code])
+                        ? 0.5
+                        : 1,
+                  }}
+                  disabled={
+                    takeCheck.isPending ||
+                    prebatchCps.data === undefined ||
+                    prebatchCps.data.length === 0 ||
+                    PREBATCH_PARAMETERS.some((p) => !assay[p.code] || !Number.isFinite(Number(assay[p.code])))
+                  }
+                  onClick={() => takeCheck.mutate()}
+                >
+                  {takeCheck.isPending ? 'Recording…' : 'Record and accept'}
+                </button>
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                Dry weight is not requested: no source states a method for it, and a test nobody can
+                report would leave this permanently unaccepted.
+              </p>
+              {assayError && (
+                <p className="mt-2 text-[12px]" style={{ color: 'var(--crit)' }}>
+                  {assayError}
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 

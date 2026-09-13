@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DB_URL,
   NO_DB_REASON,
+  actAs,
   all,
   createActiveBatch,
   createDraftBatch,
@@ -190,6 +191,9 @@ const lastAt = (done: Completed[], code: string) =>
 describeDb('Day 0–6 · decision 2 · the incoming material check is a real prerequisite', () => {
   it('a batch with no material check CANNOT be activated, and the refusal says why', async () => {
     await withRollback(async (db) => {
+      // 0058 · the refusal under test is the MATERIAL CHECK, not the role, so this wears the
+      // role that passes the guard and is then stopped by the prerequisite.
+      await actAs(db, 'admin');
       const batch = await createDraftBatch(db);
 
       const finding = await all<{ code: string; message: string }>(
@@ -522,7 +526,13 @@ describeDb('Day 0–6 · decision 3 · four Day-1 checkpoints, independently rec
         `select checkpoint_map, count(*)::text as n from lab_checkpoint
           group by checkpoint_map order by checkpoint_map`
       );
-      expect(maps.map((m) => m.checkpoint_map)).toEqual(['LAB_DICTATION', 'S4B_COLUMNS']);
+      // CONTAINMENT, NOT EQUALITY. LAB-2026A was seeded beside the two C-33 maps (0053), and the
+      // claim being made is that BOTH C-33 maps are still carried — that selecting one for the
+      // build did not resolve which source is authoritative. A third, separate checkpoint set does
+      // not weaken that; asserting equality would have forbidden it.
+      const mapCodes = maps.map((m) => m.checkpoint_map);
+      expect(mapCodes).toContain('LAB_DICTATION');
+      expect(mapCodes).toContain('S4B_COLUMNS');
 
       // And every activity added under the selection carries the marker, so validate_batch reports
       // the open question at the point of use.
@@ -695,6 +705,9 @@ describeDb('Day 0–6 · decision 1 · the straw bunker rest stays required, wit
 
   it('a batch whose straw rest has no answer CANNOT be activated', async () => {
     await withRollback(async (db) => {
+      // 0058 · creating and activating are admin-or-GM. The claim is about the REST answer
+      // being required, not about who may activate, so it wears the entitled role.
+      await actAs(db, 'admin');
       // Every rest answered EXCEPT this one, so the finding is unambiguous.
       const gates = await all<{ code: string }>(
         db,
@@ -722,7 +735,17 @@ describeDb('Day 0–6 · decision 1 · the straw bunker rest stays required, wit
       );
       const batch = await one<{ id: string }>(
         db,
-        `select public.create_master_batch($1,$2,$3,$4,$5,$6,$7,$8) as id`,
+        // ⚠ NAMES PROCESS-2026B, and it must.
+        //
+        // The gates above are read from 2026B, and the eight-argument form leaves the standard to
+        // `process_catalogue` (0044) — which now points at PROCESS-2026C. So the batch was being
+        // built on a standard whose holds are not time gates at all, `STRAW-REST-1` did not exist
+        // in it, and the finding this test is about could never be raised. The test asked one
+        // definition for its question and a different one for its answer.
+        `select public.create_master_batch($1,$2,$3,$4,$5,$6,$7,$8,
+                  (select id from process_definition
+                    where code = 'PROCESS-2026B' and status = 'published'
+                    order by version desc limit 1)) as id`,
         [
           'TEST-NOREST',
           'TEST-NOREST',
@@ -754,6 +777,16 @@ describeDb('Day 0–6 · THE WALK · PRE-BATCH → H0 → … → DAY 6 SOAK 2',
       await withRollback(async (db) => {
         // H0 well in the past, so a backdated actual still lands after it.
         const batch = await createActiveBatch(db, { startDate: startDateDaysBack(20) });
+
+        // WEARS THE SUPERVISOR FOR THE WALK.
+        //
+        // 0058 guarded start_activity, submit_activity and release_elapsed_rests, and
+        // createActiveBatch restores the caller's role after borrowing admin. Without this the
+        // walk drove the whole chain as "an unauthenticated session". A supervisor can perform
+        // every step, which is what keeps it one continuous walk rather than a relay.
+        //
+        // Adopted, not exempted: the server holds this session to supervisor throughout.
+        await actAs(db, 'supervisor');
 
         // PRE-BATCH is on the record for this very batch, before its own H0.
         const pre = await one<{ before_h0: boolean; accepted: number }>(
@@ -885,15 +918,36 @@ describeDb('Day 0–6 · THE WALK · PRE-BATCH → H0 → … → DAY 6 SOAK 2',
       expect(gen.is_generated, 'a typed-in duration is not an actual').toBe('ALWAYS');
 
       const batch = await createActiveBatch(db, { startDate: startDateDaysBack(20) });
+
+        // WEARS THE SUPERVISOR FOR THE WALK.
+        //
+        // 0058 guarded start_activity, submit_activity and release_elapsed_rests, and
+        // createActiveBatch restores the caller's role after borrowing admin. Without this the
+        // walk drove the whole chain as "an unauthenticated session". A supervisor can perform
+        // every step, which is what keeps it one continuous walk rather than a relay.
+        //
+        // Adopted, not exempted: the server holds this session to supervisor throughout.
+        await actAs(db, 'supervisor');
       const act = await one<{ id: string }>(
         db,
         `select id from batch_activity where master_batch_id = $1 and code = 'FIB1-WEIGH'
           order by instance_no limit 1`,
         [batch]
       );
-      await db.query(`select public.start_activity($1)`, [act.id]);
       await satisfyEvidence(db, act.id);
 
+      // ⚠ `start_activity` IS DELIBERATELY NOT CALLED, and that is a real consequence of 0050.
+      //
+      // The stored actual now wins over a stated one — a submitted timestamp may FILL a gap, never
+      // overwrite. So calling `start_activity` first stamps `actual_start = now()`, and a backdated
+      // pair submitted over it leaves "started now, ended two hours ago", which the
+      // `actual_end_after_start` check refuses outright.
+      //
+      // That is right, and it sharpens what the paper-slip case actually is: work done while the
+      // system was unreachable was never STARTED in the system either. Nothing to overwrite, so the
+      // stated pair lands. Where a start HAS been recorded and is wrong, the path is
+      // `correct_actual`, with a reason, keeping the original — which is the whole point of B1.
+      //
       // A backdated pair three hours apart — the paper-slip case PROCESS_V2 §2 describes.
       const values = await inRangeValues(db, act.id);
       await db.query(
@@ -926,6 +980,8 @@ describeDb('Day 0–6 · THE WALK · PRE-BATCH → H0 → … → DAY 6 SOAK 2',
   it('decision 8 · before/after evidence gates submission, and unloading permits video', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded; this test drives it, so it wears the role that does.
+      await actAs(db, 'supervisor');
 
       // The unload takes video as well as a photo. `{photo,video}` PERMITS video; min_count is 1, so
       // either kind satisfies it and a bad connection is not a blocker.

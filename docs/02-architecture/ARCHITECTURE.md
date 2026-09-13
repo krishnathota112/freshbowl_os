@@ -4,8 +4,86 @@ What you need to know to not break it. Full domain map:
 `docs/_reference/SYSTEM_ARCHITECTURE_V1.md` — *which still carries the stale H552 in §14/§15 and
 is being corrected under PRD-002.*
 
-**Stack:** Supabase / PostgreSQL with RLS · React 18 + Vite · Capacitor for the field build.
-**Size:** 36 migrations · 50+ tables · ~95 functions · 24 views · 19 routes · 28 test files.
+**Stack:** Supabase / PostgreSQL with RLS · Supabase Auth (role claim) · Supabase Storage (private `evidence` bucket) · React 18 + TypeScript + Vite · Capacitor 6 Android. **One build** serves web and Android; there is no React Native or separate mobile codebase.
+**Size (13 September 2026):** 74 migration files · 59 tables (all RLS) · 38 views · ~90 app-callable functions · 45 triggers · 85 policies · 27 routes · 38 test files. Database figures were read from the deployed catalog; they drift, so re-read before relying on them.
+
+---
+
+## 0 · System at a glance
+
+Replaces the retired architecture image of 13 September 2026, which showed React Native, Operator = Supervisor as one role, Manager approving lab results, lab after execution, and batch closure as existing. All five were wrong.
+
+### Workstations and authority
+
+```
+                    ONE REACT + TYPESCRIPT + VITE BUILD
+                      web browser  ·  Capacitor Android
+                                    │
+          FIRST-RELEASE PRODUCT WORKSTATIONS
+      ┌─────────────────────────────┼─────────────────────────────┐
+    ADMIN                       OPERATIONS                       LAB
+ control the factory:        one workstation              test · record ·
+ new batch · ongoing batch   (operator, supervisor)       submit
+ SOPs · assign work          every user: execute owned
+ oversight                   work, evidence, progress
+                             supervisor authority adds:
+                             attention, hold/release/
+                             return, lab decision (D09),
+                             exceptions
+      └─────────────────────────────┼─────────────────────────────┘
+                                    │
+     EXTENDED AUTHORITY (backend only; no first-release screens)
+     MANAGER · extension decision before GM
+     GM      · extension decision after manager · controlled override · lab decision (D09)
+                                    │
+                reads through views · writes through RPCs
+             the server checks role, subject and state on every call
+                                    │
+     SUPABASE — Postgres (RLS · triggers · append-only audit) · Auth · Storage
+```
+
+- **Operations is one product workstation. Operator and Supervisor are not separate application experiences. Backend authorization remains capability-specific.** `operator` and `supervisor` stay separate backend roles; see the [role model](../02-roles/OWNERSHIP_VISIBILITY_AUTHORITY.md#operations-workstation--product-direction-13-september-2026).
+- **First release is Admin, Operations and Lab.** Manager and GM keep their backend authority as extended roles; they gain no screens or navigation unless explicitly brought into scope.
+- **Manager does not decide lab submissions.** While D09 is open the server accepts a lab decision from Supervisor or GM; numeric result acceptance is Lab technician or Supervisor. Manager's decision authority is extensions.
+- Menus are usability, not security. A hidden action must still be refused by the server.
+
+### Batch flow — lab runs alongside production
+
+```
+PUBLISHED PROCESS VERSION (immutable)
+        │
+        ▼
+DRAFT BATCH ── generate plan (server) ── assign work ── validate
+        │
+        ├── INCOMING-MATERIAL LAB CHECK ── before activation (Lab records; acceptance per D09/D10)
+        │
+        ▼
+ACTIVATE ── baseline freezes; plan never changes again
+        │
+        ├────────────── OPERATIONS WORK ─────────────┐
+        │               start → evidence → finish     │
+        │                                             │
+        └────────────── LAB WORK (in parallel) ──────┤
+                        sample → readings → evidence  │
+                        → submit → independent        │
+                          decision                    │
+                                                      ▼
+                                        GATE CHECK (server) ◄── predecessors · rests ·
+                                                      │         evidence · lab decisions
+                                                      ▼
+                                        NEXT ELIGIBLE WORK in every stream
+                                                      │
+          deviations · extensions · overrides ────────┤  branch off at any point;
+          never edit the baseline                     │  recorded beside plan and actual
+                                                      ▼
+                          all planned work complete · all required gates satisfied
+                                                      │
+                                                      ▼
+                          READY FOR CLOSURE — closure workflow NOT IMPLEMENTED
+                          (`closed` status exists; no closing action · G12 / D13)
+```
+
+A lab approval satisfies only its own gate condition; it never bypasses rests, evidence or predecessors. Some lab work happens before H0 (incoming material), most runs beside the production streams it gates (e.g. before bunker loading and tunnel loading).
 
 ---
 

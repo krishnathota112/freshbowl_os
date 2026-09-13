@@ -40,7 +40,7 @@ export function Batches() {
         subtitle="A batch is a graph of parallel streams, not a linear checklist"
         right={
           <Link
-            to="/admin/batch/new"
+            to="/admin/batch/start"
             className="inline-flex items-center rounded px-4 font-head text-[12px] font-700"
             style={{ minHeight: 44, background: 'var(--accent)', color: '#fff' }}
           >

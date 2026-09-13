@@ -19,6 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  actAs,
   DB_URL,
   NO_DB_REASON,
   all,
@@ -66,6 +67,9 @@ describeDb('B6 — the seeded rule is intact, and it is what holds the tunnel', 
   it('TN-LOAD fails its GM_APPROVAL gate on a batch with no decision, naming the checkpoint', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       const tn = await one<{ id: string }>(
         db,
         `select id from batch_activity
@@ -152,6 +156,9 @@ describeDb('B6 — an approval opens the gate, and only an approval', () => {
   it('with every predecessor complete, GM_APPROVAL is the ONLY thing still failing', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       const tn = await driveToTunnel(db, batch);
 
       const failing = await all<{ kind: string; reason: string }>(
@@ -178,6 +185,9 @@ describeDb('B6 — an approval opens the gate, and only an approval', () => {
   it('a recorded approval opens it; a return does not', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       const tn = await driveToTunnel(db, batch);
       const gm = await one<{ id: string }>(db, `select id from profiles where role = 'gm'`);
 
@@ -248,6 +258,9 @@ describeDb('B6 — the decision is immutable and cannot be unreasoned', () => {
   it('a decision with a blank reason is refused by the column, not only by the RPC', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       const gm = await one<{ id: string }>(db, `select id from profiles where role = 'gm'`);
       await db.query(
         `insert into management_checkpoint (master_batch_id, checkpoint_no) values ($1, 3)`,
@@ -275,6 +288,9 @@ describeDb('B6 — the decision is immutable and cannot be unreasoned', () => {
   it('the snapshot cannot be edited or deleted, by anyone, including postgres', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       const gm = await one<{ id: string }>(db, `select id from profiles where role = 'gm'`);
       await db.query(
         `insert into management_checkpoint (master_batch_id, checkpoint_no) values ($1, 3)`,
@@ -311,6 +327,9 @@ describeDb('B6 — the decision is immutable and cannot be unreasoned', () => {
   it('the snapshot records what the GM was NOT shown', async () => {
     await withRollback(async (db) => {
       const batch = await createActiveBatch(db);
+      // 0058 · submission is guarded. This proof drives work through the engine, so it
+      // wears the role that legitimately performs it — adopted, never exempted.
+      await actAs(db, 'supervisor');
       const pkg = await one<{ absent: { section: number; name: string; reason: string }[] }>(
         db,
         `select public.checkpoint_package($1, 3)->'sections_absent' as absent`,

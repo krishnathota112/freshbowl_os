@@ -27,7 +27,7 @@ export const ROLE_HOME: Record<AppRole, string> = {
   operator: '/operator/my-work',
   lab_tech: '/lab/queue',
   supervisor: '/supervisor/control-room',
-  admin: '/admin/today',
+  admin: '/admin',
   manager: '/manager/resources',
   // S1 · the Control Tower, C3. `/gm/command-center` still resolves — App.tsx redirects it.
   gm: '/gm/control-tower',

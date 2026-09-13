@@ -29,7 +29,7 @@ const DENSITIES: Density[] = ['operator', 'lab', 'supervisor', 'admin', 'manager
 const in90Min = () => new Date(Date.now() + 90 * 60 * 1000).toISOString();
 
 function C1Primitives() {
-  const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: getPublishedBaseline });
+  const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: () => getPublishedBaseline() });
   const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
 
   if (baseline.isLoading || clock.isLoading) {
@@ -143,7 +143,7 @@ function C1Primitives() {
  * the happy path is a component whose empty state nobody has seen.
  */
 function C2AgainstFixtures() {
-  const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: getPublishedBaseline });
+  const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: () => getPublishedBaseline() });
   const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
 
   if (baseline.isLoading || clock.isLoading) {

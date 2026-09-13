@@ -6,6 +6,9 @@ import { factoryDate } from '../components/composite/geometry';
 import { PageHeading } from '../components/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../components/primitives';
 import { nowMs } from '../lib/now';
+import { LabGateBoard, LiveBatches } from '../components/domain/AdminLive';
+import { listBatchContexts } from '../api/work';
+import { loadLabApprovals } from '../api/lab';
 
 /*
  * C4 HAS LANDED, so these point at `/batch/:id` — the shared management batch page.
@@ -38,6 +41,23 @@ export function AdminToday() {
   // Today in the FACTORY's timezone. An admin travelling, or a browser on a different zone, must
   // still see the factory's day — `TIME_CONTRACT §3.2`. `factoryDate` is the one implementation.
   const today = clock.data?.timezone ? factoryDate(nowMs(), clock.data.timezone).iso : null;
+
+  /*
+   * The route fetches; the panels take props. `uiFoundations.test.ts` A10 enforces that an L1–L3
+   * component may neither import `api/` nor hold a query — only a route may know where data comes
+   * from. A first version put these two `useQuery` calls inside the panel component and the suite
+   * caught it.
+   */
+  const live = useQuery({
+    queryKey: ['batch-contexts'],
+    queryFn: listBatchContexts,
+    refetchInterval: 60_000,
+  });
+  const approvals = useQuery({
+    queryKey: ['lab-approvals'],
+    queryFn: loadLabApprovals,
+    refetchInterval: 60_000,
+  });
 
   const q = useQuery({
     queryKey: ['admin-today', today],
@@ -217,6 +237,31 @@ export function AdminToday() {
             ))}
           </div>
         )}
+      </section>
+
+      {/*
+        RUNNING BATCHES and LAB GATES, from `v_batch_forecast` and `v_lab_approval_queue`.
+
+        Both were absent from this screen. A batch's PROCESS, its calculated STANDARD, its H0 and
+        its BASELINE were nowhere on the admin's home page, and neither was the fact that a lab
+        submission can hold production shut indefinitely with nobody able to release it.
+      */}
+      <section className="mt-6">
+        <h2 className="text-[12px] font-mono font-bold uppercase tracking-wider text-ink-2 px-1">
+          Live batches
+        </h2>
+        <div className="mt-2">
+          <LiveBatches batches={live.data} loading={live.isLoading} />
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-[12px] font-mono font-bold uppercase tracking-wider text-danger px-1">
+          Laboratory gates
+        </h2>
+        <div className="mt-2">
+          <LabGateBoard approvals={approvals.data} loading={approvals.isLoading} />
+        </div>
       </section>
     </>
   );

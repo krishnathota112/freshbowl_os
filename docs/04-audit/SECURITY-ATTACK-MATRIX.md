@@ -11,6 +11,67 @@ proof. `[FORGED]` = the write succeeded. `[refused]` = the database rejected it 
 
 ---
 
+## G · Re-run after hardening — 8 to 11 September
+
+**Read this section first.** Every finding below it is the 31 August original; this is what each one
+does now, with the proof beside it. *A fix without its proof beside it is a claim.*
+
+Method: HTTP as a real signed-in person, with the publishable key and nothing else — no service role,
+no direct SQL for any attack — plus probes of the deployed catalogue (`role_table_grants`,
+`pg_options_to_table(reloptions)`, `pg_trigger`, `pg_event_trigger`). The attack suites are in
+`mushroomos/scripts/break/` and re-runnable.
+
+### The 31 August findings, re-attacked
+
+| Original | 31 Aug | Now | Proof |
+|---|---|---|---|
+| **A1–A8** view writes — relabel, rewrite activation, config, definition swap, delete, insert through `v_live_batch` | **FORGED** | **refused** | 38 of 38 views `security_invoker`; 0 write grants to any client role (probe, 11 Sep). `PATCH` on `batch_activity`, `master_batch`, `audit_event` → **403** (R-18, R-19, R-20). `0061`, `0069`, `0074`. |
+| **A9** manager-decision forge through `v_deviation_open` | path open | **refused** | views carry no write grant; rewriting or deleting an audit row as GM → **403** (W-AU-04, W-AU-05). |
+| **B1–B4** `truncate audit_event`, `batch_activity`, `evidence_media` | **FORGED** | **refused** | 0 `TRUNCATE` grants to `anon` or `authenticated` (probe, 11 Sep). `0074`. |
+| **C4** admin edits a published definition's activity | rows=0 under `ref_write` | **refused** | admin `PATCH` on `process_activity`, `gate_rule`, `evidence_requirement`, `lab_checkpoint_activity` → refused (W-PV, 11 Sep). |
+| **D1** operator moves the dev clock | refused | **refused** | `set_dev_clock_h`, `pause_dev_clock` as operator → **403** (R-10, R-11). |
+| **E** actual overwrite via `coalesce(p_actual_end, …)` | **confirmed** | **refused** | `trg_actual_is_append_only`. Clearing an actual **from a superuser connection** refused: *"There is no un-happen."* Backdated and future actuals from an operator ignored or refused (T-01, T-02). A correction keeps the original with its reason (T-05b). |
+| storage-object delete by a client | **not probed** | **refused** | operator, supervisor, admin and GM deleting a bound evidence object → refused (W-EV-15); a deleted-underneath file cannot be arranged (W-EV-14). |
+
+### The adversarial passes
+
+**195 attacks**, over two waves, against throwaway batches named `MB-BRK*` (all retired through
+`cancel_batch`; nothing deleted).
+
+| Wave | Suite | Attacks | Covers |
+|---|---|---|---|
+| 1 | `t1-4` | 33 | every important write with the wrong JWT · cross-batch · duplicate taps · lost responses |
+| 1 | `t5-8` | 31 | evidence · client timestamps · gates · the frozen baseline |
+| 1 | `t9-15` | 24 | Turner per pile · two process versions · stale screens · two phones · sessions · orphaned uploads · the full journey |
+| 2 | `w2a-lab` | 15 | correct result in the wrong context · duplicate submissions · approve/reject in both orders and simultaneously |
+| 2 | `w2b-ext` | 16 | extension races · after completion · variance and forecast with a real grant in force |
+| 2 | `w2c-evidence` | 21 | retakes · kind substitution · MIME and content · size boundaries · deletion by every role |
+| 2 | `w2d-lifecycle` | 20 | every client-timestamp entry point · activation races · the incoming check · cancellation |
+| 2 | `w2e-integrity` | 24 | process-version mutation · deleting what a gate depends on · audit attribution |
+| 2 | `w2f-resources` | 11 | one machine in two places · one vessel for two batches · file typing at upload |
+
+**What the attacks found, and what fixed it.** Wave 1: a locked start answering 204 with a false
+audit event, a zero-byte photo satisfying a requirement, an operator finishing unstarted work, a
+submit race (`0071`). Wave 2: **a rejection after an approval leaving production open** (`0072`),
+an operator opening lab samples and a reading filed against another checkpoint's band (`0072`,
+`0076`), a false *"Baseline frozen"* and a sample predating its batch (`0073`, `0075`), and 54 tables
+granting writes to every signed-in user (`0074`).
+
+**What held throughout.** No gate opened that should not have. No plan moved after activation, for
+admin or GM, by any path. No batch reached another. No client-supplied timestamp was stored. A lab
+technician could not decide a lab submission; neither could an operator. Each pile rested on its own
+T1. The two process versions computed their own standards, 470 and 536.
+
+### Still open
+
+- **`request_lab_test` has no role guard** — `FINDINGS.md` F37.
+- **Replay of the lab chain and `raise_deviation` duplicates** — no idempotency key exists — F39.
+- **A signed-out or demoted token works until it expires** — the role is read from the JWT. A platform
+  setting, not a code defect — F41.
+- **File content is not inspected at upload** — F40.
+
+---
+
 ## A · The auto-updatable view bypass — the critical finding
 
 The base tables are protected; the views over them are not (`postgres`-owned, no `security_invoker`,

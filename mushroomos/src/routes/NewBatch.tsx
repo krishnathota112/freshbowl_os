@@ -7,11 +7,11 @@ import {
   DEFAULT_STRUCTURE,
   createBatch,
   factoryInstant,
-  getPublishedBaseline,
   getFactoryClock,
   type RoleBindingInput,
 } from '../api/batch';
 import { setIndividualBatches } from '../api/movements';
+import { listSelectableProcessVersions, type ProcessVersion } from '../api/process';
 import { humanError } from '../lib/humanError';
 import { PageHeading } from '../components/layout/PageHeading';
 
@@ -25,8 +25,13 @@ import { PageHeading } from '../components/layout/PageHeading';
  * 2. Materials & Quantity (Real calculator: MT ÷ Capacity -> Full + Tail loads)
  * 3. Individual Batches (Sub-batch numbers & MT split)
  * 4. Physical Movement Plan (Bunkers auto-configured, tunnel allocation due by H240)
- * 5. H0 Factory Clock (Factory timezone instant & H0 anchor)
+ * 5. Process & H0 (which SOP this batch is planned against, and the factory clock anchor)
  * 6. Review & Activate (Timeline preview & activation)
+ *
+ * THE STANDARD IS A PROPERTY OF THE PROCESS, NOT OF THIS SCREEN.
+ * PROCESS-2026C computes 470 h from its own stages; another standard computes its own number.
+ * Step 5 picks the version and step 6 shows THAT version's standard — this file contains no
+ * hour figure and derives none.
  */
 const STEPS = [
   'Schedule',
@@ -34,7 +39,7 @@ const STEPS = [
   'Materials & Quantity',
   'Individual Batches',
   'Movement Plan',
-  'H0 Factory Clock',
+  'Process & H0',
   'Review & Activate',
 ] as const;
 
@@ -73,10 +78,34 @@ export function NewBatch() {
     { code: '368', targetMT: 25.0 },
   ]);
 
+  /**
+   * WHICH STANDARD. Null means "whatever the catalogue says is current", which is what the
+   * server does when the parameter is omitted. Choosing one explicitly is how a batch gets
+   * planned against an older published standard while a newer one is current.
+   */
+  const [processId, setProcessId] = useState<string | null>(null);
+
+  const processes = useQuery({
+    queryKey: ['process-versions'],
+    queryFn: listSelectableProcessVersions,
+  });
+
   const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
   const clock = useQuery({ queryKey: ['factory-clock'], queryFn: getFactoryClock });
   const [startTimeOverride, setStartTimeOverride] = useState('');
-  const baseline = useQuery({ queryKey: ['process-baseline'], queryFn: getPublishedBaseline });
+  /**
+   * The chosen version, or the current one. Resolved from the list the server already sent
+   * rather than fetched again, so the standard shown and the standard planned against are the
+   * same row.
+   */
+  const chosen: ProcessVersion | null =
+    (processes.data ?? []).find((p) => p.id === processId) ??
+    (processes.data ?? []).find((p) => p.isCurrent) ??
+    null;
+
+  // No separate baseline query: `chosen` already carries this version's calculated standard,
+  // straight from `v_process_catalogue`. Fetching it twice is how the standard shown and the
+  // standard planned against come to differ by a render.
 
   const rolesReady = roles.data ?? [];
   if (rolesReady.length > 0 && Object.keys(leads).length === 0) {
@@ -130,6 +159,7 @@ export function NewBatch() {
         supervisor,
         weather,
         start_at: startAt,
+        process_definition_id: chosen?.id ?? null,
       });
 
       if (scheduleGroupId) {
@@ -483,10 +513,81 @@ export function NewBatch() {
         {/* STEP 5: H0 FACTORY CLOCK */}
         {step === 5 && (
           <div className="space-y-4">
-            <h3 className="font-head text-lg font-bold text-ink">6. Factory Start Clock (H0 Anchor)</h3>
+            <h3 className="font-head text-lg font-bold text-ink">6. Process Version & Start Clock</h3>
             <p className="text-xs text-muted">
-              Confirm the authoritative start time instant. Every planned hour counts from H0.
+              Choose the process this batch is planned against, then confirm H0. The baseline is
+              generated from that process — its stages, its durations, its dependencies — and
+              freezes on activation.
             </p>
+
+            {/*
+              THE PROCESS PICKER.
+
+              Every standard shown here is CALCULATED by the server from that version's own
+              activities. This screen renders numbers; it does not derive one, and it carries no
+              hour figure of its own. `isSelectable` is the server's judgement too — published,
+              non-empty, every activity on the hour axis — so an unfinished standard is never
+              offered as something a batch could be planned against.
+            */}
+            {processes.isLoading ? (
+              <p className="text-xs text-muted">Loading process versions…</p>
+            ) : (processes.data ?? []).length === 0 ? (
+              <p className="text-xs text-red-600">
+                No published process version is ready to plan against. A standard must be published
+                and every one of its activities placed on the hour axis before a batch can use it.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {(processes.data ?? []).map((p) => {
+                  const active = (chosen?.id ?? null) === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setProcessId(p.id)}
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all ${
+                        active
+                          ? 'border-accent bg-accent-soft'
+                          : 'border-line bg-surface-2 hover:border-line-2'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="font-mono text-sm font-bold text-ink">{p.code}</span>
+                        <span className="font-mono text-sm font-bold text-accent">
+                          {p.standardHr === null ? '—' : `${p.standardHr} h`}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted">{p.name}</span>
+                        {p.isCurrent && (
+                          <span className="text-[10px] uppercase font-bold text-accent bg-surface px-1.5 py-0.5 rounded">
+                            Current standard
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-muted">
+                        {p.activityCount} activities · {p.streamCount} streams · {p.holdCount} holds
+                        {p.fullSpanHr !== null &&
+                          p.standardHr !== null &&
+                          p.fullSpanHr > p.standardHr &&
+                          ` · last stream out at H${p.fullSpanHr}`}
+                      </p>
+                      {/*
+                        The factory wrote down a number that its own activities do not produce.
+                        Shown rather than resolved: which of the two is wrong is a factory
+                        question, and a screen that quietly picked one would hide the finding.
+                      */}
+                      {p.envelopeDisagrees && (
+                        <p className="mt-1.5 text-[11px] font-bold text-red-600">
+                          Stated envelope is {p.statedEnvelopeHr} h but the activities compute{' '}
+                          {p.standardHr} h. This standard disagrees with itself.
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {clock.data ? (
               <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-3">
@@ -517,16 +618,64 @@ export function NewBatch() {
         {step === 6 && (
           <div className="space-y-4">
             <h3 className="font-head text-lg font-bold text-ink">7. Review & Pre-Activation</h3>
-            <div className="grid sm:grid-cols-3 gap-2.5 text-center">
+            {/*
+              PROCESS · STANDARD · H0 · BASELINE — four separate facts, never collapsed.
+
+              The standard is the CHOSEN PROCESS's, calculated by the server from that version's
+              own activities. It is not a constant and it is not (total_days + 1) x 24, which is a
+              day grid and reads ten hours long for the 470-hour standard. Select a different
+              version above and every number here changes with it.
+            */}
+            <div className="grid sm:grid-cols-2 gap-2.5">
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">Process</span>
+                <span className="font-mono text-sm font-bold text-ink">{chosen?.code ?? '—'}</span>
+                <span className="block text-[11px] text-muted mt-0.5">{chosen?.name ?? ''}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">Standard</span>
+                <span className="font-mono text-sm font-bold text-accent">
+                  {chosen?.standardHr === null || chosen === null ? '—' : `${chosen.standardHr} h`}
+                </span>
+                <span className="block text-[11px] text-muted mt-0.5">
+                  {chosen === null
+                    ? ''
+                    : chosen.fullSpanHr !== null &&
+                        chosen.standardHr !== null &&
+                        chosen.fullSpanHr > chosen.standardHr
+                      ? `H0 → H${chosen.standardHr} · fully discharged H${chosen.fullSpanHr}`
+                      : `H0 → H${chosen.standardHr ?? '—'}`}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">H0</span>
+                <span className="font-mono text-sm font-bold text-ink">
+                  {startDate}
+                  {clock.data
+                    ? ` · ${startTimeOverride || factoryClockTime(clock.data)}`
+                    : ''}
+                </span>
+                <span className="block text-[11px] text-muted mt-0.5">
+                  {clock.data?.timezone ?? 'factory timezone not set'}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-2 border border-line">
+                <span className="text-[10px] uppercase font-bold text-muted block">Baseline</span>
+                <span className="font-mono text-sm font-bold text-ink">
+                  {chosen === null ? '—' : `Generated from ${chosen.code}`}
+                </span>
+                <span className="block text-[11px] text-muted mt-0.5">
+                  {chosen === null
+                    ? ''
+                    : `${chosen.activityCount} activities · frozen on activation`}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-2.5">
               <div className="p-3 rounded-xl bg-surface-2 border border-line">
                 <span className="text-[10px] uppercase font-bold text-muted block">Batch Code</span>
                 <span className="font-mono text-sm font-bold text-ink">{code}</span>
-              </div>
-              <div className="p-3 rounded-xl bg-surface-2 border border-line">
-                <span className="text-[10px] uppercase font-bold text-muted block">Process Span</span>
-                <span className="font-mono text-sm font-bold text-accent">
-                  H0 → H{baseline.data?.baselineHours ?? '—'}
-                </span>
               </div>
               <div className="p-3 rounded-xl bg-surface-2 border border-line">
                 <span className="text-[10px] uppercase font-bold text-muted block">Sub-Batches</span>
@@ -534,18 +683,24 @@ export function NewBatch() {
               </div>
             </div>
 
-            {/* Physical Movement & Tunnel Planning Milestone */}
+            {/*
+              H240 USED TO BE ASSERTED HERE AS A TUNNEL-PLANNING DEADLINE, AS A LITERAL.
+
+              No process version states it. PROCESS-2026C loads its tunnel at H324/H326/H330 and
+              its own activities say so; PROCESS-2026B says something else again. A deadline typed
+              into a screen is a factory rule living in React, which rule 4 forbids and which is
+              wrong for every standard but the one somebody had in mind. The sub-batches are still
+              shown; the invented hour is not.
+            */}
             <div className="p-3.5 rounded-xl bg-surface-2 border border-line space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold text-muted block">
-                  Tunnel Planning Status:
-                </span>
-                <span className="font-mono text-xs font-bold text-accent bg-accent-soft px-2 py-0.5 rounded">
-                  Due by H240 (Day 10)
-                </span>
-              </div>
+              <span className="text-[10px] uppercase font-bold text-muted block">
+                Individual sub-batches
+              </span>
               <p className="text-xs text-muted">
-                {subBatches.length} individual sub-batches ({subBatches.map((sb) => sb.code).join(', ')}) registered. Tunnel destinations will be finalized by H240 against live vessel availability.
+                {subBatches.length} registered
+                {subBatches.length > 0 && ` (${subBatches.map((sb) => sb.code).join(', ')})`}.
+                Tunnel destinations are chosen against live vessel availability, on the hours{' '}
+                {chosen?.code ?? 'the selected process'} plans them for.
               </p>
             </div>
 

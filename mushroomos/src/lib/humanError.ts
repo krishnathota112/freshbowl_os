@@ -48,8 +48,51 @@ const NETWORK_SHAPES = [
   'the internet connection appears to be offline',
 ];
 
+/**
+ * The server's own sentence, whatever shape the thrower used.
+ *
+ * `supabase-js` does NOT throw `Error`. A refusal from Postgres arrives as a PLAIN OBJECT —
+ * `{ code, message, details, hint }` (`PostgrestError`), and `AuthError` is its own class whose
+ * instances also failed the `instanceof Error` test across bundler/realm boundaries. Both fell
+ * through to `String(err)`, which for an object is the literal text `[object Object]`.
+ *
+ * That is how the prepare screen came to say "Nothing was accepted. [object Object]" while the
+ * database was answering with a sentence naming exactly who may accept a lab result. The refusal
+ * message is the single most useful thing the server produces — rule "a refusal must name what to
+ * do instead" is worthless if the message never reaches the screen.
+ *
+ * So: read `.message` off anything that carries one, and keep `details`/`hint` as a second line,
+ * because a Postgres RAISE puts the "do this instead" half in `hint` more often than not.
+ */
+function errorText(err: unknown): { message: string; extra: string } {
+  if (err == null) return { message: '', extra: '' };
+  if (typeof err === 'string') return { message: err, extra: '' };
+
+  if (typeof err === 'object') {
+    const o = err as { message?: unknown; details?: unknown; hint?: unknown; error_description?: unknown };
+    const message =
+      typeof o.message === 'string' && o.message.length > 0
+        ? o.message
+        : typeof o.error_description === 'string'
+          ? o.error_description
+          : '';
+    const extra = [o.hint, o.details]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .join(' ');
+    // Only fall back to String() when the object genuinely carries no message — and never let
+    // "[object Object]" through as if it were words.
+    if (message.length === 0) {
+      const s = String(err);
+      return { message: s === '[object Object]' ? '' : s, extra };
+    }
+    return { message, extra };
+  }
+
+  return { message: String(err), extra: '' };
+}
+
 export function humanError(err: unknown): HumanError {
-  const raw = err instanceof Error ? err.message : String(err ?? '');
+  const { message: raw, extra } = errorText(err);
   const low = raw.toLowerCase();
 
   if (NETWORK_SHAPES.some((s) => low.includes(s))) {
@@ -111,9 +154,10 @@ export function humanError(err: unknown): HumanError {
   // Anything else: show what the server actually said, because a real message from the database —
   // "this reload goes back into the bunker it came from" — is far more useful than a generic
   // apology. Only the shapes above are worth translating.
+  const said = [raw, extra].filter((v) => v.length > 0).join(' ');
   return {
     title: 'That did not go through',
-    detail: raw.length > 0 ? raw : 'No reason was given. Nothing has been changed.',
+    detail: said.length > 0 ? said : 'No reason was given. Nothing has been changed.',
     retryable: true,
   };
 }

@@ -6,11 +6,18 @@ import { isTimeTravelled, timeTravelOffsetMs } from '../../lib/now';
 
 const NAV: Record<string, { to: string; label: string }[]> = {
   admin: [
+    { to: '/admin', label: 'Home' },
     { to: '/admin/today', label: 'Today' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/schedule', label: 'Schedule' },
-    { to: '/admin/batch/new', label: '+ New Batch' },
-    { to: '/operator/my-work', label: 'Tasks' },
+    { to: '/admin/batch/start', label: '+ New Batch' },
+    /*
+      `Tasks` (→ /operator/my-work) used to sit here. Every button on that screen is refused for an
+      admin: `start_activity` and `submit_activity` require operator, supervisor or lab_tech, and
+      answer an admin with a 403. A menu item whose every action fails is not access, it is a trap.
+      An admin assigns work (Prepare → "Who is doing the work?", or the batch schedule); they do
+      not perform it.
+    */
     { to: '/admin/process-explorer', label: 'Process' },
     { to: '/admin/reference', label: 'Reference' },
     /*
@@ -21,8 +28,18 @@ const NAV: Record<string, { to: string; label: string }[]> = {
   ],
   operator: [{ to: '/operator/my-work', label: 'My Work' }],
   lab_tech: [{ to: '/lab/queue', label: 'Lab Queue' }],
+  /*
+    THE SUPERVISOR DECIDES LAB WORK, so the lab screens are theirs.
+
+    The server lets a supervisor accept a lab result as final (`accept_lab_result`) and decide a lab
+    submission (`decide_lab_submission`, while C-32 is open). Neither screen was in this menu, so the
+    person who opens production gates had to know the URL. The Lab Queue is included because a
+    supervisor may also take the sample — the route already allows it.
+  */
   supervisor: [
     { to: '/supervisor/control-room', label: 'Control Room' },
+    { to: '/lab/approvals', label: 'Lab Approvals' },
+    { to: '/lab/queue', label: 'Lab Queue' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/operator/my-work', label: 'Tasks' },
     { to: '/admin/process-explorer', label: 'Process' },
@@ -34,6 +51,8 @@ const NAV: Record<string, { to: string; label: string }[]> = {
   gm: [
     { to: '/gm/control-tower', label: 'Control Tower' },
     { to: '/plant', label: 'Plant' },
+    // The GM is one of the two roles C-32 lets decide a lab submission — see `lab_approval_reading`.
+    { to: '/lab/approvals', label: 'Lab Approvals' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/schedule', label: 'Schedule' },
     { to: '/admin/process-explorer', label: 'Process' },

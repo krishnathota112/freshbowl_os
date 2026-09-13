@@ -1,3 +1,6 @@
+> **ARCHIVED 31 Aug 2026 — historical record, not an instruction.**
+> Superseded by `docs/AGENT-BRIEF.md` (all coding agents) and `docs/CLAUDE-CODE.md`.
+
 # Foundation Mission — the executable brief
 
 **For Claude Code.** Derived from `CLAUDE_COWORK_FOUNDATION_FREEZE_MASTER.md`, narrowed to what is

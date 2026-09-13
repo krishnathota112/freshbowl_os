@@ -163,37 +163,73 @@ export function isPreH0Activity(activity: { code: string; rel_day?: number; base
 }
 
 /**
- * The baseline the process states, read from `process_definition`.
+ * The standard length of ONE process version, calculated from that version's own activities.
  *
- * The only honest source of the process length. `baseline_hours` and `baseline_days` are GENERATED
- * columns over `total_days`, so no caller — and no component — carries the number as a literal.
- * TIME_CONTRACT §1.3 and invariant 8.
+ * ⚠ THIS USED TO READ `process_definition.baseline_hours`, AND THAT WAS THE DAY GRID.
+ *
+ * `baseline_hours` is `(total_days + 1) × 24` — a generated column, correct at what it means
+ * and never the standard. It reads 552 for PROCESS-2026B, whose activities compute 536, and
+ * 480 for PROCESS-2026C, whose activities compute 470. Every screen showing "of 480" for a
+ * 470-hour standard was showing a day count with an hour label on it.
+ *
+ * The standard is a PROPERTY OF THE SOP, not of this application. `v_process_catalogue`
+ * derives it in the database (0045) from the definition's own stages, durations and
+ * dependencies, so PROCESS-2026C answers 470 and a future standard answers whatever its own
+ * process computes. Nothing here is a literal — TIME_CONTRACT §1.3, invariant 8 — and now
+ * nothing here is a day grid either.
  */
 export type ProcessBaseline = {
   code: string;
-  /** The whole length of the process in hours. Pass this to `isWithinBaseline`. */
+  /** The definition this describes. Pass it to `createBatch` to plan against exactly this one. */
+  processDefinitionId: string;
+  /** The standard, calculated from this version's activities. Pass to `isWithinBaseline`. */
   baselineHours: number;
+  /**
+   * The last hour anything happens, which is not always the standard. PROCESS-2026C's standard
+   * is H470, measured on stream 1; the third stream is not out until H474. Both are true.
+   */
+  fullSpanHours: number;
   /** How many batch-days the process spans: Day 0 through Day `finalDayIndex`. */
   baselineDays: number;
   /** The index of the last day, which is what `process_definition.total_days` holds. */
   finalDayIndex: number;
 };
 
-export async function getPublishedBaseline(): Promise<ProcessBaseline | null> {
-  const { data, error } = await supabase
-    .from('process_definition')
-    .select('code, total_days, baseline_days, baseline_hours')
-    .eq('status', 'published')
-    .order('version', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+/**
+ * The standard for one process version — the current one by default.
+ *
+ * Pass `definitionId` whenever the caller knows which standard it is showing. Omitting it asks
+ * the catalogue, which is right for "what would a NEW batch be planned against" and wrong for
+ * any batch that already exists: a batch created on PROCESS-2026B stays a PROCESS-2026B batch
+ * after 2026C becomes current, and measuring it against the new standard would misreport every
+ * variance it has. For those, use `getBatchProcessVersion` in `api/process.ts`.
+ */
+export async function getPublishedBaseline(definitionId?: string): Promise<ProcessBaseline | null> {
+  const query = supabase
+    .from('v_process_catalogue')
+    .select('process_definition_id, code, standard_hr, full_span_hr');
+
+  const { data, error } = await (definitionId
+    ? query.eq('process_definition_id', definitionId)
+    : query.eq('is_current', true)
+  ).maybeSingle();
   if (error) throw error;
   if (!data) return null;
+
+  // `numeric` arrives as a string from PostgREST — `Number` here, never string arithmetic.
+  const standard = Number(data.standard_hr);
+  const span = Number(data.full_span_hr ?? data.standard_hr);
+  if (!Number.isFinite(standard)) return null;
+
   return {
     code: data.code as string,
-    baselineHours: data.baseline_hours as number,
-    baselineDays: data.baseline_days as number,
-    finalDayIndex: data.total_days as number,
+    processDefinitionId: data.process_definition_id as string,
+    baselineHours: standard,
+    fullSpanHours: Number.isFinite(span) ? span : standard,
+    // The day grid, DERIVED FROM THE STANDARD rather than read from total_days, so the two can
+    // never disagree on a screen that shows both.
+    baselineDays: Math.ceil(standard / 24),
+    finalDayIndex: Math.max(0, Math.ceil(standard / 24) - 1),
   };
 }
 
@@ -262,6 +298,17 @@ export async function createBatch(input: {
   roles: RoleBindingInput[];
   supervisor?: string;
   weather?: string;
+  /**
+   * WHICH STANDARD THIS BATCH IS PLANNED AGAINST.
+   *
+   * Omit it and the server reads `process_catalogue` — the current standard. Pass one to plan
+   * deliberately against a different published version, which is what makes two SOPs able to
+   * run in the same factory at the same time: a batch started last month on the old standard
+   * keeps being measured against the old standard, because its baseline was generated from it.
+   *
+   * There is no process code in this call, and none in the server function behind it (0044).
+   */
+  process_definition_id?: string | null;
 }): Promise<string> {
   const { data, error } = await supabase.rpc('create_master_batch', {
     p_code: input.code,
@@ -272,6 +319,7 @@ export async function createBatch(input: {
     p_supervisor: input.supervisor ?? null,
     p_weather: input.weather ?? null,
     p_start_at: input.start_at ?? null,
+    p_process_definition_id: input.process_definition_id ?? null,
   });
   if (error) throw error;
   return data as string;

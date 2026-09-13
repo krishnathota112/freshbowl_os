@@ -1,3 +1,6 @@
+> **ARCHIVED 31 Aug 2026 — historical record, not an instruction.**
+> Superseded by `docs/AGENT-BRIEF.md` (all coding agents) and `docs/CLAUDE-CODE.md`.
+
 # The prompt for Claude Code
 
 Open Claude Code in `T:\freshbowl_os` and paste the block below. It is written to be pasted whole.

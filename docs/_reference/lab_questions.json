@@ -1,0 +1,866 @@
+[
+ {
+  "title": "A · One batch, end to end",
+  "why": "Before any screen is drawn, somebody has to be able to describe a batch from the laboratory’s side as a sequence of things that happen and take time. This section is that description.",
+  "items": [
+   [
+    "T",
+    "Walk one batch from start to finish from the laboratory’s side. What is the first thing you do, and the last?"
+   ],
+   [
+    "T",
+    "How many times does the laboratory get involved in one batch? Roughly, not exactly."
+   ],
+   [
+    "T",
+    "Across the whole batch, how many hours of laboratory work is that in total?"
+   ],
+   [
+    "T",
+    "Which of those involvements is the longest, and how long?"
+   ],
+   [
+    "T",
+    "Which one is the most likely to make production wait?"
+   ],
+   [
+    "W",
+    "Is the pattern the same for every batch, or does it change with the season or the raw material?"
+   ],
+   [
+    "W",
+    "How many days of the 20 does the laboratory touch the batch at all? Which days are quiet?"
+   ],
+   [
+    "W",
+    "Is there a day where the laboratory is doing several things for the same batch at once?"
+   ],
+   [
+    "W",
+    "What does a normal day look like when two batches are running?"
+   ],
+   [
+    "W",
+    "Is any part of the batch handled by someone other than the laboratory — production taking its own reading, for example?"
+   ],
+   [
+    "L",
+    "What does the laboratory do for a batch that nobody has asked for, but that is done anyway?"
+   ],
+   [
+    "L",
+    "What part of the batch does the laboratory feel it has no visibility of?"
+   ]
+  ]
+ },
+ {
+  "title": "B · How long each test takes",
+  "why": "The single most useful set of numbers in this whole document. Every scheduling decision the system makes depends on knowing how long a test takes — and \"a test\" means from sample in hand to a number that exists.",
+  "items": [
+   [
+    "T",
+    "Moisture: how long from sample in hand to a number, start to finish?"
+   ],
+   [
+    "T",
+    "pH: how long?"
+   ],
+   [
+    "T",
+    "EC: how long?"
+   ],
+   [
+    "T",
+    "TDS: how long?"
+   ],
+   [
+    "T",
+    "Nitrogen: how long?"
+   ],
+   [
+    "T",
+    "Ash: how long?"
+   ],
+   [
+    "T",
+    "C:N — is it calculated from the above, or is it its own test with its own time?"
+   ],
+   [
+    "T",
+    "Dry weight: how long?"
+   ],
+   [
+    "T",
+    "The visual checks — smell, colour, squeeze, actinomycetes: how long, together?"
+   ],
+   [
+    "T",
+    "Heights — bunker, tunnel, shrunken: how long, and is it the laboratory that measures them or production?"
+   ],
+   [
+    "W",
+    "For each of the above: how much of that time is the machine working, and how much is a person working?"
+   ],
+   [
+    "W",
+    "Which of these can be left running unattended while something else is done?"
+   ],
+   [
+    "W",
+    "Which of these needs the technician to stand there for the whole time?"
+   ],
+   [
+    "W",
+    "If all the tests at one checkpoint are done together, is the total the sum of the parts, or less?"
+   ],
+   [
+    "W",
+    "Is the time different for the first sample of the day versus the fifth?"
+   ],
+   [
+    "L",
+    "Which test would you most like to be faster, and what makes it slow?"
+   ]
+  ]
+ },
+ {
+  "title": "C · From sample to number — the gap that decides everything",
+  "why": "The system needs to know not how long a test takes, but how long production waits. Those are different numbers and the difference is where the whole schedule lives.",
+  "items": [
+   [
+    "T",
+    "For each checkpoint: how long between the sample being taken and production being told the answer?"
+   ],
+   [
+    "T",
+    "Is that gap minutes, hours, or the next morning? Give the honest normal, not the best case."
+   ],
+   [
+    "T",
+    "Which checkpoints have a gap long enough that production has already moved on by the time the number exists?"
+   ],
+   [
+    "T",
+    "Is production ever waiting, physically standing there, for a laboratory number? Which checkpoints?"
+   ],
+   [
+    "W",
+    "When production is waiting, what is the longest it has actually waited?"
+   ],
+   [
+    "W",
+    "Is the sample taken as soon as the material is ready, or at a fixed time?"
+   ],
+   [
+    "W",
+    "How long can a sample sit before it is tested without the number changing?"
+   ],
+   [
+    "W",
+    "Does the answer to that differ by test? Moisture especially."
+   ],
+   [
+    "W",
+    "Is the number ever given verbally before it is written down anywhere?"
+   ],
+   [
+    "W",
+    "How much earlier could the laboratory be told a sample is coming, and would that help?"
+   ],
+   [
+    "L",
+    "If the laboratory knew the whole day’s sampling schedule at 6am, what would change?"
+   ],
+   [
+    "L",
+    "Which gap, if halved, would make the biggest difference to production?"
+   ]
+  ]
+ },
+ {
+  "title": "D · Sequence and dependencies — what waits on what",
+  "why": "This is the section that decides whether the system can schedule laboratory work at all, or only record it after the fact.",
+  "items": [
+   [
+    "T",
+    "Which laboratory results must exist before production can move to the next step? Name them."
+   ],
+   [
+    "T",
+    "For each of those, what physically happens if the result is not there yet — does the material sit, or does work continue?"
+   ],
+   [
+    "T",
+    "Is any laboratory test dependent on another test finishing first?"
+   ],
+   [
+    "W",
+    "Does the laboratory ever hold a sample until a related sample arrives so both can be run together?"
+   ],
+   [
+    "W",
+    "Is there a test that only makes sense if an earlier one came back a certain way?"
+   ],
+   [
+    "W",
+    "Does an out-of-range result change what is tested next, or only what production does next?"
+   ],
+   [
+    "W",
+    "Which laboratory work is time-critical — must happen within a window — and which can slide by a day?"
+   ],
+   [
+    "W",
+    "For the ones with a window, how wide is the window?"
+   ],
+   [
+    "W",
+    "What has to be prepared in advance — reagents, calibration, drying — and how long before?"
+   ],
+   [
+    "L",
+    "Is anything tested that nothing downstream actually uses?"
+   ]
+  ]
+ },
+ {
+  "title": "E · What runs at the same time",
+  "why": "The process has real parallelism — paddy soaking alongside the main rail, six piles under two machines. The laboratory’s parallelism is what decides whether that is a problem.",
+  "items": [
+   [
+    "T",
+    "Can the laboratory run more than one test at the same time? Which combinations?"
+   ],
+   [
+    "T",
+    "Can two different batches be tested in the same session?"
+   ],
+   [
+    "T",
+    "When six piles need the same test, are they done one after another or all together?"
+   ],
+   [
+    "W",
+    "How much longer does six piles take than one pile? Six times, or less?"
+   ],
+   [
+    "W",
+    "Is the paddy stream tested by the same person at the same bench as the main line?"
+   ],
+   [
+    "W",
+    "Does testing the paddy soak ever collide with testing the main line? What gives way?"
+   ],
+   [
+    "W",
+    "If two checkpoints fall due at the same hour, which one is done first, and who decides?"
+   ],
+   [
+    "W",
+    "Is there a queue today, and how long does it get?"
+   ],
+   [
+    "L",
+    "What is the most the laboratory has ever had waiting at once?"
+   ]
+  ]
+ },
+ {
+  "title": "F · Equipment, and how many at once",
+  "why": "Capacity is a hard ceiling the system cannot schedule around unless it knows where it is.",
+  "items": [
+   [
+    "T",
+    "How many samples can the oven hold at once?"
+   ],
+   [
+    "T",
+    "How many moisture meters are there, and how many people can use them at the same time?"
+   ],
+   [
+    "T",
+    "How many pH and EC meters?"
+   ],
+   [
+    "T",
+    "Is there one balance, or several?"
+   ],
+   [
+    "W",
+    "Which piece of equipment is the bottleneck on a busy day?"
+   ],
+   [
+    "W",
+    "How long does the oven take to be free again after a run?"
+   ],
+   [
+    "W",
+    "Does anything need to cool, settle or stabilise before the next use, and for how long?"
+   ],
+   [
+    "W",
+    "What happens when a meter is being calibrated — does testing stop?"
+   ],
+   [
+    "W",
+    "How often does calibration happen, and how long does it take?"
+   ],
+   [
+    "W",
+    "Is any test sent outside the factory? Which, and what is the turnaround in days?"
+   ],
+   [
+    "L",
+    "If one more of any instrument were bought, which one, and how much time would it save?"
+   ]
+  ]
+ },
+ {
+  "title": "G · People, shifts and cover",
+  "why": "The system will ask somebody to do something at H317, which may be four in the morning. It needs to know whether anybody is there.",
+  "items": [
+   [
+    "T",
+    "How many people work in the laboratory?"
+   ],
+   [
+    "T",
+    "What hours does the laboratory actually work? Start and end."
+   ],
+   [
+    "T",
+    "Is there anybody in the laboratory at night?"
+   ],
+   [
+    "T",
+    "What happens to a checkpoint that falls due at 2am?"
+   ],
+   [
+    "T",
+    "Sundays and holidays — does the laboratory run?"
+   ],
+   [
+    "W",
+    "Can any of these tests be done by a production operator rather than a technician? Which?"
+   ],
+   [
+    "W",
+    "Who covers when the technician is on leave or sick?"
+   ],
+   [
+    "W",
+    "Is there a handover between shifts, and what is passed on?"
+   ],
+   [
+    "W",
+    "Does the same person do the sampling and the testing, or two people?"
+   ],
+   [
+    "W",
+    "How long does it take a new person to be trusted with each test?"
+   ],
+   [
+    "L",
+    "Is there work the laboratory does that is not testing at all — cleaning, preparation, paperwork — and how many hours a day?"
+   ]
+  ]
+ },
+ {
+  "title": "H · The checkpoints, one at a time",
+  "why": "For each of the 25, the system needs the same four numbers. Answer them as a row per checkpoint rather than as prose — a table is fine, a scribbled list is fine.",
+  "items": [
+   [
+    "T",
+    "For each checkpoint: how long does the whole thing take, sample to number?"
+   ],
+   [
+    "T",
+    "For each checkpoint: how many people are needed?"
+   ],
+   [
+    "T",
+    "For each checkpoint: does production wait, or carry on?"
+   ],
+   [
+    "T",
+    "For each checkpoint: how much warning does the laboratory need that it is coming?"
+   ],
+   [
+    "W",
+    "Which of the 25 are done at a fixed time of day regardless of the batch?"
+   ],
+   [
+    "W",
+    "Which of the 25 are done \"when production calls\"?"
+   ],
+   [
+    "W",
+    "Are any of the 25 done together as one visit to the floor?"
+   ],
+   [
+    "W",
+    "Are any of the 25 skipped in practice, and under what circumstances?"
+   ],
+   [
+    "W",
+    "Are any of the 25 done more often than the process says?"
+   ],
+   [
+    "W",
+    "Is there a checkpoint the laboratory does that is not in the list of 25?"
+   ],
+   [
+    "L",
+    "Which of the 25 does the laboratory consider least useful?"
+   ]
+  ]
+ },
+ {
+  "title": "I · The Turner window",
+  "why": "Two readings, six piles, two machines, and a process that does not stop. This is the tightest timing in the whole batch and the one most likely to be got wrong in software.",
+  "items": [
+   [
+    "T",
+    "Before T1 and after T1, six piles each — how long does the whole set of six take?"
+   ],
+   [
+    "T",
+    "Is the \"before T1\" set taken all at once, or pile by pile as each pile is about to be turned?"
+   ],
+   [
+    "T",
+    "How long before the T1 pass does the \"before\" sample need to be taken?"
+   ],
+   [
+    "T",
+    "How soon after a pile is turned is the \"after\" sample taken?"
+   ],
+   [
+    "T",
+    "Does the turner wait for the laboratory at any point, or never?"
+   ],
+   [
+    "W",
+    "If the laboratory is not ready, does T1 go ahead without the reading?"
+   ],
+   [
+    "W",
+    "Two machines turning at once — does that double the sampling load in the same hour?"
+   ],
+   [
+    "W",
+    "Is the sample taken from the pile before the machine reaches it, or after it has passed?"
+   ],
+   [
+    "W",
+    "Is a pile ever sampled twice because the first sample was taken at the wrong moment?"
+   ],
+   [
+    "W",
+    "How long does the whole T1 pass take across six piles, from the laboratory’s point of view?"
+   ],
+   [
+    "L",
+    "Would the laboratory want a reading at T0, T2 or T3 if it were free? What would it tell you?"
+   ]
+  ]
+ },
+ {
+  "title": "J · Chicken manure and the 12-hour window",
+  "why": "The one rule in the process that is already known to be conditional. The system needs to know exactly what the condition is measured between.",
+  "items": [
+   [
+    "T",
+    "Under 12 hours between arrival and use means no re-test. Is 12 the right number?"
+   ],
+   [
+    "T",
+    "Measured from arrival to what, exactly — unloading, mixing start, or something else?"
+   ],
+   [
+    "T",
+    "How long does the arrival test itself take, from lorry to number?"
+   ],
+   [
+    "T",
+    "Does the lorry wait for the arrival test, or is it unloaded first?"
+   ],
+   [
+    "W",
+    "If the manure sits longer than the window, is the full set repeated or only part of it?"
+   ],
+   [
+    "W",
+    "How often does manure actually sit longer than the window? Most loads, or rarely?"
+   ],
+   [
+    "W",
+    "Does manure arrive in one load or several, and does each load get its own test?"
+   ],
+   [
+    "W",
+    "How much notice does the laboratory get that manure is arriving?"
+   ],
+   [
+    "W",
+    "Does covered versus uncovered storage change how fast it changes?"
+   ],
+   [
+    "L",
+    "Has a load ever been rejected on arrival, and what happened to the batch that day?"
+   ]
+  ]
+ },
+ {
+  "title": "K · When something goes wrong, and what it costs in time",
+  "why": "Rework is a duration, and the system has to be able to plan for it. Every answer here should be a number of hours.",
+  "items": [
+   [
+    "T",
+    "A result comes back out of range. What happens next, and how long does it take?"
+   ],
+   [
+    "T",
+    "A retest — how long from deciding to retest to having the new number?"
+   ],
+   [
+    "T",
+    "Moisture is low and misting is needed. How long is the misting, and how long before you re-measure?"
+   ],
+   [
+    "T",
+    "After misting, is the re-measure the full test again, or a quicker check?"
+   ],
+   [
+    "W",
+    "A sample is lost or spoiled. How long to get another one?"
+   ],
+   [
+    "W",
+    "An instrument fails mid-batch. What happens, and how long is the delay?"
+   ],
+   [
+    "W",
+    "Power fails during a drying run — is the result void, and how much time is lost?"
+   ],
+   [
+    "W",
+    "How often does a checkpoint have to be repeated? Once a batch, once a month?"
+   ],
+   [
+    "W",
+    "A batch is held longer than planned. Do any checkpoints have to be repeated, and which?"
+   ],
+   [
+    "W",
+    "How long does the laboratory keep a sample in case it is needed again?"
+   ],
+   [
+    "L",
+    "What is the longest a laboratory problem has ever delayed a batch?"
+   ]
+  ]
+ },
+ {
+  "title": "L · Decisions the laboratory makes",
+  "why": "Some readings are recorded. Some readings change what happens next. The system must know which is which, who decides, and how long the deciding takes.",
+  "items": [
+   [
+    "T",
+    "Which laboratory readings actually change what production does next? Name them."
+   ],
+   [
+    "T",
+    "The moisture decision: at or above 68 proceed, below 67 mist. What happens between 67 and 68?"
+   ],
+   [
+    "T",
+    "Who makes that call — the technician, the laboratory in charge, or production?"
+   ],
+   [
+    "T",
+    "How long does that decision normally take once the number exists?"
+   ],
+   [
+    "T",
+    "Does anyone have to approve a laboratory result before production acts on it?"
+   ],
+   [
+    "W",
+    "If yes, who, and how long does that normally take?"
+   ],
+   [
+    "W",
+    "At night and at weekends, who makes the call?"
+   ],
+   [
+    "W",
+    "Is a decision ever made on a number before it is formally recorded?"
+   ],
+   [
+    "W",
+    "Does production ever overrule the laboratory? What happens then?"
+   ],
+   [
+    "W",
+    "How is the decision communicated — phone, in person, a book?"
+   ],
+   [
+    "L",
+    "Is there a decision the laboratory would like to make but currently cannot?"
+   ]
+  ]
+ },
+ {
+  "title": "M · What stops production, and for how long",
+  "why": "Four checkpoints in the standard are marked as gates. This section checks whether they really are, and what happens on the floor when one bites.",
+  "items": [
+   [
+    "T",
+    "Which laboratory results, if missing, actually stop production today?"
+   ],
+   [
+    "T",
+    "When that happens, what does production do — wait, or continue and record it?"
+   ],
+   [
+    "T",
+    "How long has production actually been stopped by the laboratory, at most?"
+   ],
+   [
+    "T",
+    "Can anybody let production continue without the result? Who?"
+   ],
+   [
+    "W",
+    "When that override happens, is anything written down?"
+   ],
+   [
+    "W",
+    "Are there results the laboratory thinks should stop production but currently do not?"
+   ],
+   [
+    "W",
+    "Are any of the four gates not really gates in practice?"
+   ],
+   [
+    "W",
+    "Would a warning an hour before a gate is due be useful, or noise?"
+   ],
+   [
+    "L",
+    "Should a result ever be too old to rely on? After how long?"
+   ]
+  ]
+ },
+ {
+  "title": "N · How the number travels today",
+  "why": "Understanding the current path from bench to decision is what tells us what the app has to replace, and what it must not break.",
+  "items": [
+   [
+    "T",
+    "When a number exists, how does the person who needs it find out?"
+   ],
+   [
+    "T",
+    "How long does that take — immediately, at the end of the shift, next morning?"
+   ],
+   [
+    "T",
+    "Where is the number written down first?"
+   ],
+   [
+    "T",
+    "Does the same number get written more than once, in more than one place?"
+   ],
+   [
+    "W",
+    "Who else sees it, and when?"
+   ],
+   [
+    "W",
+    "Is anything typed into a computer today? What, and by whom, and when?"
+   ],
+   [
+    "W",
+    "At the end of a batch, is there a summary of all its laboratory results anywhere?"
+   ],
+   [
+    "W",
+    "How long does producing that summary take?"
+   ],
+   [
+    "W",
+    "Has a number ever gone missing between the bench and the person who needed it?"
+   ],
+   [
+    "W",
+    "When an out-of-range number is reported, what happens to the person who reported it — nothing, a question, or a problem? Answer this one plainly; it predicts the quality of every number the system will collect."
+   ],
+   [
+    "L",
+    "What does management ask the laboratory for, and how long does answering take?"
+   ]
+  ]
+ },
+ {
+  "title": "O · What makes a test take longer than usual",
+  "why": "Averages are useless for scheduling if the variance is large. This section is about the spread, not the middle.",
+  "items": [
+   [
+    "T",
+    "On a bad day, how much longer does a moisture result take than on a good day?"
+   ],
+   [
+    "W",
+    "What is the usual cause of a delay — waiting for the sample, waiting for equipment, or waiting for a person?"
+   ],
+   [
+    "W",
+    "Does the time of day change how long things take?"
+   ],
+   [
+    "W",
+    "Does the weather change anything — humidity, rain, the material being wetter?"
+   ],
+   [
+    "W",
+    "Is the first batch of a season slower than a settled one?"
+   ],
+   [
+    "W",
+    "Does a new technician change these times, and by how much?"
+   ],
+   [
+    "W",
+    "Which test has the most unpredictable duration?"
+   ],
+   [
+    "L",
+    "If you had to promise production a time for each result, what would you promise?"
+   ]
+  ]
+ },
+ {
+  "title": "P · Capacity — where the laboratory breaks",
+  "why": "The factory intends to run more batches. The system should be able to say, in advance, when that stops being possible.",
+  "items": [
+   [
+    "T",
+    "How many batches can run at once before the laboratory cannot keep up?"
+   ],
+   [
+    "T",
+    "On the busiest day of a batch, how many hours of laboratory work is there?"
+   ],
+   [
+    "W",
+    "Which day of the 20 is the busiest for the laboratory, and why?"
+   ],
+   [
+    "W",
+    "If two batches were offset by a few days, would that help or make it worse?"
+   ],
+   [
+    "W",
+    "What is the first thing that would be dropped if the laboratory ran out of time?"
+   ],
+   [
+    "W",
+    "Is any of the current work done outside normal hours because there is no room in the day?"
+   ],
+   [
+    "L",
+    "At what number of simultaneous batches does the laboratory need another person?"
+   ],
+   [
+    "L",
+    "At what number does it need another instrument?"
+   ]
+  ]
+ },
+ {
+  "title": "Q · What the laboratory is waiting on from everybody else",
+  "why": "The laboratory is not only a source of delay; it is usually also a victim of one. The system can fix some of these for free.",
+  "items": [
+   [
+    "T",
+    "What does the laboratory most often wait for that is not its own doing?"
+   ],
+   [
+    "T",
+    "How much notice does the laboratory get before a sample is needed today?"
+   ],
+   [
+    "T",
+    "How much notice would be enough?"
+   ],
+   [
+    "W",
+    "Is the laboratory ever told about a batch after it has already started?"
+   ],
+   [
+    "W",
+    "Does the laboratory know the plan for the next 24 hours? How?"
+   ],
+   [
+    "W",
+    "When production changes the plan, how does the laboratory find out?"
+   ],
+   [
+    "W",
+    "Is the laboratory ever asked for a test that was not planned, and how often?"
+   ],
+   [
+    "L",
+    "What one piece of information, given earlier, would save the laboratory the most time?"
+   ]
+  ]
+ },
+ {
+  "title": "R · Tomorrow — what the app has to do on day one",
+  "why": "These are the only questions that must be answered before the APK is built. Everything above can be answered during the first batch; these cannot.",
+  "items": [
+   [
+    "T",
+    "What is the batch identifier for tomorrow’s batch? The exact text, as it will be said out loud."
+   ],
+   [
+    "T",
+    "What stage will that batch be at when the app is handed over?"
+   ],
+   [
+    "T",
+    "Which checkpoints will realistically be hit in the first 48 hours?"
+   ],
+   [
+    "T",
+    "How many phones, and who gets which — laboratory, operator, supervisor?"
+   ],
+   [
+    "T",
+    "Who trains them, and how long does that take?"
+   ],
+   [
+    "T",
+    "Is there signal where the samples are taken and where the tests are done?"
+   ],
+   [
+    "T",
+    "Will they also keep the paper record tomorrow, in parallel? (They should.)"
+   ],
+   [
+    "T",
+    "If the app is wrong or confusing tomorrow, who do they call?"
+   ],
+   [
+    "T",
+    "If the app fails entirely, does work stop or continue on paper?"
+   ],
+   [
+    "T",
+    "What single thing, at the end of tomorrow, would make you call it a success?"
+   ]
+  ]
+ }
+]

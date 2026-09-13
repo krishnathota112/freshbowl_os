@@ -117,7 +117,19 @@ describeDb('A5 — the constraint exists, and it is the thing that refuses', () 
       //   PROVENANCE  holds no hour at all. It names WHICH register placed the activity on the
       //             axis — the process standard, or an hour a person chose. Classing these as AXIS
       //             would say they are coordinates; they are labels about coordinates.
-      const permitted: Record<string, 'AXIS' | 'PLAN' | 'CAPABILITY' | 'PROVENANCE'> = {
+      //   AUTHORISATION  0036. A quantity of hours that was ASKED FOR or GRANTED, held in the
+      //             extension register. Deliberately its own class and not PLAN: the plan is what
+      //             the process says, this is permission to differ from it. Collapsing the two
+      //             would be the exact confusion the register exists to prevent.
+      //   STANDARD  the LENGTH OF A PROCESS VERSION, calculated from its own activities (0045).
+      //             Its own class and not PLAN: PLAN is what the process says about one activity,
+      //             STANDARD is what the whole version adds up to. 470 h is a property of
+      //             PROCESS-2026C and of nothing else, and collapsing it into PLAN would be the
+      //             beginning of treating it as an application constant again.
+      const permitted: Record<
+        string,
+        'AXIS' | 'PLAN' | 'CAPABILITY' | 'PROVENANCE' | 'AUTHORISATION' | 'STANDARD'
+      > = {
         'batch_activity.baseline_start_hour': 'AXIS',
         'batch_activity.baseline_end_hour': 'AXIS',
         'process_activity.standard_start_hour': 'AXIS',
@@ -148,6 +160,58 @@ describeDb('A5 — the constraint exists, and it is the thing that refuses', () 
         'v_activity_timing.standard_min_hr': 'PLAN',
         'v_activity_timing.standard_max_hr': 'PLAN',
         'v_activity_timing.planned_duration_hr': 'PLAN',
+        // 0036 · the extension register. Hours of AUTHORISATION, never hours of plan.
+        'extension_policy.max_requested_hr': 'AUTHORISATION',
+        'extension_policy.request_expiry_hr': 'AUTHORISATION',
+        'extension_request.requested_extension_hr': 'AUTHORISATION',
+        'extension_request.manager_granted_hr': 'AUTHORISATION',
+        'extension_request.gm_granted_hr': 'AUTHORISATION',
+        'extension_request.approved_extension_hr': 'AUTHORISATION',
+        'v_extension_request.requested_extension_hr': 'AUTHORISATION',
+        'v_extension_request.approved_extension_hr': 'AUTHORISATION',
+        'v_activity_expectation.approved_extension_hr': 'AUTHORISATION',
+        'v_activity_forecast.approved_extension_hr': 'AUTHORISATION',
+        'v_batch_forecast.approved_extension_hr': 'AUTHORISATION',
+
+        // 0041/0045 · the standard is a property of the SOP, calculated from its own activities.
+        'process_definition.envelope_hours': 'STANDARD',
+        'process_definition.envelope_hour_source': 'PROVENANCE',
+        'v_process_standard.calculated_standard_hr': 'STANDARD',
+        'v_process_standard.full_span_hr': 'STANDARD',
+        'v_process_envelope.standard_hr': 'STANDARD',
+        'v_process_envelope.calculated_standard_hr': 'STANDARD',
+        'v_process_envelope.full_span_hr': 'STANDARD',
+        'v_process_envelope.stated_envelope_hr': 'STANDARD',
+        'v_process_envelope.stated_minus_calculated_hr': 'STANDARD',
+        'v_process_envelope.envelope_hr': 'STANDARD',
+        // The DAY GRID, (total_days + 1) x 24. Carried deliberately beside the standard so the two
+        // can be told apart — it reads 480 for the 470-hour standard. F7.
+        'v_process_envelope.baseline_hours': 'STANDARD',
+        'v_process_envelope.envelope_hour_source': 'PROVENANCE',
+        'v_process_catalogue.standard_hr': 'STANDARD',
+        'v_process_catalogue.full_span_hr': 'STANDARD',
+        'v_process_catalogue.stated_envelope_hr': 'STANDARD',
+        'v_process_catalogue.stated_minus_calculated_hr': 'STANDARD',
+        'v_process_envelope_reconciliation.standard_hr': 'STANDARD',
+        'v_process_envelope_reconciliation.full_span_hr': 'STANDARD',
+        'v_process_envelope_reconciliation.stated_envelope_hr': 'STANDARD',
+        'v_process_envelope_reconciliation.stated_minus_calculated_hr': 'STANDARD',
+        'v_process_envelope_reconciliation.tail_beyond_standard_hr': 'STANDARD',
+        // The SUM of durations, reported and explicitly NOT the length — three parallel streams
+        // and 128 hours of holds are why PROCESS-2026C sums to 855 against a 470 h standard.
+        'v_process_envelope_reconciliation.serial_duration_sum_hr': 'STANDARD',
+        'v_process_envelope_reconciliation.parallel_duration_sum_hr': 'STANDARD',
+        // 0056 · the batch is measured against ITS OWN version's standard.
+        'v_batch_slip.standard_hr': 'STANDARD',
+        'v_batch_forecast.standard_hr': 'STANDARD',
+
+        // 0051 · the Turner's rest, as data. A duration the PROCESS states — 8 h for
+        // PROCESS-2026C, whatever a future version says for itself. Never a literal in the engine.
+        'v_gate_rest_rule.min_rest_hr': 'PLAN',
+
+        // 0050 · what the operator's surface reads. Coordinates, read-only, on a view.
+        'v_my_work.baseline_start_hour': 'AXIS',
+        'v_my_work.baseline_end_hour': 'AXIS',
       };
 
       const found = await all<{ table_name: string; column_name: string; data_type: string }>(

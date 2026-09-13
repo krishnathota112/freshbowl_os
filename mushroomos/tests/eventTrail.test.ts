@@ -86,11 +86,34 @@ d('B3 · a governance change cannot happen silently', () => {
       expect(await auditCount(db)).toBe(before);
 
       // And a real edit on the same table still lands.
+      //
+      // ⚠ ON A DRAFT DEFINITION, because 0044 freezes a PUBLISHED one's activities and every
+      // definition in this database is published. The claim here is about the AUDIT trigger — that
+      // a genuine change is recorded — and it needs a row it is allowed to genuinely change. Using
+      // `FIB1-WEIGH` on PROCESS-2026B tested the freeze by accident instead.
+      const draft = await one<{ id: string }>(
+        db,
+        `insert into process_definition
+           (code, name, version, status, source_ref, anchor_day_label, total_days)
+         values ('TEST-AUDIT-EDIT', 'audit probe', 1, 'draft', 'tests/eventTrail', 'Day 0', 1)
+         returning id`
+      );
+      await db.query(
+        `insert into process_activity
+           (process_definition_id, code, label_template, stream, rel_day, seq, scope,
+            cardinality_rule, source_ref)
+         values ($1, 'TEST-AUDIT-ONE', 'One', 'YARD', 0, 10, 'MASTER', '{"kind":"SINGLETON"}',
+                 'tests/eventTrail')`,
+        [draft.id]
+      );
+      const afterInsert = await auditCount(db);
+
       await db.query(
         `update process_activity set golden_rule = 'probe'
-          where code = 'FIB1-WEIGH' and golden_rule is distinct from 'probe'`
+          where process_definition_id = $1 and golden_rule is distinct from 'probe'`,
+        [draft.id]
       );
-      expect(await auditCount(db)).toBeGreaterThan(before);
+      expect(await auditCount(db)).toBeGreaterThan(afterInsert);
     });
   }, 30_000);
 

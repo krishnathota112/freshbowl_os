@@ -22,7 +22,8 @@ type LiveBatchRow = {
   label: string;
   start_at: string | null;
   status: string;
-  process_definition: { baseline_hours: number } | null;
+  // `process_definition(baseline_hours)` is deliberately no longer selected — it is a day grid.
+  // The axis comes from `v_batch_forecast.standard_hr`, per batch.
 };
 
 type ActivityRow = {
@@ -57,19 +58,42 @@ export type TowerData = {
 };
 
 export async function loadTower(): Promise<TowerData> {
-  const [batches, clock] = await Promise.all([
+  /*
+   * THE AXIS IS THE PROCESS'S CALCULATED STANDARD, NOT `baseline_hours`.
+   *
+   * This read `process_definition(baseline_hours)`, which is `(total_days + 1) × 24` — a day grid.
+   * On screen that rendered "Day 17 · H419 of 480" for every PROCESS-2026C batch, when the
+   * standard those batches were planned against is 470. CLAUDE.md forbids exactly this: never read
+   * the standard from `baseline_hours`.
+   *
+   * It was not only a label. The same number clamps `hourNow` and sets the right-hand edge of every
+   * segment in `segmentsFor`, so the whole board was drawn ten hours too wide — and sixteen too
+   * wide for PROCESS-2026B, whose activities compute 536 against a grid of 552.
+   *
+   * `v_batch_forecast.standard_hr` is the standard of the version THAT BATCH was generated from,
+   * which is why it is fetched per batch rather than per definition: two SOPs can run at once.
+   */
+  const [batches, clock, standards] = await Promise.all([
     supabase
       .from('v_live_batch')
-      .select('id, code, label, start_at, status, process_definition(baseline_hours)')
+      .select('id, code, label, start_at, status')
       .order('start_at', { ascending: true, nullsFirst: false }),
     supabase
       .from('factory_clock')
       .select('timezone, timezone_conflict_id')
       .eq('id', 1)
       .maybeSingle(),
+    supabase.from('v_batch_forecast').select('master_batch_id, standard_hr'),
   ]);
   if (batches.error) throw batches.error;
   if (clock.error) throw clock.error;
+  if (standards.error) throw standards.error;
+
+  const standardOf = new Map<string, number>(
+    ((standards.data ?? []) as { master_batch_id: string; standard_hr: number | null }[])
+      .filter((r) => r.standard_hr != null)
+      .map((r) => [r.master_batch_id, Number(r.standard_hr)])
+  );
 
   const rows = (batches.data ?? []) as unknown as LiveBatchRow[];
   const timezone = (clock.data?.timezone as string | null) ?? null;
@@ -102,7 +126,9 @@ export async function loadTower(): Promise<TowerData> {
   // One clock for the whole product — the factory's effective now, not the browser's.
   const at = nowMs();
   const bars: BatchBar[] = rows.map((r) => {
-    const baselineHours = r.process_definition?.baseline_hours ?? 0;
+    // Named `baselineHours` because that is the prop name every component and type-probe already
+    // uses; the VALUE is now the calculated standard. Renaming the field is a separate change.
+    const baselineHours = standardOf.get(r.id) ?? 0;
     const acts = byBatch.get(r.id) ?? [];
 
     return {

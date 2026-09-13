@@ -151,8 +151,25 @@ export async function defaultRoleBindings(db: Db) {
  */
 export async function createDraftBatch(
   db: Db,
-  opts: { code?: string; startDate?: string; startAt?: string | null; restHours?: number } = {}
+  opts: {
+    code?: string;
+    startDate?: string;
+    startAt?: string | null;
+    restHours?: number;
+    /**
+     * WHICH STANDARD. Defaults to PROCESS-2026B and that default is deliberate.
+     *
+     * 0044 removed the process code from `create_master_batch` and pointed it at
+     * `process_catalogue`, which s12 moved to PROCESS-2026C. Every suite written before that
+     * asserts against 2026B's activity codes and 2026B's day grid, and silently re-pointing
+     * them at a different standard would turn a set of passing proofs into a set of proofs
+     * about something else. They keep naming the definition they were written for; a suite
+     * about the 470-hour standard asks for it by name.
+     */
+    processCode?: string;
+  } = {}
 ): Promise<string> {
+  const processCode = opts.processCode ?? 'PROCESS-2026B';
   const code = opts.code ?? `TEST-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
   const startDate = opts.startDate ?? '2026-09-20';
   // Zero, not "very short". Postgres freezes now() for the whole transaction and these proofs run
@@ -165,7 +182,8 @@ export async function createDraftBatch(
     db,
     `select pa.code from process_activity pa
        join process_definition pd on pd.id = pa.process_definition_id
-      where pd.code = 'PROCESS-2026B' and pa.is_time_gate`
+      where pd.code = $1 and pa.is_time_gate`,
+    [processCode]
   );
 
   const config: Record<string, number> = { ...DAY0_STRUCTURE };
@@ -173,9 +191,25 @@ export async function createDraftBatch(
 
   const roles = await defaultRoleBindings(db);
 
+  // ⚠ BORROWS ADMIN, AND PUTS THE CALLER'S ROLE BACK.
+  //
+  // 0058 made `create_master_batch` admin-or-GM, which is correct and which several suites tripped
+  // over immediately: they adopt `operator` first and then ask for a batch to work on. Creating one
+  // is a PRECONDITION here, not the thing under test — the authorisation of it is proved
+  // deliberately in `roleEnforcement.test.ts`, where an operator IS refused. Same pattern, and same
+  // reasoning, as `satisfyPrebatchMaterialCheck` below.
+  const priorClaims = await one<{ claims: string }>(
+    db,
+    `select coalesce(current_setting('request.jwt.claims', true), '') as claims`
+  );
+  await actAs(db, 'admin');
+
   const row = await one<{ id: string }>(
     db,
-    `select public.create_master_batch($1,$2,$3,$4,$5,$6,$7,$8) as id`,
+    `select public.create_master_batch($1,$2,$3,$4,$5,$6,$7,$8,
+              (select id from process_definition
+                where code = $9 and status = 'published'
+                order by version desc limit 1)) as id`,
     [
       code,
       code,
@@ -185,8 +219,11 @@ export async function createDraftBatch(
       'Ramarao',
       'Clear',
       opts.startAt ?? null,
+      processCode,
     ]
   );
+
+  await db.query(`select set_config('request.jwt.claims', $1, true)`, [priorClaims.claims]);
   return row.id;
 }
 
@@ -410,7 +447,15 @@ export async function createActiveBatch(
     'the batch must be genuinely activatable, not force-activated'
   ).toEqual([]);
 
+  // Activation is admin-or-GM since 0058, and it is a precondition here rather than the claim.
+  // Borrowed and restored, exactly like the creation above.
+  const claimsAtActivation = await one<{ claims: string }>(
+    db,
+    `select coalesce(current_setting('request.jwt.claims', true), '') as claims`
+  );
+  await actAs(db, 'admin');
   await db.query(`select public.activate_batch($1)`, [batch]);
+  await db.query(`select set_config('request.jwt.claims', $1, true)`, [claimsAtActivation.claims]);
   return batch;
 }
 
@@ -439,4 +484,99 @@ export async function refuses(db: Db, sql: string, values?: unknown[]): Promise<
   throw new Error(
     `expected this to be refused, but it succeeded: ${sql.trim().replace(/\s+/g, ' ').slice(0, 140)}`
   );
+}
+
+/**
+ * An ACTIVE batch on a named process version, taken through the real checks rather than forced.
+ *
+ * `createActiveBatch` above is PROCESS-2026B's path: it assigns every non-time-gate row, picks
+ * destinations from `movement_rule` and names two turners for `TR-T1`/`TR-T2`. None of that
+ * applies to PROCESS-2026C, which has no movement rules, no `TR-*` codes, and seventeen holds that
+ * nobody performs. Rather than teach one helper two processes, this is the 2026C path, and the
+ * assertion that the blocking set is empty is what keeps it honest — a batch that could not really
+ * run fails the suite instead of being forced through.
+ */
+export async function createActiveBatchOn(
+  db: Db,
+  processCode: string,
+  opts: { startAt?: string | null; startDate?: string } = {}
+): Promise<string> {
+  await db.query(`update factory_clock set timezone = 'UTC' where id = 1`);
+
+  const batch = await createDraftBatch(db, {
+    processCode,
+    startAt: opts.startAt,
+    startDate: opts.startDate,
+  });
+
+  const person = await one<{ id: string }>(
+    db,
+    `select id from profiles where is_active order by created_at nulls last limit 1`
+  );
+  // Holds excluded — 0047 stopped asking for a person to perform material resting.
+  await db.query(
+    `update batch_activity set assigned_person_id = $2
+      where master_batch_id = $1 and not is_time_gate and not is_hold`,
+    [batch, person.id]
+  );
+
+  await satisfyPrebatchMaterialCheck(db, batch);
+
+  const blocking = await all<{ code: string; message: string }>(
+    db,
+    `select code, message from validate_batch($1) where severity = 'blocking'`,
+    [batch]
+  );
+  expect(
+    blocking.map((b) => `${b.code}: ${b.message}`),
+    `${processCode} batch must be genuinely activatable, not force-activated`
+  ).toEqual([]);
+
+  // Activation is admin-or-GM since 0058, and it is a precondition here rather than the claim.
+  // Borrowed and restored, exactly like the creation above.
+  const claimsAtActivation = await one<{ claims: string }>(
+    db,
+    `select coalesce(current_setting('request.jwt.claims', true), '') as claims`
+  );
+  await actAs(db, 'admin');
+  await db.query(`select public.activate_batch($1)`, [batch]);
+  await db.query(`select set_config('request.jwt.claims', $1, true)`, [claimsAtActivation.claims]);
+  return batch;
+}
+
+/**
+ * Adopt an app role for the rest of the transaction, and hand back the previous claims.
+ *
+ * ⚠ SETS `sub` AS WELL AS THE ROLE, and both halves are load-bearing.
+ *
+ * `current_app_role()` reads the role claim; `auth.uid()` reads `sub`. A helper that set only the
+ * role produced a caller who was authorised and anonymous — which passes a role guard and then
+ * fails at the table, because several registers refuse a decision that names nobody:
+ *
+ *     extension_manager_decision_attributed
+ *
+ * A real person is behind every decision in this product, so a fixture that adopts a role adopts
+ * a person. The id is READ from `profiles` for that role rather than invented, so `auth.uid()`
+ * points at a row that exists and every foreign key holds.
+ */
+export async function actAs(db: Db, role: string): Promise<string> {
+  const prior = await one<{ claims: string }>(
+    db,
+    `select coalesce(current_setting('request.jwt.claims', true), '') as claims`
+  );
+
+  const who = await all<{ id: string }>(
+    db,
+    `select id from profiles where role = $1::app_role and is_active
+      order by created_at nulls last limit 1`,
+    [role]
+  );
+  if (who.length === 0) {
+    throw new Error(`no active ${role} in profiles — s07 has not run, or the role is misspelt`);
+  }
+
+  await db.query(`select set_config('request.jwt.claims', $1, true)`, [
+    JSON.stringify({ sub: who[0].id, app_metadata: { app_role: role } }),
+  ]);
+  return prior.claims;
 }

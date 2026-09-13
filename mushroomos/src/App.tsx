@@ -36,6 +36,10 @@ const FieldShell = lazy(() =>
 const SignIn = lazy(() => import('./routes/SignIn').then((m) => ({ default: m.SignIn })));
 
 // Management.
+const AdminHome = lazy(() => import('./routes/AdminHome').then((m) => ({ default: m.AdminHome })));
+const BatchStart = lazy(() => import('./routes/BatchStart').then((m) => ({ default: m.BatchStart })));
+const PrepareBatch = lazy(() => import('./routes/PrepareBatch').then((m) => ({ default: m.PrepareBatch })));
+const OnboardBatch = lazy(() => import('./routes/OnboardBatch').then((m) => ({ default: m.OnboardBatch })));
 const AdminToday = lazy(() => import('./routes/AdminToday').then((m) => ({ default: m.AdminToday })));
 const Batches = lazy(() => import('./routes/Batches').then((m) => ({ default: m.Batches })));
 const MonthlySchedule = lazy(() =>
@@ -62,6 +66,12 @@ const Resources = lazy(() => import('./routes/Resources').then((m) => ({ default
 // The field surface.
 const MyWork = lazy(() => import('./routes/MyWork').then((m) => ({ default: m.MyWork })));
 const LabQueue = lazy(() => import('./routes/LabQueue').then((m) => ({ default: m.LabQueue })));
+const LabCheckpoint = lazy(() =>
+  import('./routes/LabCheckpoint').then((m) => ({ default: m.LabCheckpoint }))
+);
+const LabApprovals = lazy(() =>
+  import('./routes/LabApprovals').then((m) => ({ default: m.LabApprovals }))
+);
 
 /**
  * DEV ONLY, and the guard is on the DECLARATION rather than on the route.
@@ -142,7 +152,15 @@ function Landing() {
 
 const ALL: AppRole[] = ['gm', 'manager', 'admin', 'supervisor', 'operator', 'lab_tech'];
 const MGMT: AppRole[] = ['gm', 'manager', 'admin', 'supervisor'];
-const OPS: AppRole[] = ['operator', 'supervisor', 'admin', 'gm', 'manager'];
+/*
+ * WHO MAY OPEN THE TASK SCREEN — the roles the server lets START work, and no one else.
+ *
+ * This used to include admin, gm and manager. `start_activity` and `submit_activity` refuse all
+ * three (403, "requires role operator or supervisor or lab_tech"), so they could open a list of
+ * work with no button on it that would succeed. The lab technician is excluded on purpose, as
+ * before: UI-001 gave them their own checkpoint screen.
+ */
+const OPS: AppRole[] = ['operator', 'supervisor'];
 
 export default function App() {
   return (
@@ -153,6 +171,21 @@ export default function App() {
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/" element={<Landing />} />
 
+        {/*
+          A1 · the Admin home. Two doors — a NEW batch, and one the factory is ALREADY RUNNING —
+          because what MushroomOS watched from the start and what it was told about afterwards are
+          different in kind. `WORKSTATIONS.md` §4.
+        */}
+        <Route path="/admin" element={<RoleGuard allow={MGMT}><AdminHome /></RoleGuard>} />
+        <Route path="/admin/batch/start" element={<RoleGuard allow={['admin', 'gm']}><BatchStart mode="new" /></RoleGuard>} />
+        <Route path="/admin/batch/ongoing" element={<RoleGuard allow={['admin', 'gm']}><BatchStart mode="ongoing" /></RoleGuard>} />
+        {/*
+          Onboarding a batch the factory is already running. Supervisor included deliberately: the
+          server accepts a stated past time only from a supervisor (or a lab technician), so the one
+          person who can complete this must be able to open it.
+        */}
+        <Route path="/admin/batch/:id/onboard" element={<RoleGuard allow={['admin', 'gm', 'supervisor']}><OnboardBatch /></RoleGuard>} />
+        <Route path="/admin/batch/:id/prepare" element={<RoleGuard allow={['admin', 'gm', 'supervisor']}><PrepareBatch /></RoleGuard>} />
         <Route path="/admin/today" element={<RoleGuard allow={MGMT}><AdminToday /></RoleGuard>} />
         <Route path="/admin/batches" element={<RoleGuard allow={MGMT}><Batches /></RoleGuard>} />
         <Route path="/admin/schedule" element={<RoleGuard allow={MGMT}><MonthlySchedule /></RoleGuard>} />
@@ -177,6 +210,20 @@ export default function App() {
 
         <Route path="/operator/my-work" element={<RoleGuard allow={OPS}><MyWork /></RoleGuard>} />
         <Route path="/lab/queue" element={<RoleGuard allow={['lab_tech', 'supervisor']}><LabQueue /></RoleGuard>} />
+        {/*
+          UI-001 · one lab checkpoint, sample to submit. The lab technician's own workstation — the
+          `/operator` guard is NOT widened to lab_tech. The URL carries the activity, so a refresh or an
+          app restart re-reads the same checkpoint from the server.
+        */}
+        <Route path="/lab/checkpoint/:activityId" element={<RoleGuard allow={['lab_tech', 'supervisor']}><LabCheckpoint /></RoleGuard>} />
+        {/*
+          The decision that opens a gate. Guarded to MGMT so a supervisor or GM can reach it — and
+          deliberately NOT to lab_tech, who may never decide a lab submission. `decide_lab_submission`
+          enforces that server-side whatever this guard says; while C-32 is open the server accepts
+          either gm or supervisor, and the screen reads which from `approver_roles` rather than
+          hardcoding one.
+        */}
+        <Route path="/lab/approvals" element={<RoleGuard allow={MGMT}><LabApprovals /></RoleGuard>} />
         <Route path="/supervisor/control-room" element={<RoleGuard allow={['supervisor', 'gm']}><ControlRoom /></RoleGuard>} />
         <Route path="/manager/resources" element={<RoleGuard allow={['manager', 'admin', 'gm']}><Resources /></RoleGuard>} />
         {/*

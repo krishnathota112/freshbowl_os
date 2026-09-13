@@ -269,7 +269,7 @@ type Book1 = {
 };
 
 const book1 = JSON.parse(
-  readFileSync(join(REPO_ROOT, 'docs', 'source', 'book1_hour_grid.json'), 'utf8')
+  readFileSync(join(REPO_ROOT, 'docs', '_reference', 'source', 'book1_hour_grid.json'), 'utf8')
 ) as Book1;
 
 /**

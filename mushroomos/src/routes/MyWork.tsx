@@ -1,102 +1,110 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../api/client';
-import { releaseElapsedRests } from '../api/batch';
+import { releaseElapsedRests, startActivity } from '../api/batch';
+import {
+  getBatchContext,
+  listMyWork,
+  STATE_LABEL,
+  workGroupOf,
+  type MyWorkRow,
+} from '../api/work';
 import { PageHeading } from '../components/layout/PageHeading';
-import { Bar, Card, Chip, Countdown, EmptyState, Skeleton, Stat } from '../components/primitives';
+import { Card, EmptyState, Skeleton } from '../components/primitives';
 import { TaskDrawer } from './TaskDrawer';
-import { nowMs } from '../lib/now';
-
-interface WorkItem {
-  id: string;
-  code: string;
-  title: string;
-  scope_label: string;
-  rel_day: number;
-  seq: number;
-  state: string;
-  blocked_reason: string | null;
-  unblocks_at: string | null;
-  planned_qty_mt: number | null;
-  day0_duration_hr: number | null;
-  duration_target_min_hr: number | null;
-  duration_target_max_hr: number | null;
-  baseline_start_hour: number | null;
-  baseline_end_hour: number | null;
-  actual_start: string | null;
-  actual_end: string | null;
-  master_batch_id: string;
-  machine?: { code: string } | null;
-  source?: { label: string } | null;
-  destination?: { label: string } | null;
-  master_batch: {
-    code: string;
-    label: string;
-    status: string;
-    start_date: string;
-    start_at: string | null;
-  };
-}
+import { humanError, type HumanError } from '../lib/humanError';
+import { useAuth } from '../lib/auth';
 
 /**
- * Phase 1 · Operator "My Work" Screen.
+ * Phase 1 · Operator "My Work".
  *
- * Mental Model: "What do I do NOW?"
- * - Displays active batch hour (e.g. H37 / baseline)
- * - Single authoritative CURRENT TASK (NOW)
- * - UP NEXT card for what comes right after
- * - Collapsed WAITING / COMPLETED groups
+ * WHAT CHANGED, AND WHY
+ *   This screen used to select from `batch_activity` and then decide, in TypeScript, which task was
+ *   current — four fallbacks over `baseline_start_hour`, a `currentBatchHour` derived from the
+ *   device clock, and `baselineHours = (maxDay + 1) * 24`, the day grid CLAUDE.md forbids. It read
+ *   480 against a 470-hour standard, and it held an opinion about eligibility that the database did
+ *   not share.
+ *
+ *   It now reads `v_my_work` and renders what it is given. `state`, `blocked_reason`,
+ *   `variance_minutes`, `outstanding_labels`, `satisfied_total` and `required_count` all arrive
+ *   decided. The only thing computed here is which HEADING a card sits under, and that is layout,
+ *   not eligibility — whether work may actually start is settled by the server when
+ *   `start_activity` is called.
+ *
+ * FOUR NUMBERS, NEVER COLLAPSED
+ *   PROCESS · STANDARD · H0 · BASELINE come from `v_batch_forecast`, which derives the standard from
+ *   the process the batch was generated from. There is no constant in this file, and no arithmetic
+ *   on days.
+ *
+ * NO TIMESTAMP INPUT
+ *   The operator starts and finishes. The server stamps both. There is deliberately no field on this
+ *   screen that accepts an official time.
  */
 export function MyWork() {
   const qc = useQueryClient();
+  const { role } = useAuth();
   const [open, setOpen] = useState<{ id: string; batchStatus: string } | null>(null);
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [starting, setStarting] = useState<string | null>(null);
+  const [startError, setStartError] = useState<HumanError | null>(null);
 
-  const q = useQuery({
+  const work = useQuery({
     queryKey: ['my-work'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('batch_activity')
-        .select(
-          `id, code, title, scope_label, rel_day, seq, state, blocked_reason, unblocks_at,
-           planned_qty_mt, day0_duration_hr, duration_target_min_hr, duration_target_max_hr,
-           baseline_start_hour, baseline_end_hour, actual_start, actual_end, master_batch_id,
-           machine:machine!batch_activity_assigned_machine_id_fkey(code),
-           source:location!batch_activity_source_location_id_fkey(label),
-           destination:location!batch_activity_destination_location_id_fkey(label),
-           master_batch!inner(code, label, status, start_date, start_at)`
-        )
-        .eq('master_batch.status', 'active')
-        .in('state', ['READY', 'IN_PROGRESS', 'RETURNED', 'DEVIATION', 'WAITING_TIME', 'BLOCKED', 'COMPLETED'])
-        .order('baseline_start_hour', { ascending: true, nullsFirst: false })
-        .order('rel_day', { ascending: true })
-        .order('seq', { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as unknown as WorkItem[];
-    },
+    queryFn: listMyWork,
     refetchOnWindowFocus: true,
   });
 
-  const activeBatchIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const r of q.data ?? []) {
-      if (r.master_batch?.status === 'active') ids.add(r.master_batch_id);
-    }
-    return [...ids];
-  }, [q.data]);
+  const rows = useMemo(() => work.data ?? [], [work.data]);
+
+  /**
+   * THE HEADER DESCRIBES THE BATCH OF THE WORK IN FRONT OF YOU.
+   *
+   * It used to take `rows[0]`, which on a real account was wrong the moment an operator had work on
+   * more than one batch: the hero read "CURRENT BATCH ASSIGNMENT · MB-2026-366-368" above a list of
+   * MB-DEMO-LATE tasks. Seen immediately on the running app, invisible in every test.
+   *
+   * It now follows the CURRENT card — what is running, else what is ready first — and says plainly
+   * when the rest of the list belongs to other batches. Each card already names its own batch, so
+   * nothing is hidden; what changes is that the header no longer makes a claim about all of them.
+   */
+  const runningFirst = rows.find((r) => workGroupOf(r.state) === 'running')
+    ?? rows.find((r) => workGroupOf(r.state) === 'ready')
+    ?? rows[0];
+  const batchId = runningFirst?.master_batch_id ?? null;
+  const otherBatches = new Set(
+    rows.filter((r) => r.master_batch_id !== batchId).map((r) => r.batch_code)
+  );
+
+  const context = useQuery({
+    queryKey: ['batch-context', batchId],
+    queryFn: () => getBatchContext(batchId as string),
+    enabled: Boolean(batchId),
+  });
+
+  /**
+   * A rest whose wait has genuinely elapsed does not open itself, so somebody has to ask.
+   *
+   * ONLY A ROLE THAT MAY ASK, ASKS. `release_elapsed_rests` is supervisor / admin / gm. An earlier
+   * version polled it for every batch every 15 seconds whatever the caller's role, and swallowed
+   * the refusal — which on a real operator account meant seven refused calls a minute, forever.
+   * Ninety-four `403`s were sitting in the console of the running app.
+   *
+   * A refusal that the code already knows is coming is not error handling; it is a request that
+   * should never have been made.
+   */
+  const mayReleaseRests = role === 'supervisor' || role === 'admin' || role === 'gm';
+  const batchIds = useMemo(
+    () => (mayReleaseRests ? [...new Set(rows.map((r) => r.master_batch_id))] : []),
+    [rows, mayReleaseRests]
+  );
 
   useEffect(() => {
-    if (activeBatchIds.length === 0) return;
+    if (batchIds.length === 0) return;
     let cancelled = false;
     const ask = async () => {
-      try {
-        await Promise.all(activeBatchIds.map((b) => releaseElapsedRests(b)));
-        if (!cancelled) {
-          qc.invalidateQueries({ queryKey: ['my-work'] });
-        }
-      } catch {
-        // Polling retry
+      const results = await Promise.allSettled(batchIds.map((b) => releaseElapsedRests(b)));
+      if (!cancelled && results.some((r) => r.status === 'fulfilled')) {
+        qc.invalidateQueries({ queryKey: ['my-work'] });
       }
     };
     ask();
@@ -105,324 +113,178 @@ export function MyWork() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [activeBatchIds, qc]);
+  }, [batchIds, qc]);
 
-  const totals = useQuery({
-    queryKey: ['my-work-totals'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('batch_activity')
-        .select('code, state, planned_qty_mt, master_batch_id, master_batch!inner(status)')
-        .eq('master_batch.status', 'active')
-        .eq('code', 'FIB1-WEIGH');
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  if (q.isLoading) {
+  if (work.isLoading) {
     return (
       <div className="space-y-4">
-        <PageHeading title="My Work" subtitle="Loading current assignment..." />
+        <PageHeading title="My Work" subtitle="Loading current assignment…" />
         <Skeleton label="Loading task cards" lines={4} />
       </div>
     );
   }
 
-  const rows = q.data ?? [];
+  if (work.isError) {
+    return (
+      <>
+        <PageHeading title="My Work" subtitle="One task at a time" />
+        <EmptyState
+          title={humanError(work.error).title}
+          detail={humanError(work.error).detail}
+        />
+      </>
+    );
+  }
 
   if (rows.length === 0) {
     return (
       <>
         <PageHeading title="My Work" subtitle="One task at a time" />
         <EmptyState
-          title="No active tasks right now"
-          detail="Tasks appear here when an active batch reaches an open gate. Check running batches or ask a supervisor."
+          title="No work assigned to you right now"
+          detail="Tasks appear here when an active batch reaches one that is yours. If you expect work, ask your supervisor who it is assigned to."
         />
       </>
     );
   }
 
-  // Active Batch header info & scoping
-  const firstBatch = rows[0]?.master_batch;
-  const activeBatchId = rows[0]?.master_batch_id;
-  const batchLabel = firstBatch?.label ?? 'Active Batch';
-  const startAtMs = firstBatch?.start_at ? new Date(firstBatch.start_at).getTime() : nowMs();
-  const elapsedHours = Math.max(0, Math.floor((nowMs() - startAtMs) / (1000 * 60 * 60)));
-  const maxDay = rows.length > 0 ? Math.max(...rows.map((r) => r.rel_day)) : 22;
-  const baselineHours = (maxDay + 1) * 24;
-  const currentBatchHour = Math.min(baselineHours, elapsedHours);
+  const running = rows.filter((r) => workGroupOf(r.state) === 'running');
+  const ready = rows.filter((r) => workGroupOf(r.state) === 'ready');
+  const waiting = rows.filter((r) => workGroupOf(r.state) === 'waiting');
+  const done = rows.filter((r) => workGroupOf(r.state) === 'done');
 
-  // Filter rows strictly belonging to the active batch
-  const batchRows = rows.filter((r) => !activeBatchId || r.master_batch_id === activeBatchId);
+  /**
+   * The cards that get the large treatment: everything running, else what is ready first.
+   *
+   * A LIST, NOT ONE ROW. This was `running[0]`, which assumed an operator has at most one task in
+   * progress. That is false here. A person works several overlapping batches, and starting work on
+   * batch B while batch A is still running is ordinary, not an error — the server allows it and
+   * stamps both. But a second running row belonged to no section: it is not `ready`, not `waiting`
+   * and not `done`, so nothing rendered it. The task disappeared from the operator's screen while
+   * remaining IN_PROGRESS on the server, with no card left to open and therefore no way to finish
+   * it. Found on the emulator with two batches running at once; invisible to every script, because
+   * scripts finish one activity before starting the next.
+   */
+  const current = running.length > 0 ? running : ready[0] ? [ready[0]] : [];
+  const currentIds = new Set(current.map((r) => r.activity_id));
+  const upNext = rows.find((r) => !currentIds.has(r.activity_id) && workGroupOf(r.state) === 'ready')
+    ?? waiting[0]
+    ?? null;
 
-  // Time-aware task prioritization:
-  // 1. In-progress task matching current H window
-  // 2. Ready task at current H
-  // 3. Overdue incomplete task
-  // 4. Fallback in-progress / ready
-  const inWindowInProgress = batchRows.find(
-    (r) => r.state === 'IN_PROGRESS' &&
-      (r.baseline_start_hour == null || r.baseline_start_hour <= currentBatchHour)
-  );
-  const inWindowReady = batchRows.find(
-    (r) => (r.state === 'READY' || r.state === 'RETURNED') &&
-      (r.baseline_start_hour == null || r.baseline_start_hour <= currentBatchHour)
-  );
-  const overdueTask = batchRows.find(
-    (r) => (r.state === 'READY' || r.state === 'IN_PROGRESS' || r.state === 'DEVIATION') &&
-      r.baseline_end_hour != null && r.baseline_end_hour < currentBatchHour
-  );
-  const fallbackReady = batchRows.find(
-    (r) => r.state === 'READY' || r.state === 'RETURNED' || r.state === 'DEVIATION' || r.state === 'IN_PROGRESS'
-  );
-
-  const currentTask = inWindowInProgress || inWindowReady || overdueTask || fallbackReady;
-
-  const upNextTask = batchRows.find(
-    (r) => r.id !== currentTask?.id &&
-      (r.state === 'READY' || r.state === 'BLOCKED' || r.state === 'WAITING_CONDITION' || r.state === 'LOCKED')
-  );
-
-  const waitingTasks = batchRows.filter(
-    (r) => r.id !== currentTask?.id && (r.state === 'WAITING_TIME' || (r.state === 'BLOCKED' && r.id !== upNextTask?.id))
-  );
-  const completedTasks = batchRows.filter((r) => r.state === 'COMPLETED');
-
-  // Weighment target strictly scoped to active batch
-  const loads = ((totals.data ?? []) as { master_batch_id?: string; state: string; planned_qty_mt: number | null }[])
-    .filter((l) => !activeBatchId || l.master_batch_id === activeBatchId);
-  const targetMT = loads.reduce((s, l) => s + Number(l.planned_qty_mt ?? 0), 0);
-  const loadedMT = loads
-    .filter((l) => l.state === 'COMPLETED')
-    .reduce((s, l) => s + Number(l.planned_qty_mt ?? 0), 0);
-  const loadedCount = loads.filter((l) => l.state === 'COMPLETED').length;
+  const handleStart = async (row: MyWorkRow) => {
+    setStarting(row.activity_id);
+    setStartError(null);
+    try {
+      await startActivity(row.activity_id);
+      qc.invalidateQueries({ queryKey: ['my-work'] });
+    } catch (e) {
+      // The refusal names what to do instead. Show it; never replace it with "Something went wrong".
+      setStartError(humanError(e));
+    } finally {
+      setStarting(null);
+    }
+  };
 
   return (
     <div className="pb-20 max-w-3xl mx-auto space-y-5">
-      {/* 1. TOP BATCH CLOCK HERO CARD */}
-      <div className="bg-surface rounded-2xl p-5 shadow-card border border-line">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Current Batch Assignment</span>
-            <h1 className="font-head text-xl font-extrabold text-ink">{batchLabel}</h1>
-          </div>
-          <div className="flex items-center gap-1.5 bg-green-100 text-green-700 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-green-700 pulse-dot"></span> SHIFT ACTIVE
-          </div>
-        </div>
+      <BatchHeader
+        context={context.data ?? null}
+        batchCode={runningFirst.batch_code}
+        otherBatches={[...otherBatches]}
+      />
 
-        <div className="pt-3 flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <span className="text-xs text-muted font-medium">Batch Process Clock:</span>
-            <div className="font-head text-2xl font-extrabold text-accent">
-              H{currentBatchHour} <span className="text-sm font-normal text-muted">/ H{baselineHours}</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-muted font-medium">Day Anchor:</span>
-            <p className="font-mono text-xs font-bold text-ink-2">
-              Day {Math.floor(currentBatchHour / 24)} · {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
-        </div>
-
-        {/* Visual Continuous Timeline Rail */}
-        <div className="mt-3 w-full bg-surface-2 h-2 rounded-full overflow-hidden border border-line/60">
-          <div
-            className="bg-accent h-full transition-all duration-500 rounded-full"
-            style={{ width: `${Math.min(100, Math.max(2, (currentBatchHour / baselineHours) * 100))}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Fibre Weighment Progress (if applicable) */}
-      {targetMT > 0 && (
-        <Card className="p-4" rail="var(--accent)">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-head text-[11px] font-bold uppercase tracking-wider text-ink-2">
-              Fibre Weighment Progress
-            </span>
-            <span className="font-mono text-xs font-bold text-accent">
-              {loadedCount} of {loads.length} loads
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Target" value={targetMT.toFixed(1)} unit="MT" />
-            <Stat label="Loaded" value={loadedMT.toFixed(2)} unit="MT" tone="ok" />
-            <Stat label="Remaining" value={(targetMT - loadedMT).toFixed(2)} unit="MT" />
-          </div>
-          <div className="mt-2.5">
-            <Bar kind="material" value={loadedMT} max={targetMT} unit="MT" tone="ok" />
-          </div>
+      {startError && (
+        <Card className="p-4 border-danger/40" rail="var(--danger)">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-danger">
+            Refused by the server
+          </span>
+          <p className="mt-1 text-sm font-bold text-ink">{startError.title}</p>
+          {startError.detail && <p className="mt-0.5 text-[12px] text-ink-2">{startError.detail}</p>}
         </Card>
       )}
 
-      {/* 2. CURRENT TASK (NOW) */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-[12px] font-mono font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
-            Current Work (Now)
-          </h2>
-          <span className="text-[11px] text-muted">Primary Action</span>
-        </div>
-
-        {currentTask ? (
-          <div
-            className="bg-surface rounded-2xl p-5 shadow-raised border border-line transition-all"
-            style={{ borderLeftWidth: 5, borderLeftColor: 'var(--accent)' }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-accent-soft text-accent-ink">
-                    H{currentTask.baseline_start_hour ?? currentTask.rel_day * 24}
-                    {currentTask.baseline_end_hour ? ` → H${currentTask.baseline_end_hour}` : ''}
-                  </span>
-                  {currentTask.day0_duration_hr && (
-                    <span className="font-mono text-xs text-muted font-semibold">
-                      {currentTask.day0_duration_hr}h target
-                    </span>
-                  )}
-                  <Chip tone={currentTask.state === 'IN_PROGRESS' ? 'accent' : 'ok'}>
-                    {currentTask.state === 'IN_PROGRESS' ? 'IN PROGRESS' : 'READY TO START'}
-                  </Chip>
-                </div>
-                <h3 className="font-head text-lg font-bold text-ink leading-tight">
-                  {currentTask.title}
-                </h3>
-                <p className="mt-1 text-xs text-muted font-mono">
-                  {currentTask.scope_label}
-                  {currentTask.machine?.code ? ` · Machine: ${currentTask.machine.code}` : ''}
-                  {currentTask.destination?.label ? ` · Vessel: ${currentTask.destination.label}` : ''}
-                </p>
-              </div>
-            </div>
-
-            {currentTask.actual_start && (
-              <div className="mt-3 p-2.5 rounded-xl bg-surface-2 border border-line/60 text-xs text-ink-2">
-                <span className="font-semibold text-accent">Started:</span>{' '}
-                {new Date(currentTask.actual_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} (Server authoritative)
-              </div>
-            )}
-
-            <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center justify-between gap-3">
-              <span className="text-[11px] text-muted">
-                {currentTask.state === 'IN_PROGRESS' ? 'Record readings & attach photos' : 'Press start to begin timer'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setOpen({ id: currentTask.id, batchStatus: currentTask.master_batch.status })}
-                className="h-11 px-6 rounded-xl font-head text-[13px] font-bold text-white shadow-md transition-transform active:scale-95 flex items-center gap-2"
-                style={{ background: 'var(--accent)' }}
-              >
-                {currentTask.state === 'IN_PROGRESS' ? 'Record & Submit →' : 'Start Task →'}
-              </button>
-            </div>
-          </div>
+        <GroupHeading tone="accent" pulse>
+          Current work (now)
+        </GroupHeading>
+        {current.length > 0 ? (
+          current.map((r) => (
+            <TaskCard
+              key={r.activity_id}
+              row={r}
+              prominent
+              busy={starting === r.activity_id}
+              onStart={() => handleStart(r)}
+              onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })}
+            />
+          ))
         ) : (
-          <div className="bg-surface rounded-2xl p-4 border border-line text-center text-muted text-xs">
-            No pending action items right now.
-          </div>
+          <EmptyState
+            title="Nothing to start yet"
+            detail="Everything assigned to you is waiting on something else. The reason is on each card below."
+          />
         )}
       </section>
 
-      {/* 3. UP NEXT */}
-      {upNextTask && (
-        <section className="space-y-2 pt-1">
-          <h2 className="text-[11px] font-mono font-bold uppercase tracking-wider text-muted px-1">
-            Up Next
-          </h2>
-          <div
-            onClick={() => setOpen({ id: upNextTask.id, batchStatus: upNextTask.master_batch.status })}
-            className="bg-surface rounded-xl p-4 shadow-card border border-line cursor-pointer hover:border-primary/40 transition-colors flex items-center justify-between gap-3"
-          >
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-muted/20 text-ink-2">
-                  H{upNextTask.baseline_start_hour ?? upNextTask.rel_day * 24}
-                  {upNextTask.baseline_end_hour ? ` → H${upNextTask.baseline_end_hour}` : ''}
-                </span>
-                <span className="text-[10px] uppercase font-bold text-muted">
-                  {upNextTask.state.replace(/_/g, ' ')}
-                </span>
-              </div>
-              <h4 className="font-head text-sm font-bold text-ink">{upNextTask.title}</h4>
-              <p className="text-[11px] text-muted">{upNextTask.scope_label}</p>
-            </div>
-            <span className="text-muted text-sm font-bold">→</span>
-          </div>
+      {upNext && (
+        <section className="space-y-2">
+          <GroupHeading>Up next</GroupHeading>
+          <TaskCard
+            row={upNext}
+            busy={starting === upNext.activity_id}
+            onStart={() => handleStart(upNext)}
+            onOpen={() => setOpen({ id: upNext.activity_id, batchStatus: 'active' })}
+          />
         </section>
       )}
 
-      {/* 4. WAITING ON REST / TIME-GATE (Collapsible) */}
-      {waitingTasks.length > 0 && (
-        <section className="pt-2">
-          <button
-            type="button"
-            onClick={() => setWaitingOpen(!waitingOpen)}
-            className="w-full flex items-center justify-between py-2 px-1 text-[12px] font-mono font-bold uppercase tracking-wider text-muted hover:text-ink transition-colors"
-          >
-            <span>Waiting on Rest / Time-Gates ({waitingTasks.length})</span>
-            <span>{waitingOpen ? '▲ Hide' : '▼ View'}</span>
-          </button>
-
-          {waitingOpen && (
-            <div className="space-y-2 mt-2">
-              {waitingTasks.map((t) => (
-                <div key={t.id} className="bg-surface rounded-xl p-3.5 border border-line shadow-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-head text-xs font-bold text-ink">{t.title}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                      RESTING
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted mt-0.5">{t.scope_label}</p>
-                  {t.unblocks_at && (
-                    <div className="mt-2 text-xs font-mono font-bold text-accent flex items-center gap-1.5">
-                      <span>Rest Timer:</span>
-                      <Countdown until={t.unblocks_at} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+      {ready.some((r) => !currentIds.has(r.activity_id) && r.activity_id !== upNext?.activity_id) && (
+        <section className="space-y-2">
+          <GroupHeading>Ready now</GroupHeading>
+          {ready
+            .filter((r) => !currentIds.has(r.activity_id) && r.activity_id !== upNext?.activity_id)
+            .map((r) => (
+              <TaskCard
+                key={r.activity_id}
+                row={r}
+                busy={starting === r.activity_id}
+                onStart={() => handleStart(r)}
+                onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })}
+              />
+            ))}
         </section>
       )}
 
-      {/* 5. COMPLETED TODAY (Collapsible) */}
-      {completedTasks.length > 0 && (
-        <section className="pt-1">
-          <button
-            type="button"
-            onClick={() => setCompletedOpen(!completedOpen)}
-            className="w-full flex items-center justify-between py-2 px-1 text-[12px] font-mono font-bold uppercase tracking-wider text-muted hover:text-ink transition-colors"
-          >
-            <span>Completed Work ({completedTasks.length})</span>
-            <span>{completedOpen ? '▲ Hide' : '▼ View'}</span>
-          </button>
+      <CollapsibleGroup
+        title="Waiting"
+        count={waiting.length}
+        open={waitingOpen}
+        onToggle={() => setWaitingOpen(!waitingOpen)}
+      >
+        {waiting.map((r) => (
+          <TaskCard
+            key={r.activity_id}
+            row={r}
+            onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })}
+          />
+        ))}
+      </CollapsibleGroup>
 
-          {completedOpen && (
-            <div className="space-y-2 mt-2">
-              {completedTasks.slice(0, 10).map((t) => (
-                <div key={t.id} className="bg-surface rounded-xl p-3 border border-line/60 flex items-center justify-between opacity-80">
-                  <div>
-                    <span className="font-head text-xs font-bold text-ink">{t.title}</span>
-                    <p className="text-[10px] text-muted font-mono">{t.scope_label}</p>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold text-ok flex items-center gap-1">
-                    ✓ Done
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+      <CollapsibleGroup
+        title="Completed"
+        count={done.length}
+        open={completedOpen}
+        onToggle={() => setCompletedOpen(!completedOpen)}
+      >
+        {done.map((r) => (
+          <TaskCard
+            key={r.activity_id}
+            row={r}
+            onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })}
+          />
+        ))}
+      </CollapsibleGroup>
 
-      {/* Task Drawer */}
       {open && (
         <TaskDrawer
           activityId={open.id}
@@ -430,10 +292,375 @@ export function MyWork() {
           onClose={() => setOpen(null)}
           onChanged={() => {
             qc.invalidateQueries({ queryKey: ['my-work'] });
-            qc.invalidateQueries({ queryKey: ['my-work-totals'] });
+            qc.invalidateQueries({ queryKey: ['batch-context', batchId] });
           }}
         />
       )}
     </div>
   );
+}
+
+/**
+ * PROCESS · STANDARD · H0 · BASELINE, and after work starts, AUTHORISED and PROJECTED.
+ *
+ * Six separate numbers on purpose. The projection never folds in the approved extension, and the
+ * basis is always named, so nobody reads a guess as a commitment.
+ */
+function BatchHeader({
+  context,
+  batchCode,
+  otherBatches,
+}: {
+  context: BatchContextRow | null;
+  batchCode: string;
+  otherBatches: string[];
+}) {
+  return (
+    <div className="bg-surface rounded-2xl p-5 shadow-card border border-line">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
+            Current batch assignment
+          </span>
+          <h1 className="font-head text-xl font-extrabold text-ink">{context?.code ?? batchCode}</h1>
+        </div>
+        {context?.status === 'active' && (
+          <div className="flex items-center gap-1.5 bg-green-100 text-green-700 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-green-700 pulse-dot" /> SHIFT ACTIVE
+          </div>
+        )}
+      </div>
+
+      {otherBatches.length > 0 && (
+        <p className="pt-2 text-[11px] text-muted">
+          You also have work on {otherBatches.join(', ')}. Every card names its own batch.
+        </p>
+      )}
+
+      <dl className="pt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Figure label="Process" value={context?.process_code ?? '—'} />
+        <Figure
+          label="Standard"
+          value={context?.standard_hr != null ? `H${context.standard_hr}` : '—'}
+          hint="calculated by the process"
+        />
+        <Figure label="H0" value={formatInstant(context?.h0)} />
+        <Figure label="Baseline end" value={formatInstant(context?.planned_end_at)} />
+      </dl>
+
+      {context && (context.approved_extension_hr || context.projected_end_at) && (
+        <dl className="mt-3 pt-3 border-t border-line grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {context.approved_extension_hr ? (
+            <>
+              <Figure
+                label="Approved extension"
+                value={`+${context.approved_extension_hr} h`}
+                tone="warn"
+              />
+              <Figure label="Authorised end" value={formatInstant(context.authorised_end_at)} tone="warn" />
+            </>
+          ) : null}
+          <Figure
+            label="Projected end"
+            value={formatInstant(context.projected_end_at)}
+            /*
+             * `v_batch_forecast.forecast_basis` is NOT the same vocabulary as
+             * `v_activity_forecast`'s. It yields `projected`, `unknown`, or `no measurement yet` —
+             * that last one being the common case on a young batch, and the one a screen forgets.
+             * So the test is "did it actually project?", not "is it the string 'unknown'?".
+             */
+            hint={
+              context.forecast_basis === 'projected'
+                ? 'projected from measured slip'
+                : context.forecast_unknown_reason ?? context.forecast_basis
+            }
+          />
+        </dl>
+      )}
+    </div>
+  );
+}
+
+type BatchContextRow = Awaited<ReturnType<typeof getBatchContext>>;
+
+function Figure({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: 'warn';
+}) {
+  return (
+    <div>
+      <dt className="text-[10px] font-bold uppercase tracking-widest text-muted">{label}</dt>
+      <dd
+        className={`font-head text-base font-extrabold ${tone === 'warn' ? 'text-warn' : 'text-ink'}`}
+      >
+        {value}
+      </dd>
+      {hint && <p className="text-[10px] text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+function GroupHeading({
+  children,
+  tone,
+  pulse,
+}: {
+  children: React.ReactNode;
+  tone?: 'accent';
+  pulse?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between px-1">
+      <h2
+        className={`text-[12px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+          tone === 'accent' ? 'text-accent' : 'text-ink-2'
+        }`}
+      >
+        {pulse && <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />}
+        {children}
+      </h2>
+    </div>
+  );
+}
+
+function CollapsibleGroup({
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  if (count === 0) return null;
+  return (
+    <section className="space-y-2">
+      <button
+        className="w-full flex items-center justify-between px-1 py-1 text-left"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <h2 className="text-[12px] font-mono font-bold uppercase tracking-wider text-ink-2">
+          {title}
+        </h2>
+        <span className="text-[11px] text-muted">
+          {count} {count === 1 ? 'task' : 'tasks'} {open ? '▲' : '▼'}
+        </span>
+      </button>
+      {open && <div className="space-y-2">{children}</div>}
+    </section>
+  );
+}
+
+/**
+ * One row of `v_my_work`.
+ *
+ * Everything shown is given: the state label, the blocked reason, the outstanding evidence, the
+ * variance. The card computes nothing about whether the work may proceed — it offers the button and
+ * lets the server answer.
+ */
+function TaskCard({
+  row,
+  prominent,
+  busy,
+  onStart,
+  onOpen,
+}: {
+  row: MyWorkRow;
+  prominent?: boolean;
+  busy?: boolean;
+  onStart?: () => void;
+  onOpen: () => void;
+}) {
+  const group = workGroupOf(row.state);
+  const evidenceShort =
+    row.required_count != null &&
+    row.satisfied_total != null &&
+    row.satisfied_total < row.required_count;
+
+  return (
+    <Card
+      className={prominent ? 'p-5' : 'p-4'}
+      rail={
+        group === 'running'
+          ? 'var(--accent)'
+          : group === 'waiting'
+            ? 'var(--muted)'
+            : group === 'done'
+              ? 'var(--ok)'
+              : undefined
+      }
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <StateTag state={row.state} isHold={row.is_hold} />
+          </div>
+          <h3
+            className={`mt-1.5 font-head font-extrabold text-ink ${prominent ? 'text-lg' : 'text-base'}`}
+          >
+            {row.title}
+            {row.scope_label && <span className="text-muted font-normal"> · {row.scope_label}</span>}
+          </h3>
+          <p className="font-mono text-[11px] text-muted">
+            {row.batch_code} · {row.code}
+            {row.stream && ` · ${row.stream}`}
+          </p>
+        </div>
+        {row.variance_minutes != null && row.variance_minutes !== 0 && (
+          <div className="text-right shrink-0">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
+              Variance
+            </span>
+            <p
+              className={`font-mono text-sm font-bold ${row.variance_minutes > 0 ? 'text-warn' : 'text-ok'}`}
+            >
+              {formatVariance(row.variance_minutes)}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-2">
+        <span>
+          Planned <strong className="font-mono">{formatWindow(row.planned_start_at, row.planned_end_at)}</strong>
+        </span>
+        {row.actual_start && (
+          <span>
+            Started <strong className="font-mono">{formatInstant(row.actual_start)}</strong>
+          </span>
+        )}
+        {row.actual_end && (
+          <span>
+            Finished <strong className="font-mono">{formatInstant(row.actual_end)}</strong>
+          </span>
+        )}
+        {row.required_count ? (
+          <span className={evidenceShort ? 'text-warn font-bold' : ''}>
+            Evidence{' '}
+            <strong className="font-mono">
+              {row.satisfied_total ?? 0}/{row.required_count}
+            </strong>
+          </span>
+        ) : null}
+      </div>
+
+      {/*
+        The reason comes from the server, already written as a sentence — but only shown while the
+        activity is ACTUALLY shut. `blocked_reason` is a stored column that survives the transition
+        out of LOCKED, so a running task was rendering "IN PROGRESS" and "WHY THIS IS LOCKED"
+        together. Seen on the first real screen; no test looked.
+      */}
+      {row.blocked_reason && group === 'waiting' && (
+        <div className="mt-3 rounded-lg bg-surface-2 border border-line px-3 py-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
+            Why this is locked
+          </span>
+          <p className="text-[12px] text-ink mt-0.5">{row.blocked_reason}</p>
+        </div>
+      )}
+
+      {row.outstanding_labels && (
+        <div className="mt-2 rounded-lg bg-warn/10 border border-warn/30 px-3 py-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-warn">
+            Still needed before this can finish
+          </span>
+          <p className="text-[12px] text-ink mt-0.5">{row.outstanding_labels}</p>
+        </div>
+      )}
+
+      <div className="mt-3 flex gap-2">
+        {group === 'ready' && onStart && !row.is_hold && (
+          <button
+            className="flex-1 rounded-xl bg-accent text-white font-bold py-3 text-sm disabled:opacity-60"
+            onClick={onStart}
+            disabled={busy}
+          >
+            {busy ? 'Starting…' : 'Start task'}
+          </button>
+        )}
+        <button
+          className={`rounded-xl border border-line font-bold py-3 text-sm px-4 ${
+            group === 'ready' && onStart ? '' : 'flex-1'
+          }`}
+          onClick={onOpen}
+        >
+          {group === 'running' ? 'Continue task' : group === 'done' ? 'View record' : 'Open'}
+        </button>
+      </div>
+
+      {/* A hold is never started by anybody, so the line about starting does not belong on it. */}
+      {group === 'ready' && !row.is_hold && (
+        <p className="mt-2 text-[10px] text-muted">
+          Starting records the official time. You do not enter it.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function StateTag({ state, isHold }: { state: string; isHold?: boolean }) {
+  /*
+   * A HOLD IS NOT READY. `is_hold` rows are material resting — nobody performs them — and the
+   * screen was tagging them "Ready now" beside the line saying nobody performs this. A hold has
+   * its own state and should read as one.
+   */
+  if (isHold) {
+    return (
+      <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-surface-2 text-muted">
+        Resting — nobody performs this
+      </span>
+    );
+  }
+  const group = workGroupOf(state);
+  const cls =
+    group === 'running'
+      ? 'bg-accent/15 text-accent'
+      : group === 'ready'
+        ? 'bg-ok/15 text-ok'
+        : group === 'done'
+          ? 'bg-surface-2 text-muted'
+          : 'bg-warn/15 text-warn';
+  return (
+    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${cls}`}>
+      {STATE_LABEL[state] ?? state}
+    </span>
+  );
+}
+
+/** `+01:18` / `−00:12`. A minute count is not a duration a person reads at arm's length. */
+function formatVariance(minutes: number): string {
+  const sign = minutes > 0 ? '+' : '−';
+  const abs = Math.abs(minutes);
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
+}
+
+function formatInstant(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString([], {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatWindow(start: string | null, end: string | null): string {
+  if (!start && !end) return '—';
+  const t = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  return `${t(start)} → ${t(end)}`;
 }

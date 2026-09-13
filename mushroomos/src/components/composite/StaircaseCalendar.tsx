@@ -40,7 +40,7 @@ export function StaircaseCalendar({
     return (
       <EmptyState
         title="No batch is running"
-        detail="The board fills the moment a batch is activated. Admin creates one at /admin/batch/new; activation freezes its baseline and opens whatever its gates allow."
+        detail="The board fills the moment a batch is activated. Admin creates one at /admin/batch/start; activation freezes its baseline and opens whatever its gates allow."
       />
     );
   }
