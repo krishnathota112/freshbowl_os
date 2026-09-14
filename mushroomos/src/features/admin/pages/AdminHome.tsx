@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { loadAdminHome } from '../api/intake';
 import type { BatchContext } from '../../../shared/api/work';
-import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
-import { fmtWhen } from '../../../shared/utilities/labWords';
+import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
+import { fmtWhen } from '../../../shared/utils/labWords';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 
 /**
@@ -107,7 +107,7 @@ export function AdminHome() {
               )}
               {q.data.deviationsOpen > 0 && (
                 <RowLink
-                  to="/supervisor/control-room"
+                  to="/gm/progress"
                   label={`${q.data.deviationsOpen} open ${q.data.deviationsOpen === 1 ? 'deviation' : 'deviations'} on record`}
                   detail="Supervisor or GM review required to clear active deviations."
                   icon="warning"

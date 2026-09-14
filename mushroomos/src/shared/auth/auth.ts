@@ -27,11 +27,11 @@ import type { AppRole } from '../../domain/types';
 const WEB_HOME: Record<AppRole, string> = {
   operator: '/operator/my-work',
   lab_tech: '/lab/queue',
-  supervisor: '/supervisor/control-room',
+  // The Control Room, Resources and Control Tower homes were retired to src/legacy/ (14 Sep 2026).
+  supervisor: '/operator/my-work',
   admin: '/admin',
-  manager: '/manager/resources',
-  // S1 · the Control Tower, C3. `/gm/command-center` still resolves — App.tsx redirects it.
-  gm: '/gm/control-tower',
+  manager: '/admin/batches',
+  gm: '/gm/progress',
 };
 
 /**

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { APP_ROLES, ROLE_HOME, ROLE_LABEL, isNativeApp, roleAllowedHere, signIn, signOut, useAuth } from './auth';
 import type { AppRole } from '../../domain/types';
-import { humanError } from '../../lib/humanError';
+import { humanError } from '../utils/humanError';
 import { Chip } from '../ui/primitives';
 
 const ALL_DEMO_ACCOUNTS = [

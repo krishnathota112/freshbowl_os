@@ -7,8 +7,8 @@ import { createAndPlan, requiredMaterialRoles, resolveH0 } from '../api/intake';
 import { listSelectableProcessVersions, type ProcessVersion } from '../api/process';
 import { loadMaterialRoles } from '../api/processDefinition';
 import { supabase } from '../../../shared/api/client';
-import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
-import { fmtWhen } from '../../../shared/utilities/labWords';
+import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
+import { fmtWhen } from '../../../shared/utils/labWords';
 import { Skeleton } from '../../../shared/ui/primitives';
 
 /**

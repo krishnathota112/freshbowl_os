@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { nowMs } from '../../utilities/now';
+import { nowMs } from '../../utils/now';
 
 /** Semantic tones. Meaning only — never decoration. docs/UI_DESIGN_SPEC.md §1. */
 export type Tone = 'ok' | 'warn' | 'crit' | 'inherit' | 'lock' | 'accent' | 'muted';

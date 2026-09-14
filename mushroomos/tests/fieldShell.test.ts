@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { FIELD_ROLES, ROLE_HOME, isFieldRole } from '../src/lib/auth';
+import { FIELD_ROLES, ROLE_HOME, isFieldRole } from '../src/shared/auth/auth';
 import type { AppRole } from '../src/domain/types';
 
 const APP_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -115,7 +115,7 @@ function redirectComponents(text: string): { name: string; targets: string[] }[]
 }
 
 function routeTable(): RouteRow[] {
-  const text = src('App.tsx');
+  const text = src('app', 'App.tsx');
   const lines = text.split('\n');
 
   // The named role sets, read from their declarations: `const MGMT: AppRole[] = [...]`.
@@ -309,9 +309,9 @@ const bytesIn = (keys: Set<string>) =>
  * Rollup merges a route's dependencies into the route's own chunk and the file names carry hashes.
  */
 const FORBIDDEN_IN_FIELD: { module: string; what: string; inProductionBuild?: false }[] = [
-  { module: 'src/components/composite/StaircaseCalendar.tsx', what: 'the staircase' },
+  { module: 'src/legacy/ui/StaircaseCalendar.tsx', what: 'the staircase', inProductionBuild: false }, // retired to src/legacy, 14 Sep 2026
   {
-    module: 'src/components/composite/HourRail.tsx',
+    module: 'src/shared/ui/composite/HourRail.tsx',
     what: 'the hour rail',
     // The `inProductionBuild: false` exception THIS ENTRY USED TO CARRY IS GONE.
     //
@@ -323,27 +323,27 @@ const FORBIDDEN_IN_FIELD: { module: string; what: string; inProductionBuild?: fa
     // exception predicted. So the entry is now an ordinary positive control again: the rail must be in
     // the production build AND out of the field entry.
   },
-  { module: 'src/components/composite/geometry.ts', what: 'the board geometry' },
-  { module: 'src/components/composite/ExceptionBand.tsx', what: 'the exception band' },
-  { module: 'src/api/tower.ts', what: "the tower's query layer" },
-  { module: 'src/routes/ControlTower.tsx', what: 'the control tower' },
-  { module: 'src/components/node/FiveLayerNode.tsx', what: 'the production graph node' },
-  { module: 'src/routes/ProcessExplorer.tsx', what: 'the process graph' },
+  { module: 'src/shared/ui/composite/geometry.ts', what: 'the board geometry' },
+  { module: 'src/legacy/ui/ExceptionBand.tsx', what: 'the exception band', inProductionBuild: false }, // retired
+  { module: 'src/shared/api/tower.ts', what: "the tower's query layer" },
+  { module: 'src/legacy/gm/ControlTower.tsx', what: 'the control tower', inProductionBuild: false }, // retired
+  { module: 'src/shared/ui/graph/FiveLayerNode.tsx', what: 'the production graph node' },
+  { module: 'src/features/admin/pages/ProcessExplorer.tsx', what: 'the process graph' },
   // The Gantt does not exist yet — A5 builds it. `UI_IMPLEMENTATION_PLAN §3.1` puts it in `Resources`,
   // which is why that screen was extracted into its own module: the boundary is asserted now, so the
   // Gantt cannot land inside the field entry later without failing this test.
-  { module: 'src/routes/Resources.tsx', what: 'the resource view, where the Gantt lands at A5' },
-  { module: 'src/components/layout/AppShell.tsx', what: 'the management shell' },
+  { module: 'src/legacy/manager/Resources.tsx', what: 'the resource view', inProductionBuild: false }, // retired
+  { module: 'src/shared/ui/layout/AppShell.tsx', what: 'the management shell' },
 ];
 
 /** The chunks a field session downloads: the entry, the field shell, and the field screens. */
 function fieldBundle(): Set<string> {
   return initialBundle([
     entryKey(),
-    chunkOf('src/components/layout/FieldShell.tsx').key,
-    chunkOf('src/routes/MyWork.tsx').key,
-    chunkOf('src/routes/LabQueue.tsx').key,
-    chunkOf('src/routes/LabCheckpoint.tsx').key,
+    chunkOf('src/shared/ui/layout/FieldShell.tsx').key,
+    chunkOf('src/features/supervisor/pages/MyWork.tsx').key,
+    chunkOf('src/features/lab/pages/LabQueue.tsx').key,
+    chunkOf('src/features/lab/pages/LabCheckpoint.tsx').key,
   ]);
 }
 
@@ -408,7 +408,7 @@ describe('C-FIELD — an operator lands on the field shell and can reach no mana
    * route table that leaks.
    */
   it('an unguarded redirect lands on a GUARDED route, so it cannot launder access', () => {
-    const text = src('App.tsx');
+    const text = src('app', 'App.tsx');
     const table = routeTable();
     const comps = redirectComponents(text);
 
@@ -438,10 +438,10 @@ describe('C-FIELD — an operator lands on the field shell and can reach no mana
     }
   });
 
-  it('the gallery is the only dev-only route, and a field role reaching it is a DEV concession', () => {
+  it('there is no dev-only route — the gallery was retired to src/legacy (14 Sep 2026)', () => {
     const dev = routeTable().filter((r) => r.devOnly);
-    expect(dev.map((r) => r.path)).toEqual(['/dev/gallery']);
-    // And it genuinely leaves the production build — asserted on the build output further down.
+    expect(dev.map((r) => r.path)).toEqual([]);
+    // And it is absent from the production build — asserted on the build output further down.
   });
 });
 
@@ -469,9 +469,9 @@ describe('C-FIELD — a management role never sees the field shell', () => {
         users.push(relative(APP_ROOT, file).split(sep).join('/'));
       }
     }
-    expect(users).toEqual(['src/App.tsx']);
+    expect(users).toEqual(['src/app/App.tsx']);
 
-    const app = code(src('App.tsx'));
+    const app = code(src('app', 'App.tsx'));
     const selector = /isFieldRole\(role\)\s*\?\s*FieldShell\s*:\s*AppShell/.exec(app);
     expect(selector, 'the shell is not chosen by isFieldRole(role)').toBeTruthy();
     // No second, URL-based path into the field shell.
@@ -482,7 +482,7 @@ describe('C-FIELD — a management role never sees the field shell', () => {
 
 describe('C-FIELD — FieldShell is what §C-FIELD specifies', () => {
   /** Comments stripped — see `code()`. The header describes every one of these bans by name. */
-  const shell = () => code(src('components', 'layout', 'FieldShell.tsx'));
+  const shell = () => code(src('shared', 'ui', 'layout', 'FieldShell.tsx'));
 
   it('has no nav bar', () => {
     const text = shell();
@@ -599,7 +599,7 @@ describe('C-FIELD — the PWA manifest', () => {
     expect(m.display).toBe('standalone');
 
     // The claim above only holds if Landing really does redirect by role.
-    const app = code(src('App.tsx'));
+    const app = code(src('app', 'App.tsx'));
     expect(app).toMatch(/function Landing\(\)/);
     expect(app).toMatch(/<Navigate to=\{ROLE_HOME\[role\]\} replace \/>/);
     expect(app).toMatch(/<Route path="\/" element=\{<Landing \/>\}/);
@@ -608,7 +608,7 @@ describe('C-FIELD — the PWA manifest', () => {
   it('its colours are the token values, not invented ones', () => {
     // A manifest is JSON read by the operating system, so it cannot use var(--accent). This is the one
     // place a token value is duplicated, and it has to match.
-    const tokens = readFileSync(join(APP_ROOT, 'src', 'theme', 'tokens.css'), 'utf8');
+    const tokens = readFileSync(join(APP_ROOT, 'src', 'styles', 'tokens.css'), 'utf8');
     const light = tokens.slice(tokens.indexOf(':root'), tokens.indexOf("[data-theme='dark']"));
     const value = (name: string) => new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(light)?.[1];
 
@@ -641,8 +641,8 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
     // The entry is App, the shells' selector, auth, the Supabase client and the primitives — nothing
     // that renders a screen.
     for (const m of entry.modules) {
-      expect(m, `${m} is in the entry chunk`).not.toMatch(/^src\/routes\//);
-      expect(m, `${m} is in the entry chunk`).not.toMatch(/^src\/components\/(composite|layout)\//);
+      expect(m, `${m} is in the entry chunk`).not.toMatch(/^src\/features\//);
+      expect(m, `${m} is in the entry chunk`).not.toMatch(/^src\/shared\/ui\/(composite|layout)\//);
     }
     // And the screens are reached lazily.
     expect(entry.dynamicImports.length, 'nothing is lazily loaded').toBeGreaterThan(10);
@@ -679,7 +679,7 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
    * "is it present" check.
    */
   it('HourRail is in the production build now C4 landed, and still out of the field entry', () => {
-    const rail = 'src/components/composite/HourRail.tsx';
+    const rail = 'src/shared/ui/composite/HourRail.tsx';
     const everywhere = new Set([...build().values()].flatMap((c) => c.modules));
     expect(
       everywhere.has(rail),
@@ -688,7 +688,7 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
 
     // Its consumer is the batch page, not the gallery. If this were still gallery-only it would drop
     // out of the production build the moment the dev block stopped being emitted.
-    expect(src('routes', 'BatchPage.tsx')).toMatch(/HourRail/);
+    expect(src('features', 'admin', 'pages', 'BatchPage.tsx')).toMatch(/HourRail/);
 
     // AND IT IS NOT IN THE FIELD ENTRY. The operator never downloads the rail.
     expect(modulesIn(fieldBundle()).has(rail), 'the field entry downloads the hour rail').toBe(false);
@@ -696,18 +696,18 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
     expect(existsSync(join(APP_ROOT, rail)), 'the rail was deleted rather than wired up').toBe(true);
   });
 
-  it('the management entry DOES contain the tower, so the two really differ', () => {
+  // The Control Tower was retired to src/legacy (14 Sep 2026); the batch page is now the management
+  // screen that carries the heavy layer, so it is the positive control.
+  it('the management batch page DOES contain the heavy layer, so the two really differ', () => {
     const mgmt = initialBundle([
       entryKey(),
-      chunkOf('src/components/layout/AppShell.tsx').key,
-      chunkOf('src/routes/ControlTower.tsx').key,
+      chunkOf('src/shared/ui/layout/AppShell.tsx').key,
+      chunkOf('src/features/admin/pages/BatchPage.tsx').key,
     ]);
     const present = modulesIn(mgmt);
     for (const m of [
-      'src/components/composite/StaircaseCalendar.tsx',
-      'src/components/composite/geometry.ts',
-      'src/api/tower.ts',
-      'src/components/layout/AppShell.tsx',
+      'src/shared/ui/composite/HourRail.tsx',
+      'src/shared/ui/layout/AppShell.tsx',
     ]) {
       expect(present.has(m), `${m} is not in the management entry either`).toBe(true);
     }
@@ -718,10 +718,9 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
     const mgmt = bytesIn(
       initialBundle([
         entryKey(),
-        chunkOf('src/components/layout/AppShell.tsx').key,
-        chunkOf('src/routes/ControlTower.tsx').key,
-        chunkOf('src/routes/ProcessExplorer.tsx').key,
-        chunkOf('src/routes/ScheduleBuilder.tsx').key,
+        chunkOf('src/shared/ui/layout/AppShell.tsx').key,
+        chunkOf('src/features/admin/pages/BatchPage.tsx').key,
+        chunkOf('src/features/admin/pages/ProcessExplorer.tsx').key,
       ])
     );
     expect(field).toBeLessThan(mgmt);
@@ -733,15 +732,15 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
 
   it('the field shell is in the field entry and the management shell is not', () => {
     const present = modulesIn(fieldBundle());
-    expect(present.has('src/components/layout/FieldShell.tsx')).toBe(true);
-    expect(present.has('src/components/layout/AppShell.tsx')).toBe(false);
+    expect(present.has('src/shared/ui/layout/FieldShell.tsx')).toBe(true);
+    expect(present.has('src/shared/ui/layout/AppShell.tsx')).toBe(false);
   });
 
   it('the gallery leaves the production build entirely', () => {
     // Its route was already DEV-gated, but the `lazy()` call sat at module scope where nothing removed
     // it, so a Gallery chunk of its own was emitted — carrying the staircase, the rail and api/tower.
     const everywhere = new Set([...build().values()].flatMap((c) => c.modules));
-    expect(everywhere.has('src/routes/Gallery.tsx')).toBe(false);
+    expect(everywhere.has('src/legacy/dev/Gallery.tsx')).toBe(false);
     expect(
       [...build().values()].filter((c) => /Gallery/i.test(c.file)).map((c) => c.file)
     ).toEqual([]);
@@ -750,12 +749,12 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
   it('no field chunk reaches the management shell, by any path', () => {
     // The reason `PageHeading` was moved out of `AppShell.tsx`: ten routes import it, `MyWork` among
     // them, so every one of them used to pull the management shell into its chunk.
-    const appShell = chunkOf('src/components/layout/AppShell.tsx').key;
+    const appShell = chunkOf('src/shared/ui/layout/AppShell.tsx').key;
     for (const module of [
-      'src/routes/MyWork.tsx',
-      'src/routes/LabQueue.tsx',
-      'src/routes/LabCheckpoint.tsx',
-      'src/components/layout/FieldShell.tsx',
+      'src/features/supervisor/pages/MyWork.tsx',
+      'src/features/lab/pages/LabQueue.tsx',
+      'src/features/lab/pages/LabCheckpoint.tsx',
+      'src/shared/ui/layout/FieldShell.tsx',
     ]) {
       const reached = initialBundle([chunkOf(module).key]);
       expect([...reached], `${module} statically reaches AppShell`).not.toContain(appShell);

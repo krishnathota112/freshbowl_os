@@ -121,13 +121,15 @@ export function BatchPage() {
             <Chip tone={d.status === 'active' ? 'ok' : d.status === 'draft' ? 'inherit' : 'lock'}>
               {d.status}
             </Chip>
-            <Link
-              to={`/admin/batch/${id}/schedule`}
-              className="rounded border px-3 py-2 font-head text-[12px] font-700"
-              style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
-            >
-              {d.status === 'draft' ? 'Open the schedule' : 'View the schedule'}
-            </Link>
+            {d.status === 'draft' && (
+              <Link
+                to={`/admin/batch/${id}/prepare`}
+                className="rounded border px-3 py-2 font-head text-[12px] font-700"
+                style={{ borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
+              >
+                Continue setup
+              </Link>
+            )}
           </div>
         }
       />

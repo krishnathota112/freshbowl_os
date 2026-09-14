@@ -10,7 +10,7 @@ import {
   type BatchMonitor as Monitor,
   type TimelinePhoto,
   type TimelineRow,
-} from '../api/monitor';
+} from '../../../shared/api/monitor';
 
 /**
  * The verification console. Operating flow §6, 14 Sep 2026:

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rowsFromCells } from '../src/lib/monthlyScheduleImport';
+import { rowsFromCells } from '../src/shared/utils/monthlyScheduleImport';
 import {
   DAY0_STRUCTURE,
   DB_URL,

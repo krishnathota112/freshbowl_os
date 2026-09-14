@@ -12,8 +12,8 @@ import {
 import { supabase } from '../../../shared/api/client';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, ConflictMarker, EmptyState, Stat } from '../../../shared/ui/primitives';
-import { TaskDrawer } from '../../../shared/ui/TaskDrawer';
-import { nowMs } from '../../../shared/utilities/now';
+import { TaskDrawer } from '../../../shared/ui/task/TaskDrawer';
+import { nowMs } from '../../../shared/utils/now';
 import { BatchMonitor } from '../components/BatchMonitor';
 
 /**
@@ -74,13 +74,15 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
                 Check rest timers
               </button>
             )}
-            <Link
-              to={`/admin/batch/${id}/schedule`}
-              className="rounded px-3 py-2 font-head text-[12px] font-700"
-              style={{ background: '#16794a', color: '#fff' }}
-            >
-              {b.status === 'draft' ? 'Open the schedule' : 'View the schedule'}
-            </Link>
+            {b.status === 'draft' && (
+              <Link
+                to={`/admin/batch/${id}/prepare`}
+                className="rounded px-3 py-2 font-head text-[12px] font-700"
+                style={{ background: '#16794a', color: '#fff' }}
+              >
+                Continue setup
+              </Link>
+            )}
             {b.status === 'draft' && (
               <button
                 onClick={() => activate.mutate()}
@@ -1013,12 +1015,6 @@ function TunnelPlanningSection({ batchId }: { batchId: string }) {
                 movement windows.
               </p>
             </div>
-            <Link
-              to={`/admin/batch/${batchId}/schedule`}
-              className="px-3.5 py-1.5 rounded-lg bg-accent text-white font-head text-xs font-bold shrink-0 hover:opacity-90 transition-all"
-            >
-              Allocate Tunnels →
-            </Link>
           </div>
         )}
       </div>

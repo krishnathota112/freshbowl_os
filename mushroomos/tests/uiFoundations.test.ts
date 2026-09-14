@@ -31,8 +31,8 @@ import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 
-import { humanDuration } from '../src/components/domain/HumanDuration';
-import { densityForRole } from '../src/lib/useDensity';
+import { humanDuration } from '../src/shared/ui/domain/HumanDuration';
+import { densityForRole } from '../src/shared/utils/useDensity';
 import { batchDay, isWithinBaseline, wallClock } from '../src/domain/time';
 import {
   fixtureActivities,
@@ -41,7 +41,7 @@ import {
   fixtureSegments,
   fixtureStaircase,
   type FixtureGeometry,
-} from '../src/fixtures';
+} from '../src/legacy/dev/fixtures';
 import type { ActivityRef, BatchBar, Exception, TowerCounters } from '../src/domain/contracts';
 import { ACTIVITY_STATES } from '../src/domain/types';
 import { REPO_ROOT } from './db';
@@ -141,10 +141,10 @@ describe('A4 — Bar cannot be used for batch progress', () => {
  * `App.tsx`, which A15 requires to exist. The architecture document wins.
  */
 const COMPONENT_LAYERS: { dir: string; layer: 'L1' | 'L2' | 'L3' }[] = [
-  { dir: 'src/components/primitives', layer: 'L1' },
-  { dir: 'src/components/node', layer: 'L2' },
-  { dir: 'src/components/domain', layer: 'L2' },
-  { dir: 'src/components/composite', layer: 'L3' },
+  { dir: 'src/shared/ui/primitives', layer: 'L1' },
+  { dir: 'src/shared/ui/graph', layer: 'L2' },
+  { dir: 'src/shared/ui/domain', layer: 'L2' },
+  { dir: 'src/shared/ui/composite', layer: 'L3' },
 ];
 
 /** Imports no L1/L2/L3 component may make. A component that fetches cannot render from a fixture. */
@@ -244,7 +244,7 @@ describe('A11 — role reaches layout through useDensity and nowhere else', () =
       const text = readFileSync(file, 'utf8');
       if (/lab_tech['"]?\s*:\s*['"]lab['"]/.test(text)) mappers.push(rel(file));
     }
-    expect(mappers).toEqual(['src/lib/useDensity.ts']);
+    expect(mappers).toEqual(['src/shared/utils/useDensity.ts']);
   });
 
   it('the mapping is total over AppRole and narrows to operator when the role is unknown', () => {

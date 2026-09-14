@@ -23,6 +23,31 @@ Read **`CLAUDE.md`**, then **`docs/00-START-HERE.md`**. Do not read the reposito
 | **The signed documents** | `docs/_reference/*.docx` |
 | **Why we decided things** | `T:\obsidian\memory` |
 
+## Repository layout
+
+```
+freshbowl_os/
+├── mushroomos/          THE APP — web (Admin) and Android APK (Supervisor, Lab, GM) from one codebase
+│   ├── src/             Application code — see mushroomos/src/README.md for every folder
+│   │   ├── app/         entry point + routes
+│   │   ├── domain/      pure business logic
+│   │   ├── features/    screens per role: admin/ supervisor/ lab/ gm/
+│   │   ├── shared/      code used by several roles: api/ auth/ camera/ ui/ utils/
+│   │   ├── styles/      CSS and design tokens
+│   │   └── legacy/      retired screens, not built into the app
+│   ├── supabase/        database: migrations/ (numbered SQL), seed/
+│   ├── android/         Capacitor Android project (builds the APK)
+│   ├── tests/           unit + engine tests
+│   ├── scripts/         node maintenance / verification scripts
+│   └── public/          static assets
+├── docs/                all documentation (numbered folders; _archive/ is superseded)
+├── scripts/             repository-level scripts
+├── mails/               correspondence
+├── _archive/            non-source material moved out of the root (unpacked APKs, old builds)
+├── .kiro/  .claude/     agent configuration
+└── CLAUDE.md            agent entry point
+```
+
 ## Stack
 
 Supabase / PostgreSQL with row-level security · React 18 + Vite · Capacitor for the field build.

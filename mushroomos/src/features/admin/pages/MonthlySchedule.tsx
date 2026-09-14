@@ -11,8 +11,8 @@ import { Card, Chip, EmptyState } from '../../../shared/ui/primitives';
 import {
   parseMonthlyScheduleFile,
   type ParsedMonthlySchedule,
-} from '../../../shared/utilities/monthlyScheduleImport';
-import { humanError } from '../../../shared/utilities/humanError';
+} from '../../../shared/utils/monthlyScheduleImport';
+import { humanError } from '../../../shared/utils/humanError';
 
 function defaultMonth(): string {
   const now = new Date();
@@ -309,7 +309,7 @@ export function MonthlySchedule() {
                       {group.status === 'scheduled' && (
                         <div className="flex items-center justify-end gap-2">
                           <Link
-                            to={`/admin/batch/new?scheduleGroupId=${encodeURIComponent(group.id)}&groupCode=${encodeURIComponent(group.groupCode)}&scheduledStartDate=${encodeURIComponent(group.scheduledStartDate)}`}
+                            to="/admin/batch/start"
                             className="px-3 py-1.5 bg-primary text-primary-foreground font-semibold text-xs rounded hover:bg-primary/90 transition-colors"
                           >
                             Create Master Batch

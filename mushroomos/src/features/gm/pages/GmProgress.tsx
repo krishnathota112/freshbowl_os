@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
-import { listBatchMonitors, type BatchMonitor } from '../../admin/api/monitor';
+import { listBatchMonitors, type BatchMonitor } from '../../../shared/api/monitor';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 

@@ -1,5 +1,5 @@
 /**
- * The plant view. `0026_vessel_allocation.sql`, `src/api/plant.ts`, `src/routes/Plant.tsx`.
+ * The plant view. `0026_vessel_allocation.sql`, `src/api/plant.ts`, `src/legacy/admin/Plant.tsx`.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * WHAT THIS SUITE IS GUARDING

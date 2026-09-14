@@ -16,9 +16,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { humanDuration } from '../src/components/domain/HumanDuration';
-import { countersFor } from '../src/api/tower';
-import { fixtureExceptions, fixtureStaircase, type FixtureGeometry } from '../src/fixtures';
+import { humanDuration } from '../src/shared/ui/domain/HumanDuration';
+import { countersFor } from '../src/shared/api/tower';
+import { fixtureExceptions, fixtureStaircase, type FixtureGeometry } from '../src/legacy/dev/fixtures';
 import { DB_URL, NO_DB_REASON, REPO_ROOT, all, one, withRollback } from './db';
 
 const describeDb = DB_URL ? describe : describe.skip;

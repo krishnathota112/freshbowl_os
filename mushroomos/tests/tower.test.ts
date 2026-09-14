@@ -11,7 +11,7 @@
  * nodes, and **no DOM environment is installed**: no `jsdom`, no `happy-dom`, no
  * `@testing-library/react`. Adding one is three dependencies and a config change.
  *
- * So the layout is a pure module (`src/components/composite/geometry.ts`) and the assertions are made
+ * So the layout is a pure module (`src/shared/ui/composite/geometry.ts`) and the assertions are made
  * against it. For B.5 that is a STRONGER guarantee than counting nodes: `nowLinePct` returns a single
  * number rather than a list, so a second line is not something the component can express. The
  * remaining visual halves of B.4 and B.7 — that the diagonal reads as a diagonal, and that nothing
@@ -36,7 +36,7 @@ import {
   sortByStartAt,
 } from '../src/shared/ui/composite/geometry';
 import { countersFor } from '../src/shared/api/tower';
-import { fixtureStaircase, type FixtureGeometry } from '../src/fixtures';
+import { fixtureStaircase, type FixtureGeometry } from '../src/legacy/dev/fixtures';
 import { DB_URL, NO_DB_REASON, REPO_ROOT, all, one, withRollback } from './db';
 
 const describeDb = DB_URL ? describe : describe.skip;

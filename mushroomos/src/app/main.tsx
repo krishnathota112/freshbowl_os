@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
-import { syncEffectiveNow } from '../shared/utilities/now';
-import '../index.css';
+import { syncEffectiveNow } from '../shared/utils/now';
+import '../styles/index.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

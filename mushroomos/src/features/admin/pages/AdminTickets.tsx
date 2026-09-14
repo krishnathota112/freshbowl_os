@@ -5,8 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TICKET_STATUS_WORDS, decideTicket, listTickets, type Ticket } from '../../../shared/api/tickets';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
-import { Thumb } from '../../../shared/ui/LateTicketPanel';
-import { humanError } from '../../../shared/utilities/humanError';
+import { Thumb } from '../../../shared/ui/task/LateTicketPanel';
+import { humanError } from '../../../shared/utils/humanError';
 
 /**
  * Admin · late-task tickets (0088). Only Admin decides: approve (granting up to the hours asked) or

@@ -6,8 +6,8 @@ import { activateBatch, getPreBatchMaterialCheck } from '../../../shared/api/bat
 import { loadPrepare } from '../api/intake';
 import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
 import { getBatchContext } from '../../../shared/api/work';
-import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
-import { fmtWhen } from '../../../shared/utilities/labWords';
+import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
+import { fmtWhen } from '../../../shared/utils/labWords';
 import { Chip, Skeleton } from '../../../shared/ui/primitives';
 
 /**

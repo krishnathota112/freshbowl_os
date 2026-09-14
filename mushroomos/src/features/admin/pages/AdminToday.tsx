@@ -5,10 +5,10 @@ import { getFactoryClock } from '../../../shared/api/batch';
 import { factoryDate } from '../../../shared/ui/composite/geometry';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
-import { nowMs } from '../../../shared/utilities/now';
+import { nowMs } from '../../../shared/utils/now';
 import { LabGateBoard, LiveBatches } from '../../../shared/ui/domain/AdminLive';
 import { listBatchContexts } from '../../../shared/api/work';
-import { loadLabApprovals } from '../../lab/api/lab';
+import { loadLabApprovals } from '../../../shared/api/lab';
 
 /*
  * C4 HAS LANDED, so these point at `/batch/:id` — the shared management batch page.
@@ -147,7 +147,7 @@ export function AdminToday() {
                   )}
                 </p>
                 <Link
-                  to={`/admin/batch/${b.batchId}/schedule`}
+                  to={`/admin/batch/${b.batchId}/prepare`}
                   className="mt-2 inline-flex items-center rounded border px-3 font-head text-[12px] font-700"
                   style={{
                     minHeight: 40,
@@ -226,7 +226,7 @@ export function AdminToday() {
                   <span className="text-[13px]">{b.message}</span>
                   {/* 44 px — this is read on a phone as often as on a desktop now. */}
                   <Link
-                    to={`/admin/batch/${b.batchId}/schedule`}
+                    to={`/admin/batch/${b.batchId}/prepare`}
                     className="mono inline-flex items-center px-2 text-[11px] text-muted"
                     style={{ minHeight: 44 }}
                   >
