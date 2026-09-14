@@ -11,6 +11,7 @@ import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { TaskDrawer } from '../../../shared/ui/task/TaskDrawer';
 import { humanError, type HumanError } from '../../../shared/utils/humanError';
+import { dayLabel, isDueByToday } from '../../../shared/utils/day';
 import { useAuth } from '../../../shared/auth/auth';
 
 export function MyWork() {
@@ -18,6 +19,8 @@ export function MyWork() {
   const { role } = useAuth();
   const [open, setOpen] = useState<{ id: string; batchStatus: string } | null>(null);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (key: string) => setOpenGroups((p) => ({ ...p, [key]: !p[key] }));
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<HumanError | null>(null);
 
@@ -82,18 +85,37 @@ export function MyWork() {
     );
   }
 
+  /*
+    THE DAY'S WORK, per batch (day plan, 15 Sep 2026). The planned time is the server's: counted from H0 for
+    a new batch, from its position for an onboarded one.
+      Today           running work, and work that can start now and is due today or earlier
+      Due today       planned for today (or earlier) but still waiting on the step before it
+      Coming up       planned for a later day — shown on request; work that is ready early can still start
+    Work without a planned time (older process versions) counts as due, as before.
+  */
   const executable = rows.filter((r) => ['running', 'ready'].includes(workGroupOf(r.state)));
   const done = rows.filter((r) => r.state === 'COMPLETED');
-  // Grouped by batch, in the order the view returns them; running work first inside each batch.
-  const byBatch = new Map<string, { code: string; rows: MyWorkRow[] }>();
-  for (const r of executable) {
-    const g = byBatch.get(r.master_batch_id) ?? { code: r.batch_code, rows: [] };
-    g.rows.push(r);
+  const byPlan = (a: MyWorkRow, b: MyWorkRow) => (a.planned_start_at ?? '').localeCompare(b.planned_start_at ?? '');
+  const byBatch = new Map<string, { code: string; today: MyWorkRow[]; waiting: MyWorkRow[]; later: MyWorkRow[] }>();
+  const groupFor = (r: MyWorkRow) => {
+    const g = byBatch.get(r.master_batch_id) ?? { code: r.batch_code, today: [], waiting: [], later: [] };
     byBatch.set(r.master_batch_id, g);
+    return g;
+  };
+  for (const r of rows) {
+    const kind = workGroupOf(r.state);
+    if (kind === 'done') continue;
+    const due = isDueByToday(r.planned_start_at);
+    if (kind === 'running' || (kind === 'ready' && due)) groupFor(r).today.push(r);
+    else if (kind === 'waiting' && due && r.planned_start_at) groupFor(r).waiting.push(r);
+    else if (r.planned_start_at && !due) groupFor(r).later.push(r);
   }
   for (const g of byBatch.values()) {
-    g.rows.sort((a, b) => Number(workGroupOf(b.state) === 'running') - Number(workGroupOf(a.state) === 'running'));
+    g.today.sort((a, b) => Number(workGroupOf(b.state) === 'running') - Number(workGroupOf(a.state) === 'running') || byPlan(a, b));
+    g.waiting.sort(byPlan);
+    g.later.sort(byPlan);
   }
+  const todayCount = [...byBatch.values()].reduce((n, g) => n + g.today.length, 0);
 
   const handleStart = async (row: MyWorkRow) => {
     setStarting(row.activity_id);
@@ -112,7 +134,7 @@ export function MyWork() {
     <div className="pb-20 max-w-3xl mx-auto space-y-5">
       <PageHeading
         title="My Work"
-        subtitle={`${executable.length} task${executable.length === 1 ? '' : 's'} you can do now · ${byBatch.size} batch${byBatch.size === 1 ? '' : 'es'}`}
+        subtitle={`${todayCount} task${todayCount === 1 ? '' : 's'} for today · ${byBatch.size} batch${byBatch.size === 1 ? '' : 'es'}`}
       />
 
       {startError && (
@@ -125,17 +147,20 @@ export function MyWork() {
         </Card>
       )}
 
-      {byBatch.size === 0 && (
+      {byBatch.size === 0 && executable.length === 0 && (
         <EmptyState
           title="Nothing to do right now"
-          detail="Production work appears here as soon as a running batch reaches it."
+          detail="Production work appears here on the day it is planned for."
         />
       )}
 
       {[...byBatch.entries()].map(([id, g]) => (
         <section key={id} className="space-y-2">
           <GroupHeading tone="accent">{g.code}</GroupHeading>
-          {g.rows.map((r) => (
+          {g.today.length === 0 && (
+            <p className="px-1 text-[13px] text-muted">Nothing to start today for this batch.</p>
+          )}
+          {g.today.map((r) => (
             <TaskCard
               key={r.activity_id}
               row={r}
@@ -144,6 +169,34 @@ export function MyWork() {
               onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })}
             />
           ))}
+          <CollapsibleGroup
+            title="Due today · waiting on the step before"
+            count={g.waiting.length}
+            open={openGroups[`${id}:waiting`] ?? false}
+            onToggle={() => toggleGroup(`${id}:waiting`)}
+          >
+            {g.waiting.map((r) => (
+              <TaskCard key={r.activity_id} row={r} onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })} />
+            ))}
+          </CollapsibleGroup>
+          <CollapsibleGroup
+            title="Coming up"
+            count={g.later.length}
+            open={openGroups[`${id}:later`] ?? false}
+            onToggle={() => toggleGroup(`${id}:later`)}
+          >
+            {g.later.map((r) => (
+              <div key={r.activity_id} className="space-y-1">
+                <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-muted">{dayLabel(r.planned_start_at)}</p>
+                <TaskCard
+                  row={r}
+                  busy={starting === r.activity_id}
+                  onStart={workGroupOf(r.state) === 'ready' ? () => handleStart(r) : undefined}
+                  onOpen={() => setOpen({ id: r.activity_id, batchStatus: 'active' })}
+                />
+              </div>
+            ))}
+          </CollapsibleGroup>
         </section>
       ))}
 

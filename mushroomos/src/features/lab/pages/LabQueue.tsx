@@ -7,6 +7,7 @@ import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
 import { fmtWhen, labStatus, paramLabel } from '../../../shared/utils/labWords';
+import { dayLabel, isDueByToday } from '../../../shared/utils/day';
 
 const NEXT_SHOWN = 6;
 const DONE_SHOWN = 5;
@@ -37,7 +38,10 @@ export function LabQueue() {
 
   const items = q.data ?? [];
   const running = items.filter((i) => i.state === 'IN_PROGRESS' || i.state === 'RETURNED').sort(byPlan);
-  const next = items.filter((i) => i.state === 'READY' || i.state === 'LOCKED' || i.state === 'BLOCKED').sort(byPlan);
+  // The day plan (15 Sep 2026): checks planned for today or earlier are today's work; later days wait below.
+  const open = items.filter((i) => i.state === 'READY' || i.state === 'LOCKED' || i.state === 'BLOCKED').sort(byPlan);
+  const next = open.filter((i) => isDueByToday(i.plannedStartAt));
+  const later = open.filter((i) => !isDueByToday(i.plannedStartAt));
   const done = items.filter((i) => i.state === 'COMPLETED');
   const waiting = done.filter((i) => i.lastSubmission === null && i.holdsGate);
   const rejected = done.filter((i) => i.lastSubmission === 'rejected');
@@ -45,7 +49,7 @@ export function LabQueue() {
     .filter((i) => !waiting.includes(i) && !rejected.includes(i))
     .sort((a, b) => (b.actualEnd ?? '').localeCompare(a.actualEnd ?? ''));
 
-  const shownNext = showAll ? next : next.slice(0, NEXT_SHOWN);
+  const shownLater = showAll ? later : later.slice(0, NEXT_SHOWN);
 
   return (
     <>
@@ -53,10 +57,10 @@ export function LabQueue() {
         title="Lab"
         subtitle={
           running.length > 0
-            ? `${running.length} in progress`
+            ? `${running.length} in progress · ${next.length} for today`
             : next.length > 0
-              ? 'What to sample next'
-              : 'Nothing waiting on the lab'
+              ? `${next.length} check${next.length === 1 ? '' : 's'} for today`
+              : 'Nothing for the lab today'
         }
       />
 
@@ -76,18 +80,26 @@ export function LabQueue() {
       )}
 
       {next.length > 0 && (
-        <Section title="Next">
-          {shownNext.map((i) => (
+        <Section title="Today">
+          {next.map((i) => (
             <WorkCard key={i.activityId} i={i} />
           ))}
-          {next.length > NEXT_SHOWN && (
+        </Section>
+      )}
+
+      {later.length > 0 && (
+        <Section title="Coming up">
+          {shownLater.map((i) => (
+            <WorkCard key={i.activityId} i={i} />
+          ))}
+          {later.length > NEXT_SHOWN && (
             <button
               type="button"
               onClick={() => setShowAll((v) => !v)}
               className="rounded-lg border font-head text-[14px] font-700"
               style={{ minHeight: 48, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
             >
-              {showAll ? 'Show fewer' : `Show all ${next.length}`}
+              {showAll ? 'Show fewer' : `Show all ${later.length}`}
             </button>
           )}
         </Section>
@@ -146,7 +158,7 @@ function WorkCard({ i }: { i: LabWorkItem }) {
   } else if (i.blockedReason) {
     line = i.blockedReason;
   } else {
-    line = `${i.plannedStartAt ? `Planned ${fmtWhen(i.plannedStartAt)}` : 'No planned time'}${measuring ? ` · ${measuring}` : ''}`;
+    line = `${i.plannedStartAt ? `${dayLabel(i.plannedStartAt)} · planned ${fmtWhen(i.plannedStartAt)}` : 'No planned time'}${measuring ? ` · ${measuring}` : ''}`;
   }
 
   return (
