@@ -195,8 +195,8 @@ export function LabGateBoard({
               <span className="font-mono text-[11px] text-muted">
                 {r.batch_code} · {r.checkpoint_code}
               </span>
-              <Link to="/lab/approvals" className="text-[11px] font-bold text-accent">
-                Decide →
+              <Link to="/gm/progress" className="text-[11px] font-bold text-accent">
+                View progress →
               </Link>
             </div>
             <p className="text-[13px] text-ink mt-0.5">

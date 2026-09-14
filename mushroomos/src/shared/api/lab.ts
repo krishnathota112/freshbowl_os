@@ -191,6 +191,36 @@ export async function requestTest(sampleId: string, parameter: string): Promise<
   return data as string;
 }
 
+/**
+ * What kind of value each Lab parameter takes (0091 `lab_parameter`): a number, a written observation,
+ * or one of a fixed set of choices. The screen renders the input from this; the server refuses the
+ * wrong kind either way.
+ */
+export type LabParameter = {
+  code: string;
+  label: string;
+  kind: 'numeric' | 'observation' | 'choice';
+  choices: string[];
+  unit: string | null;
+};
+
+export async function loadLabParameters(): Promise<Map<string, LabParameter>> {
+  const { data, error } = await supabase.from('lab_parameter').select('code, label, value_kind, choices, unit');
+  if (error) throw error;
+  return new Map(
+    (data ?? []).map((r) => [
+      r.code as string,
+      {
+        code: r.code as string,
+        label: r.label as string,
+        kind: r.value_kind as LabParameter['kind'],
+        choices: (r.choices as string[] | null) ?? [],
+        unit: (r.unit as string | null) ?? null,
+      },
+    ])
+  );
+}
+
 export async function recordResult(input: {
   testId: string;
   numeric?: number | null;

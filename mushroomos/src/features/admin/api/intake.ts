@@ -84,7 +84,8 @@ export async function createAndPlan(input: {
   code: string;
   label: string;
   date: string;
-  startAt: string;
+  /** Actual H0. Null for a running batch being onboarded: its original start is not required (0091). */
+  startAt: string | null;
   processDefinitionId: string;
   roles: RoleBindingInput[];
 }): Promise<string> {

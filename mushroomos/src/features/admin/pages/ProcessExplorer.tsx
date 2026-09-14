@@ -5,6 +5,7 @@ import {
   loadMaterialRoles,
   loadProcessDefinition,
 } from '../api/processDefinition';
+import { getCurrentProcessVersion } from '../api/process';
 import { evaluateCardinality, type BatchConfigView } from '../../../domain/cardinality';
 import { tryResolveLabel } from '../../../domain/label';
 import type { ProcessActivity, StreamCode } from '../../../domain/types';
@@ -48,9 +49,13 @@ export function ProcessExplorer() {
   const [config, setConfig] = useState<BatchConfigView>(DEFAULT_CONFIG);
   const [leadOverride, setLeadOverride] = useState<Record<string, string>>({});
 
+  // The CURRENT process version — the one new batches follow — never a hardcoded code.
+  const current = useQuery({ queryKey: ['process-current'], queryFn: getCurrentProcessVersion });
+  const currentCode = current.data?.code ?? null;
   const def = useQuery({
-    queryKey: ['process', 'PROCESS-2026B'],
-    queryFn: () => loadProcessDefinition('PROCESS-2026B'),
+    queryKey: ['process', currentCode],
+    queryFn: () => loadProcessDefinition(currentCode as string),
+    enabled: currentCode !== null,
   });
   const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
   const conflicts = useQuery({ queryKey: ['conflicts'], queryFn: loadConflicts });
@@ -65,8 +70,11 @@ export function ProcessExplorer() {
     return map;
   }, [roles.data, leadOverride]);
 
-  if (def.isLoading || roles.isLoading) {
+  if (current.isLoading || def.isLoading || roles.isLoading) {
     return <p className="text-sm text-muted">Loading the process definition…</p>;
+  }
+  if (!current.isLoading && currentCode === null) {
+    return <EmptyState title="No current process" detail="No process version has been made current yet." />;
   }
   if (def.error) {
     return (

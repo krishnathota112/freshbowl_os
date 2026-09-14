@@ -170,15 +170,14 @@ export default function App() {
           different in kind. `WORKSTATIONS.md` §4.
         */}
         <Route path="/admin" element={<RoleGuard allow={MGMT}><AdminHome /></RoleGuard>} />
-        <Route path="/admin/batch/start" element={<RoleGuard allow={['admin', 'gm']}><BatchStart mode="new" /></RoleGuard>} />
-        <Route path="/admin/batch/ongoing" element={<RoleGuard allow={['admin', 'gm']}><BatchStart mode="ongoing" /></RoleGuard>} />
+        <Route path="/admin/batch/start" element={<RoleGuard allow={['admin']}><BatchStart mode="new" /></RoleGuard>} />
+        <Route path="/admin/batch/ongoing" element={<RoleGuard allow={['admin']}><BatchStart mode="ongoing" /></RoleGuard>} />
         {/*
-          Onboarding a batch the factory is already running. Supervisor included deliberately: the
-          server accepts a stated past time only from a supervisor (or a lab technician), so the one
-          person who can complete this must be able to open it.
+          Onboarding a batch the factory is already running, and preparing a new one: Admin only
+          (current process baseline §9, §11.1). The server enforces the same (0091).
         */}
-        <Route path="/admin/batch/:id/onboard" element={<RoleGuard allow={['admin', 'gm', 'supervisor']}><OnboardBatch /></RoleGuard>} />
-        <Route path="/admin/batch/:id/prepare" element={<RoleGuard allow={['admin', 'gm', 'supervisor']}><PrepareBatch /></RoleGuard>} />
+        <Route path="/admin/batch/:id/onboard" element={<RoleGuard allow={['admin']}><OnboardBatch /></RoleGuard>} />
+        <Route path="/admin/batch/:id/prepare" element={<RoleGuard allow={['admin']}><PrepareBatch /></RoleGuard>} />
         <Route path="/admin/today" element={<RoleGuard allow={MGMT}><AdminToday /></RoleGuard>} />
         <Route path="/admin/batches" element={<RoleGuard allow={MGMT}><Batches /></RoleGuard>} />
         <Route path="/admin/schedule" element={<RoleGuard allow={MGMT}><MonthlySchedule /></RoleGuard>} />
@@ -196,13 +195,13 @@ export default function App() {
         <Route path="/admin/reference" element={<RoleGuard allow={MGMT}><ReferenceData /></RoleGuard>} />
 
         <Route path="/operator/my-work" element={<RoleGuard allow={OPS}><MyWork /></RoleGuard>} />
-        <Route path="/lab/queue" element={<RoleGuard allow={['lab_tech', 'supervisor']}><LabQueue /></RoleGuard>} />
+        <Route path="/lab/queue" element={<RoleGuard allow={['lab_tech']}><LabQueue /></RoleGuard>} />
         {/*
           UI-001 · one lab checkpoint, sample to submit. The lab technician's own workstation — the
           `/operator` guard is NOT widened to lab_tech. The URL carries the activity, so a refresh or an
           app restart re-reads the same checkpoint from the server.
         */}
-        <Route path="/lab/checkpoint/:activityId" element={<RoleGuard allow={['lab_tech', 'supervisor']}><LabCheckpoint /></RoleGuard>} />
+        <Route path="/lab/checkpoint/:activityId" element={<RoleGuard allow={['lab_tech']}><LabCheckpoint /></RoleGuard>} />
         {/*
           The decision that opens a gate. Guarded to MGMT so a supervisor or GM can reach it — and
           deliberately NOT to lab_tech, who may never decide a lab submission. `decide_lab_submission`
@@ -210,7 +209,7 @@ export default function App() {
           either gm or supervisor, and the screen reads which from `approver_roles` rather than
           hardcoding one.
         */}
-        <Route path="/lab/approvals" element={<RoleGuard allow={MGMT}><LabApprovals /></RoleGuard>} />
+        <Route path="/lab/approvals" element={<RoleGuard allow={['gm']}><LabApprovals /></RoleGuard>} />
         <Route path="/gm/progress" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmProgress /></RoleGuard>} />
         <Route path="/admin/tickets" element={<RoleGuard allow={['admin', 'gm', 'manager']}><AdminTickets /></RoleGuard>} />
         {/* Anything else — including the retired screens' old addresses — goes to the role's home. */}

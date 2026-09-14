@@ -136,7 +136,16 @@ function BatchHeader({ m, currentActivities }: { m: Monitor; currentActivities: 
       </div>
       <dl className="mt-3 grid grid-cols-1 gap-2 text-[13px] sm:grid-cols-3">
         <Fact label="Process / SOP" value={`${m.process_code} v${m.process_version}`} />
-        <Fact label="Actual H0" value={m.h0 ? when(m.h0) : '—'} />
+        <Fact
+          label="Actual H0"
+          value={
+            m.h0
+              ? when(m.h0)
+              : m.onboarded
+                ? `Not recorded — tracked from ${m.activated_at ? when(m.activated_at) : 'onboarding'}`
+                : '—'
+          }
+        />
         <Fact label="Materials" value={m.materials ?? '—'} />
         <Fact label="Current stage" value={m.current_stages ?? '—'} wide />
         <Fact label="Current activity" value={currentActivities.length > 0 ? currentActivities.join(' · ') : '—'} wide />

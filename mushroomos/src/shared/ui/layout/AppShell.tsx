@@ -27,10 +27,8 @@ const NAV: Record<string, { to: string; label: string }[]> = {
   operator: [{ to: '/operator/my-work', label: 'My Work' }],
   lab_tech: [{ to: '/lab/queue', label: 'Lab Queue' }],
   supervisor: [
-    { to: '/lab/approvals', label: 'Lab Approvals' },
-    { to: '/lab/queue', label: 'Lab Queue' },
+    { to: '/operator/my-work', label: 'My Work' },
     { to: '/admin/batches', label: 'Batches' },
-    { to: '/operator/my-work', label: 'Tasks' },
     { to: '/admin/process-explorer', label: 'Process' },
   ],
   manager: [

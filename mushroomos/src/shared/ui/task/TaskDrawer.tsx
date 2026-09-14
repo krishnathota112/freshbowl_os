@@ -12,7 +12,7 @@ import {
 import { supabase } from '../../api/client';
 import { completeActivity } from '../../api/work';
 import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } from '../../camera/camera';
-import { Chip, ConflictMarker, Countdown } from '../primitives';
+import { Chip, Countdown } from '../primitives';
 import { LateTicketPanel } from './LateTicketPanel';
 
 /**
@@ -204,6 +204,73 @@ export function TaskDrawer({
   const anyOutOfRange = vals.some(outOfRange);
   const remarkRequired = anyOutOfRange && remarks.trim().length === 0;
 
+  // With two or more photo requirements the first (by the process's ordering) is taken before the work.
+  const beforeEvs = evs.length >= 2 ? evs.slice(0, 1) : [];
+  const afterEvs = evs.length >= 2 ? evs.slice(1) : evs;
+
+  const renderEvidence = (e: (typeof evs)[number]) => {
+    const met = e.satisfied_count >= e.min_count;
+    // Photos already captured for this requirement
+    const captured = fullEvItems.filter((f) => f.key === e.key && f.mediaId !== null && f.supersededById === null);
+    return (
+      <div key={e.id} className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[13px] font-600" style={{ color: met ? 'var(--ok)' : 'var(--ink)' }}>
+            {met ? '✓ ' : '○ '}
+            {e.label}
+          </span>
+          {!met && editable && cameraIsGuaranteed() && (
+            <button
+              type="button"
+              disabled={evidence.isPending}
+              onClick={() => captureWithCamera(e.key)}
+              className="shrink-0 rounded border px-3 py-2 font-head text-[11px] font-600"
+              style={{ borderColor: 'var(--accent)', color: 'var(--accent-ink)', minHeight: 44 }}
+            >
+              {evidence.isPending ? 'Uploading…' : 'Take photo'}
+            </button>
+          )}
+          {!met && editable && !cameraIsGuaranteed() && (
+            <label
+              className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
+              style={{
+                borderColor: 'var(--accent)',
+                color: 'var(--accent-ink)',
+                minHeight: 44,
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              {evidence.isPending ? 'Uploading…' : 'Capture'}
+              <input
+                type="file"
+                accept={acceptFor(e.media_kinds)}
+                capture="environment"
+                className="hidden"
+                disabled={evidence.isPending}
+                onChange={(ev) => {
+                  const file = ev.target.files?.[0];
+                  ev.target.value = '';
+                  if (!file) return;
+                  evidence.mutate({
+                    requirementKey: e.key,
+                    file,
+                    mediaKind: file.type.startsWith('video/') ? 'video' : 'photo',
+                  });
+                }}
+              />
+            </label>
+          )}
+        </div>
+        {e.capture_hint && <span className="text-[11px] text-muted">{e.capture_hint}</span>}
+        {/* Render the actual captured photos */}
+        {captured.map((f) => (
+          <PhotoThumb key={f.mediaId!} item={f} />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-20 flex justify-end" style={{ background: 'rgba(0,0,0,.4)' }}>
       <div
@@ -213,9 +280,8 @@ export function TaskDrawer({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 className="font-head text-lg font-800 leading-tight">{a?.title ?? '…'}</h2>
-            <p className="mono mt-0.5 text-[11px] text-muted">
-              {a?.code} · {a?.scope_label} · Day {a?.rel_day}
-            </p>
+            {/* Where the work is (pile, bunker, whole batch) — not engine codes or a planned day. */}
+            <p className="mt-0.5 text-[12px] text-muted">{a?.scope_label}</p>
           </div>
           <button
             onClick={onClose}
@@ -231,7 +297,6 @@ export function TaskDrawer({
             <Chip tone={a.state === 'COMPLETED' ? 'ok' : a.state === 'DEVIATION' ? 'crit' : 'accent'}>
               {STATE_LABEL[a.state] ?? a.state.replace(/_/g, ' ')}
             </Chip>
-            {a.tbd_marker && <ConflictMarker id={a.tbd_marker} />}
             {a.day0_duration_hr != null && (
               <span className="mono text-[11px] text-ink2">rest {a.day0_duration_hr} h</span>
             )}
@@ -338,10 +403,21 @@ export function TaskDrawer({
           </p>
         )}
 
+        {/* The work in order: the first photo the process asks for (before the work), then the readings,
+            then the rest (after the work). The order is the requirements' own ordering. */}
+        {beforeEvs.length > 0 && (
+          <section className="mb-5">
+            <p className="mb-2 font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
+              Photo before the work
+            </p>
+            <div className="flex flex-col gap-3">{beforeEvs.map(renderEvidence)}</div>
+          </section>
+        )}
+
         {vals.length > 0 && (
           <section className="mb-5">
             <p className="mb-2 font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-              What to record
+              Record readings
             </p>
             <div className="flex flex-col gap-3">
               {vals.map((v) => {
@@ -363,17 +439,47 @@ export function TaskDrawer({
                     </label>
                   );
                 }
+                // A controlled choice (0091): one of the options the process states, e.g. Turner machine M1 / M2.
+                if (v.datatype === 'choice') {
+                  const options = (v.sop_value ?? '').split('|').map((o) => o.trim()).filter(Boolean);
+                  return (
+                    <div key={v.id}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-head text-[13px] font-600">{v.label}</span>
+                        {v.operator_input === 'optional' && <Chip tone="muted">optional</Chip>}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {options.map((o) => (
+                          <button
+                            key={o}
+                            type="button"
+                            aria-pressed={values[v.field_key] === o}
+                            disabled={!editable}
+                            onClick={() => setValues((p) => ({ ...p, [v.field_key]: o }))}
+                            className="rounded border px-4 font-head text-[14px] font-700 disabled:opacity-50"
+                            style={{
+                              minHeight: 44,
+                              minWidth: 72,
+                              borderColor: values[v.field_key] === o ? 'var(--accent)' : 'var(--line-2)',
+                              background: values[v.field_key] === o ? 'var(--accent-soft)' : 'var(--surface)',
+                              color: 'var(--ink)',
+                            }}
+                          >
+                            {o}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={v.id}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-head text-[13px] font-600">{v.label}</span>
                       {v.operator_input === 'optional' && <Chip tone="muted">optional</Chip>}
-                      {v.conflict_id && <ConflictMarker id={v.conflict_id} />}
                     </div>
                     <p className="mono text-[11px] text-muted">
-                      {v.sop_value
-                        ? `target ${v.sop_value}${v.unit ? ' ' + v.unit : ''}`
-                        : `no target — ${v.sop_source_ref ?? 'no source gives a bound'}`}
+                      {v.sop_value ? `target ${v.sop_value}${v.unit ? ' ' + v.unit : ''}` : 'no target'}
                       {v.variance_allowed ? ` · allowed ${v.variance_allowed}` : ''}
                     </p>
                     <div className="mt-1 flex items-center gap-2">
@@ -402,79 +508,13 @@ export function TaskDrawer({
 
         <section className="mb-5">
           <p className="mb-2 font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
-            Evidence {evs.length > 0 && `· ${evs.length - outstanding.length} / ${evs.length}`}
+            {beforeEvs.length > 0 ? 'Photo after the work' : 'Photos'}{' '}
+            {evs.length > 0 && `· ${evs.length - outstanding.length} / ${evs.length} taken`}
           </p>
           {evs.length === 0 ? (
-            <p className="text-[12px] text-muted">Nothing required for this task.</p>
+            <p className="text-[12px] text-muted">No photo is needed for this task.</p>
           ) : (
-            <div className="flex flex-col gap-3">
-              {evs.map((e) => {
-                const met = e.satisfied_count >= e.min_count;
-                // Photos already captured for this requirement
-                const captured = fullEvItems.filter(
-                  (f) => f.key === e.key && f.mediaId !== null && f.supersededById === null
-                );
-                return (
-                  <div key={e.id} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[13px] font-600" style={{ color: met ? 'var(--ok)' : 'var(--ink)' }}>
-                        {met ? '✓ ' : '○ '}
-                        {e.label}
-                      </span>
-                      {!met && editable && cameraIsGuaranteed() && (
-                        <button
-                          type="button"
-                          disabled={evidence.isPending}
-                          onClick={() => captureWithCamera(e.key)}
-                          className="shrink-0 rounded border px-3 py-2 font-head text-[11px] font-600"
-                          style={{ borderColor: 'var(--accent)', color: 'var(--accent-ink)', minHeight: 44 }}
-                        >
-                          {evidence.isPending ? 'Uploading…' : 'Take photo'}
-                        </button>
-                      )}
-                      {!met && editable && !cameraIsGuaranteed() && (
-                        <label
-                          className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
-                          style={{
-                            borderColor: 'var(--accent)',
-                            color: 'var(--accent-ink)',
-                            minHeight: 44,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          {evidence.isPending ? 'Uploading…' : 'Capture'}
-                          <input
-                            type="file"
-                            accept={acceptFor(e.media_kinds)}
-                            capture="environment"
-                            className="hidden"
-                            disabled={evidence.isPending}
-                            onChange={(ev) => {
-                              const file = ev.target.files?.[0];
-                              ev.target.value = '';
-                              if (!file) return;
-                              evidence.mutate({
-                                requirementKey: e.key,
-                                file,
-                                mediaKind: file.type.startsWith('video/') ? 'video' : 'photo',
-                              });
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                    {e.capture_hint && (
-                      <span className="text-[11px] text-muted">{e.capture_hint}</span>
-                    )}
-                    {/* Render the actual captured photos */}
-                    {captured.map((f) => (
-                      <PhotoThumb key={f.mediaId!} item={f} />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+            <div className="flex flex-col gap-3">{afterEvs.map(renderEvidence)}</div>
           )}
         </section>
 
@@ -516,7 +556,7 @@ export function TaskDrawer({
 
         {outstanding.length > 0 && (
           <p className="mb-3 text-[12px]" style={{ color: 'var(--ink-2)' }}>
-            {outstanding.length} evidence item(s) outstanding: {outstanding.map((o) => o.label).join(', ')}
+            Still to take: {outstanding.map((o) => o.label).join(', ')}
           </p>
         )}
 
@@ -549,10 +589,12 @@ export function TaskDrawer({
             }}
           >
             {submit.isPending
-              ? 'Submitting…'
+              ? 'Saving…'
               : outstanding.length > 0
-                ? `Submit · ${outstanding.length} evidence item(s) outstanding`
-                : 'Submit'}
+                ? `${a?.is_hold ? 'Confirm' : 'Finish'} · ${outstanding.length} photo${outstanding.length === 1 ? '' : 's'} still needed`
+                : a?.is_hold
+                  ? 'Confirm the condition is met'
+                  : 'Finish'}
           </button>
         )}
       </div>

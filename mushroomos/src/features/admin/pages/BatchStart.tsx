@@ -68,7 +68,9 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
     mutationFn: async () => {
       if (!chosen) throw new Error('Choose the process this batch follows.');
       if (code.trim() === '') throw new Error('Give the batch a name — the numbers the factory calls it by.');
-      const startAt = await resolveH0(date, time);
+      // A running batch starts tracking from its current position; its original start is asked for,
+      // optionally, on the onboarding screen — never assumed here.
+      const startAt = ongoing ? null : await resolveH0(date, time);
       const bindings = roleList.flatMap((r) => {
         const id = materialFor(r.role);
         const material = r.materials.find((m) => m.id === id);
@@ -107,7 +109,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         </h1>
         <p className="mt-1 max-w-[60ch] text-[14px] text-muted">
           {ongoing
-            ? 'For a batch the factory is already running. Register it here with its actual start, then record where each stream is now. Nothing is claimed to have happened inside MushroomOS.'
+            ? 'For a batch the factory is already running. Register it here, then record where each stream is now. Its original start time is not needed. Nothing is claimed to have happened inside MushroomOS.'
             : 'Plan it against a published process, record the initial material data, then activate.'}
         </p>
       </header>
@@ -235,12 +237,11 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         </label>
       </Step>
 
-      <Step n={chosen ? 4 : 3} title={ongoing ? 'When did it actually start?' : 'When does it start?'}>
+      {!ongoing && (
+      <Step n={chosen ? 4 : 3} title="When does it start?">
         <p className="mb-2 max-w-[60ch] text-[13px] text-muted">
-          H0 is bagasse wetting — the moment the batch clock begins.{' '}
-          {ongoing
-            ? 'Use the real time the factory started it. Everything is measured from here, and it cannot be changed once the batch is activated.'
-            : 'Everything is measured from here, and it cannot be changed once the batch is activated.'}
+          H0 is bagasse wetting — the moment the batch clock begins. Everything is measured from here, and
+          it cannot be changed once the batch is activated.
         </p>
         <div className="flex flex-wrap gap-2">
           <input
@@ -268,6 +269,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
           </p>
         )}
       </Step>
+      )}
 
       {start.error && (
         <div className="mb-4">

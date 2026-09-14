@@ -13,6 +13,7 @@ import { listBatchContexts } from '../../../shared/api/work';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { humanError } from '../../../shared/utils/humanError';
+import { approverWords } from '../../../shared/utils/labWords';
 import { useAuth } from '../../../shared/auth/auth';
 
 /**
@@ -566,14 +567,10 @@ function DecisionSheet({
       </div>
 
       <p className="mt-2 text-[11px] text-muted">
-        Who may approve: <strong>{(row.approver_roles ?? []).join(' or ') || 'named by the server'}</strong>
-        {row.approver_question_settled ? '' : ' — C-32 is open, so both readings stand.'}
+        Approved or rejected by <strong>{approverWords(row.approver_roles ?? [])}</strong>.
       </p>
       {!mayDecide && (
-        <p className="mt-1 text-[11px] text-muted">
-          Your role may not decide a lab submission. The server enforces this — the disabled buttons
-          are a courtesy, not the boundary.
-        </p>
+        <p className="mt-1 text-[11px] text-muted">Only the approver can decide this submission.</p>
       )}
     </>
   );

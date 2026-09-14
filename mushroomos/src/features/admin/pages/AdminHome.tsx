@@ -99,7 +99,7 @@ export function AdminHome() {
             <Section title="Attention Required">
               {q.data.approvalsWaiting > 0 && (
                 <RowLink
-                  to="/lab/approvals"
+                  to="/gm/progress"
                   label={`${q.data.approvalsWaiting} Lab ${q.data.approvalsWaiting === 1 ? 'submission' : 'submissions'} awaiting GM decision`}
                   detail="Production gates remain locked until checkpoint approval is granted."
                   icon="biotech"

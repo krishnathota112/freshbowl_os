@@ -76,7 +76,8 @@ export type OnboardResult = { beforeTracking: number; positions: number; open: n
 
 export async function onboardBatch(input: {
   batchId: string;
-  actualH0: string;
+  /** Optional: the original physical start is not required to begin tracking (0091). */
+  actualH0: string | null;
   positions: string[];
   completedStreams: string[];
   note: string | null;

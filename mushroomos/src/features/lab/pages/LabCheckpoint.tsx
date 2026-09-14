@@ -7,11 +7,13 @@ import {
   findOpenSample,
   loadCheckpointOptions,
   loadLabActivity,
+  loadLabParameters,
   loadResults,
   loadSampleTests,
   orderRetest,
   recordResult,
   type LabActivityContext,
+  type LabParameter,
   type LabResultRow,
   type SampleTest,
 } from '../../../shared/api/lab';
@@ -53,6 +55,7 @@ export function LabCheckpoint() {
   });
   const results = useQuery({ queryKey: ['lab-results', activityId], queryFn: () => loadResults(activityId) });
   const evidence = useQuery({ queryKey: ['evidence-full', activityId], queryFn: () => loadEvidenceState(activityId) });
+  const params = useQuery({ queryKey: ['lab-parameters'], queryFn: loadLabParameters, staleTime: 3_600_000 });
 
   const refresh = () => {
     for (const k of ['lab-activity', 'lab-sample', 'lab-sample-tests', 'lab-results', 'evidence-full', 'lab-work']) {
@@ -97,6 +100,7 @@ export function LabCheckpoint() {
         tests={tests.data ?? []}
         results={results.data ?? []}
         evidence={evidence.data ?? []}
+        params={params.data ?? new Map()}
         refresh={refresh}
       />
     </>
@@ -110,6 +114,7 @@ function Checkpoint({
   tests,
   results,
   evidence,
+  params,
   refresh,
 }: {
   c: LabActivityContext;
@@ -118,6 +123,7 @@ function Checkpoint({
   tests: SampleTest[];
   results: LabResultRow[];
   evidence: Awaited<ReturnType<typeof loadEvidenceState>>;
+  params: Map<string, LabParameter>;
   refresh: () => void;
 }) {
   const { item } = c;
@@ -136,8 +142,8 @@ function Checkpoint({
   });
   const choices =
     c.checkpoints.length > 1
-      ? c.checkpoints.map((x) => ({ id: x.id, name: x.name, detail: `${x.code} · ${x.map}` }))
-      : (options.data ?? []).map((x) => ({ id: x.id, name: x.name, detail: `${x.code} · ${x.map}` }));
+      ? c.checkpoints.map((x) => ({ id: x.id, name: x.name }))
+      : (options.data ?? []).map((x) => ({ id: x.id, name: x.name }));
   const checkpointId = needsChoice ? chosen : c.checkpoints[0].id;
   const sampledAt = sample
     ? c.checkpoints.find((x) => x.id === sample.checkpointId)?.name ?? null
@@ -241,7 +247,6 @@ function Checkpoint({
                     }}
                   >
                     <span className="font-head text-[15px] font-700">{x.name}</span>
-                    <span className="mono ml-2 text-[11px] text-muted">{x.detail}</span>
                   </button>
                 ))}
               </div>
@@ -277,10 +282,10 @@ function Checkpoint({
         ) : (
           <div className="grid gap-2">
             {pending.map((t) => (
-              <ReadingEntry key={t.id} t={t} enabled={open} onDone={refresh} />
+              <ReadingEntry key={t.id} t={t} param={params.get(t.parameterCode)} enabled={open} onDone={refresh} />
             ))}
             {current.map((r) => (
-              <RecordedReading key={r.resultId} r={r} canRetest={open} onDone={refresh} />
+              <RecordedReading key={r.resultId} r={r} param={params.get(r.parameterCode)} canRetest={open} onDone={refresh} />
             ))}
             {superseded.length > 0 && (
               <div className="mt-1">
@@ -411,14 +416,105 @@ function GatePanel({ c, verdict }: { c: LabActivityContext; verdict: string | nu
   return <Panel tone="ok">Completed · {fmtWhen(item.actualEnd)}.</Panel>;
 }
 
-function ReadingEntry({ t, enabled, onDone }: { t: SampleTest; enabled: boolean; onDone: () => void }) {
+/**
+ * The value, shaped by the parameter's definition (`lab_parameter`): a number, a written observation, or
+ * one of its fixed choices. Unknown parameters stay numeric, as before.
+ */
+function toValue(param: LabParameter | undefined, label: string, value: string): { numeric?: number; text?: string } {
+  const kind = param?.kind ?? 'numeric';
+  if (kind === 'numeric') {
+    const n = Number(value.replace(',', '.'));
+    if (value.trim() === '' || !Number.isFinite(n)) throw new Error(`${label}: enter a number.`);
+    return { numeric: n };
+  }
+  if (value.trim() === '') throw new Error(kind === 'choice' ? `${label}: choose one.` : `${label}: describe what you see.`);
+  return { text: value.trim() };
+}
+
+function ValueInput({
+  id,
+  param,
+  unit,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  id?: string;
+  param: LabParameter | undefined;
+  unit: string | null;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  placeholder?: string;
+}) {
+  if (param?.kind === 'choice') {
+    return (
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+        {param.choices.map((ch) => (
+          <button
+            key={ch}
+            type="button"
+            aria-pressed={value === ch}
+            disabled={disabled}
+            onClick={() => onChange(ch)}
+            className="rounded-md border px-2 font-head text-[15px] font-700 disabled:opacity-50"
+            style={{
+              minHeight: 52,
+              borderColor: value === ch ? 'var(--accent)' : 'var(--line-2)',
+              background: value === ch ? 'var(--accent-soft)' : 'var(--surface)',
+              color: 'var(--ink)',
+            }}
+          >
+            {ch}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  if (param?.kind === 'observation') {
+    return (
+      <input
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? 'What do you observe?'}
+        className="min-w-0 flex-1 rounded-md border bg-surface px-3 text-[16px]"
+        style={{ minHeight: 52, borderColor: 'var(--line-2)', color: 'var(--ink)' }}
+      />
+    );
+  }
+  return (
+    <input
+      id={id}
+      inputMode="decimal"
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder ?? (unit ? `Value in ${unit}` : 'Value')}
+      className="mono min-w-0 flex-1 rounded-md border bg-surface px-3 text-[18px]"
+      style={{ minHeight: 52, borderColor: 'var(--line-2)', color: 'var(--ink)' }}
+    />
+  );
+}
+
+function ReadingEntry({
+  t,
+  param,
+  enabled,
+  onDone,
+}: {
+  t: SampleTest;
+  param: LabParameter | undefined;
+  enabled: boolean;
+  onDone: () => void;
+}) {
   const [value, setValue] = useState('');
+  const label = param?.label ?? paramLabel(t.parameterCode);
+  const kind = param?.kind ?? 'numeric';
   const save = useMutation({
-    mutationFn: () => {
-      const n = Number(value.replace(',', '.'));
-      if (value.trim() === '' || !Number.isFinite(n)) throw new Error(`${paramLabel(t.parameterCode)}: enter a number.`);
-      return recordResult({ testId: t.id, numeric: n });
-    },
+    mutationFn: () => recordResult({ testId: t.id, ...toValue(param, label, value) }),
     onSuccess: () => {
       setValue('');
       onDone();
@@ -429,22 +525,26 @@ function ReadingEntry({ t, enabled, onDone }: { t: SampleTest; enabled: boolean;
     <div className="rounded-lg border bg-surface p-3" style={{ borderColor: 'var(--line)' }}>
       <div className="flex items-baseline justify-between gap-2">
         <label htmlFor={`t-${t.id}`} className="font-head text-[15px] font-800">
-          {paramLabel(t.parameterCode)}
+          {label}
         </label>
         <span className="mono text-[12px] text-muted">
-          {t.specFound ? `range ${t.min ?? '—'}–${t.max ?? '—'} ${t.unit ?? ''}` : 'no range to judge against'}
+          {kind === 'choice'
+            ? 'choose one'
+            : kind === 'observation'
+              ? 'observation'
+              : t.specFound
+                ? `range ${t.min ?? '—'}–${t.max ?? '—'} ${t.unit ?? ''}`
+                : 'no range to judge against'}
         </span>
       </div>
-      <div className="mt-2 flex gap-2">
-        <input
+      <div className={`mt-2 flex gap-2 ${kind === 'choice' ? 'flex-col' : ''}`}>
+        <ValueInput
           id={`t-${t.id}`}
-          inputMode="decimal"
+          param={param}
+          unit={t.unit}
           value={value}
+          onChange={setValue}
           disabled={!enabled || save.isPending}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={t.unit ? `Value in ${t.unit}` : 'Value'}
-          className="mono min-w-0 flex-1 rounded-md border bg-surface px-3 text-[18px]"
-          style={{ minHeight: 52, borderColor: 'var(--line-2)', color: 'var(--ink)' }}
         />
         <button
           type="button"
@@ -465,16 +565,26 @@ function ReadingEntry({ t, enabled, onDone }: { t: SampleTest; enabled: boolean;
   );
 }
 
-function RecordedReading({ r, canRetest, onDone }: { r: LabResultRow; canRetest: boolean; onDone: () => void }) {
+function RecordedReading({
+  r,
+  param,
+  canRetest,
+  onDone,
+}: {
+  r: LabResultRow;
+  param: LabParameter | undefined;
+  canRetest: boolean;
+  onDone: () => void;
+}) {
   const [retesting, setRetesting] = useState(false);
   const [value, setValue] = useState('');
   const [reason, setReason] = useState('');
+  const kind = param?.kind ?? 'numeric';
   const retest = useMutation({
     mutationFn: () => {
-      const n = Number(value.replace(',', '.'));
-      if (value.trim() === '' || !Number.isFinite(n)) throw new Error('Enter the new reading.');
+      if (value.trim() === '') throw new Error('Enter the new reading.');
       if (reason === '') throw new Error('Say why this is being measured again.');
-      return orderRetest({ testId: r.testId, reason, numeric: n });
+      return orderRetest({ testId: r.testId, reason, ...toValue(param, param?.label ?? paramLabel(r.parameterCode), value) });
     },
     onSuccess: () => {
       setRetesting(false);
@@ -485,16 +595,18 @@ function RecordedReading({ r, canRetest, onDone }: { r: LabResultRow; canRetest:
   });
 
   const verdict =
-    r.verdict === 'pass'
-      ? { text: 'Within range', color: 'var(--ok)' }
-      : r.verdict === 'fail'
-        ? { text: 'Outside range', color: 'var(--crit)' }
-        : { text: 'No range to judge against', color: 'var(--muted)' };
+    kind !== 'numeric'
+      ? { text: 'Recorded', color: 'var(--muted)' }
+      : r.verdict === 'pass'
+        ? { text: 'Within range', color: 'var(--ok)' }
+        : r.verdict === 'fail'
+          ? { text: 'Outside range', color: 'var(--crit)' }
+          : { text: 'No range to judge against', color: 'var(--muted)' };
 
   return (
     <div className="rounded-lg border bg-surface p-3" style={{ borderColor: 'var(--line)' }}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-head text-[15px] font-800">{paramLabel(r.parameterCode)}</span>
+        <span className="font-head text-[15px] font-800">{param?.label ?? paramLabel(r.parameterCode)}</span>
         <span className="font-head text-[13px] font-700" style={{ color: verdict.color }}>
           {verdict.text}
         </span>
@@ -524,14 +636,14 @@ function RecordedReading({ r, canRetest, onDone }: { r: LabResultRow; canRetest:
                 </option>
               ))}
             </select>
-            <div className="flex gap-2">
-              <input
-                inputMode="decimal"
+            <div className={`flex gap-2 ${kind === 'choice' ? 'flex-col' : ''}`}>
+              <ValueInput
+                param={param}
+                unit={r.unit}
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={setValue}
+                disabled={retest.isPending}
                 placeholder="New reading"
-                className="mono min-w-0 flex-1 rounded-md border bg-surface px-3 text-[18px]"
-                style={{ minHeight: 52, borderColor: 'var(--line-2)' }}
               />
               <button
                 type="button"

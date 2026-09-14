@@ -7,7 +7,6 @@ import { getBatchContext } from '../../../shared/api/work';
 import { supabase } from '../../../shared/api/client';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
 import { Chip, Skeleton } from '../../../shared/ui/primitives';
-import { fmtWhen } from '../../../shared/utils/labWords';
 import { resolveH0 } from '../api/intake';
 import { listBatchStreams, onboardBatch, type BatchStream } from '../api/onboarding';
 import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
@@ -69,12 +68,13 @@ export function OnboardBatch() {
     mutationFn: async () => {
       const b = batch.data;
       if (!b) throw new Error('The batch could not be read.');
-      let actualH0 = b.h0;
+      // Optional (baseline §2): only a start the factory actually knows is sent. Left empty, the batch
+      // carries no H0 and tracking starts now.
+      let actualH0: string | null = null;
       if (h0Date !== '' || h0Time !== '') {
-        if (h0Date === '' || h0Time === '') throw new Error('Give both the date and the time of the actual start.');
+        if (h0Date === '' || h0Time === '') throw new Error('Give both the date and the time of the actual start, or leave both empty.');
         actualH0 = await resolveH0(h0Date, h0Time);
       }
-      if (!actualH0) throw new Error('Give the actual date and time the batch started.');
       const unfinished = Object.entries(choices).find(([, c]) => c.mode === 'at' && c.positions.filter(Boolean).length === 0);
       if (unfinished) throw new Error('Pick the current activity for every stream marked "at an activity".');
       if (positions.length === 0 && completed.length === 0) {
@@ -156,9 +156,10 @@ export function OnboardBatch() {
         </p>
       </header>
 
-      <Step n={1} title="Actual H0 — when the batch really started">
+      <Step n={1} title="Actual start (optional)">
         <p className="text-[14px] text-ink2">
-          Registered as <strong className="mono">{b.h0 ? fmtWhen(b.h0) : 'not set'}</strong>. Change it only if that is wrong.
+          Not needed to start tracking. Enter it only if the factory knows when bagasse wetting really
+          started; leave both empty and MushroomOS tracks this batch from now.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <input type="date" value={h0Date} onChange={(e) => setH0Date(e.target.value)}
