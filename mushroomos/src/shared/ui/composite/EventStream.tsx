@@ -27,7 +27,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 
-import type { BatchBar, BatchEvent } from '../../domain/contracts';
+import type { BatchBar, BatchEvent } from '../../../domain/contracts';
 import { usePlayhead } from '../domain/PlayheadContext';
 import { TimeLabel } from '../domain/TimeLabel';
 import { EmptyState } from '../primitives';

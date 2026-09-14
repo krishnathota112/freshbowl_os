@@ -1,11 +1,11 @@
-import { supabase } from './client';
-import { loadTower } from './tower';
+import { supabase } from '../../../shared/api/client';
+import { loadTower } from '../../../shared/api/tower';
 import type {
   BatchEvent,
   BatchPageData,
   BatchVariance,
   Contributor,
-} from '../domain/contracts';
+} from '../../../domain/contracts';
 
 /**
  * S2's data. `UI_IMPLEMENTATION_PLAN §S2`, `UI_CONTROL_TOWER_SPEC §10`–§13.
@@ -107,7 +107,7 @@ export async function loadBatchPage(batchId: string): Promise<BatchPageData> {
   if (contribRes.error) throw contribRes.error;
   if (eventRes.error) throw eventRes.error;
 
-  const bar = tower.bars.find((b) => b.batchId === batchId);
+  const bar = tower.bars.find((b: any) => b.batchId === batchId);
   if (!bar) {
     // A cancelled batch is excluded from `v_live_batch` and therefore from the tower. It is still
     // a record; it just has no live position, and saying so beats rendering a blank axis.

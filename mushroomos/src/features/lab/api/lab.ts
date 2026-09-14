@@ -1,5 +1,5 @@
-import { supabase } from './client';
-import { getBatchContext } from './work';
+import { supabase } from '../../../shared/api/client';
+import { getBatchContext } from '../../../shared/api/work';
 
 /**
  * S12's data — the lab technician's queue and the record-a-result flow.
@@ -433,10 +433,10 @@ export async function loadLabWork(): Promise<LabWorkItem[]> {
   const byId = new Map(
     ((work.data ?? []) as unknown as Record<string, unknown>[]).map((w) => [w.activity_id as string, w])
   );
-  const items = queue.map((q) => mergeWork(q, byId.get(q.activityId) ?? null));
+  const items = queue.map((q: LabQueueRow) => mergeWork(q, byId.get(q.activityId) ?? null));
 
-  const finished = items.filter((i) => i.state === 'COMPLETED' && i.lastSubmission === null);
-  const holding = await gateHolders(finished.map((i) => i.activityId));
+  const finished = items.filter((i: LabQueueRow) => i.state === 'COMPLETED' && i.lastSubmission === null);
+  const holding = await gateHolders(finished.map((i: LabQueueRow) => i.activityId));
   for (const i of finished) i.holdsGate = holding.has(i.activityId);
   return items;
 }

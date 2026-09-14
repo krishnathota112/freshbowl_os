@@ -15,8 +15,8 @@ import type {
   DeviationRow,
   LabFailure,
   UrgentGate,
-} from '../domain/contracts';
-import { PageHeading } from '../components/layout/PageHeading';
+} from '../../../domain/contracts';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import {
   Band,
   BandNotBuilt,
@@ -26,9 +26,9 @@ import {
   Countdown,
   EmptyState,
   Skeleton,
-} from '../components/primitives';
-import { HumanDuration } from '../components/domain/HumanDuration';
-import { nowMs } from '../lib/now';
+} from '../../../shared/ui/primitives';
+import { HumanDuration } from '../../../shared/ui/domain/HumanDuration';
+import { nowMs } from '../../../shared/utilities/now';
 
 /**
  * S11 · the Supervisor Control Room.  `UI_IMPLEMENTATION_PLAN §S11`,

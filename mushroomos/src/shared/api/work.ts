@@ -53,6 +53,17 @@ export interface MyWorkRow {
   satisfied_total: number | null;
   /** Already names the missing evidence. Show it verbatim. */
   outstanding_labels: string | null;
+  /** The SOP stage of the activity (0081). */
+  stage: string | null;
+  skip_policy: string | null;
+  unblocks_at: string | null;
+  started_by_name: string | null;
+  finished_by_name: string | null;
+  /** In progress past its stated maximum duration plus approved hours (0088). */
+  overdue: boolean | null;
+  duration_target_max_hr: number | null;
+  latest_ticket_status: string | null;
+  is_demo: boolean | null;
 }
 
 /**

@@ -1,14 +1,14 @@
 import { ACTIVITY_STATES, type Density } from '../domain/types';
 import { useQuery } from '@tanstack/react-query';
-import { FiveLayerNode } from '../components/node/FiveLayerNode';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Bar, Card, EmptyState, Skeleton, Stat } from '../components/primitives';
-import { TimeLabel } from '../components/domain/TimeLabel';
-import { HumanDuration, Variance } from '../components/domain/HumanDuration';
-import { getFactoryClock, getPublishedBaseline } from '../api/batch';
-import { loadTower } from '../api/tower';
-import { HourRail } from '../components/composite/HourRail';
-import { StaircaseCalendar } from '../components/composite/StaircaseCalendar';
+import { FiveLayerNode } from '../shared/ui/node/FiveLayerNode';
+import { PageHeading } from '../shared/ui/layout/PageHeading';
+import { Bar, Card, EmptyState, Skeleton, Stat } from '../shared/ui/primitives';
+import { TimeLabel } from '../shared/ui/domain/TimeLabel';
+import { HumanDuration, Variance } from '../shared/ui/domain/HumanDuration';
+import { getFactoryClock, getPublishedBaseline } from '../shared/api/batch';
+import { loadTower } from '../shared/api/tower';
+import { HourRail } from '../shared/ui/composite/HourRail';
+import { StaircaseCalendar } from '../shared/ui/composite/StaircaseCalendar';
 import { fixtureActivities, fixtureStaircase, type FixtureGeometry } from '../fixtures';
 
 /**

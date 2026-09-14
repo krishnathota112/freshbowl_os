@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { IndividualBatch, Movement, VesselOption } from '../../domain/contracts';
-import { humanError } from '../../lib/humanError';
+import type { IndividualBatch, Movement, VesselOption } from '../../../domain/contracts';
+import { humanError } from '../../utilities/humanError';
 import { ConflictMarker, EmptyState, Skeleton } from '../primitives';
 
 /**

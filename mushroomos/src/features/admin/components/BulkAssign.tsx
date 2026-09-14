@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
-import { bulkAssign, type CrewRow, type Person } from '../../api/intake';
-import { ErrorPanel } from '../field/ErrorPanel';
+import { bulkAssign, type BulkAssignResult, type CrewRow, type Person } from '../api/intake';
+import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 
 /**
  * S4 · Assign the crew — `UI-004`, finding F33.
@@ -63,16 +63,16 @@ function RoleRow({
   batchIsActive: boolean;
   onDone: () => void;
 }) {
-  const [personId, setPersonId] = useState('');
-  const [reason, setReason] = useState('');
-  const [done, setDone] = useState(0);
+  const [personId, setPersonId] = useState<string>(people[0]?.id ?? '');
+  const [reason, setReason] = useState<string>('');
+  const [done, setDone] = useState<number>(0);
 
   // People whose own role matches what the process holds responsible, then everyone else — a
   // supervisor genuinely does operator work, so the list narrows rather than excludes.
   const matching = people.filter((p) => p.role === crew.role);
   const others = people.filter((p) => p.role !== crew.role);
 
-  const run = useMutation({
+  const run = useMutation<BulkAssignResult, Error>({
     mutationFn: () => {
       if (personId === '') throw new Error('Choose who is doing this work.');
       if (batchIsActive && reason.trim() === '') {
@@ -94,59 +94,61 @@ function RoleRow({
           {crew.assigned} of {crew.total} assigned
         </span>
       </div>
-      <p className="mt-0.5 text-[13px] text-ink2">
-        {crew.activityIds.length} {crew.activityIds.length === 1 ? 'activity needs' : 'activities need'} a person.
-      </p>
 
-      <select
-        value={personId}
-        onChange={(e) => setPersonId(e.target.value)}
-        className="mt-3 w-full rounded-md border bg-surface px-3 text-[16px]"
-        style={{ minHeight: 52, borderColor: 'var(--line-2)' }}
-        aria-label={`Who does the ${crew.role} work`}
-      >
-        <option value="">Choose a person…</option>
-        {matching.length > 0 && (
-          <optgroup label={`${crew.role.replace('_', ' ')}s`}>
-            {matching.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.display_name}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {others.length > 0 && (
-          <optgroup label="Other people">
-            {others.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.display_name} · {p.role.replace('_', ' ')}
-              </option>
-            ))}
-          </optgroup>
-        )}
-      </select>
+      <div className="mt-3 flex flex-col gap-2">
+        <label className="text-[12px] text-muted">Assign all {crew.total} activities to</label>
+        <select
+          value={personId}
+          onChange={(e) => setPersonId(e.target.value)}
+          className="rounded border bg-surface px-2.5 py-1.5 text-[13px]"
+          style={{ borderColor: 'var(--line-2)' }}
+        >
+          {matching.length > 0 && (
+            <optgroup label={`${crew.role.replace('_', ' ')}s`}>
+              {matching.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.display_name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {others.length > 0 && (
+            <optgroup label="Other roles">
+              {others.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.display_name} ({p.role.replace('_', ' ')})
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
 
-      {batchIsActive && (
-        <input
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Why is this being assigned now?"
-          className="mt-2 w-full rounded-md border bg-surface px-3 text-[16px]"
-          style={{ minHeight: 52, borderColor: 'var(--line-2)' }}
-          aria-label="Reason for assigning on a running batch"
-        />
-      )}
+        {batchIsActive && (
+          <label className="flex flex-col gap-1 text-[12px] text-muted">
+            Reason for reassigning a running batch
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Shift changeover"
+              className="rounded border bg-surface px-2.5 py-1 text-[13px]"
+              style={{ borderColor: 'var(--line-2)' }}
+            />
+          </label>
+        )}
+      </div>
 
       <button
-        type="button"
-        disabled={run.isPending || personId === ''}
         onClick={() => run.mutate()}
-        className="mt-2 w-full rounded-lg font-head text-[15px] font-800 disabled:opacity-50"
-        style={{ minHeight: 52, background: 'var(--accent)', color: 'var(--on-accent)' }}
+        disabled={run.isPending}
+        className="mt-3 w-full rounded px-3 py-1.5 font-head text-[13px] font-700"
+        style={{
+          background: 'var(--accent)',
+          color: 'var(--accent-ink)',
+          opacity: run.isPending ? 0.6 : 1,
+        }}
       >
-        {run.isPending
-          ? `Assigning… ${done} of ${crew.activityIds.length}`
-          : `Assign ${crew.activityIds.length} ${crew.activityIds.length === 1 ? 'activity' : 'activities'}`}
+        {run.isPending ? `Assigning… ${done} / ${crew.total}` : `Assign all ${crew.total}`}
       </button>
 
       {run.error && (
@@ -161,7 +163,7 @@ function RoleRow({
             {result.assigned} assigned
             {result.failures.length > 0 && `, ${result.failures.length} refused`}.
           </p>
-          {result.failures.slice(0, 3).map((f) => (
+          {result.failures.slice(0, 3).map((f: { activityId: string; message: string }) => (
             <p key={f.activityId} className="mt-0.5 text-muted">
               {f.message}
             </p>

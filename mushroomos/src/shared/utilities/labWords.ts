@@ -1,5 +1,5 @@
-import { STATE_LABEL } from '../../api/work';
-import type { Tone } from '../primitives';
+import { STATE_LABEL } from '../api/work';
+import type { Tone } from '../ui/primitives';
 
 /**
  * The words the Lab workstation uses. `UI-SYSTEM.md` — one word per state, the same everywhere.

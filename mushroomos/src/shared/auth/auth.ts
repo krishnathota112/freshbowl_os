@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../api/client';
-import type { AppRole } from '../domain/types';
+import type { AppRole } from '../../domain/types';
 
 /**
  * Authorisation reads the role from the SIGNED TOKEN.
@@ -23,7 +24,7 @@ import type { AppRole } from '../domain/types';
  * everyone — which is the safe direction to fail.
  */
 
-export const ROLE_HOME: Record<AppRole, string> = {
+const WEB_HOME: Record<AppRole, string> = {
   operator: '/operator/my-work',
   lab_tech: '/lab/queue',
   supervisor: '/supervisor/control-room',
@@ -32,6 +33,29 @@ export const ROLE_HOME: Record<AppRole, string> = {
   // S1 · the Control Tower, C3. `/gm/command-center` still resolves — App.tsx redirects it.
   gm: '/gm/control-tower',
 };
+
+/**
+ * THE ANDROID APP'S SCREENS PER ROLE (operating flow §8, 14 Sep 2026). Supervisor: production work.
+ * Lab: the queue and its checkpoints. GM: lab approvals and read-only progress. Nothing else is
+ * reachable in the app; Admin is web-only.
+ */
+export const APP_PATHS: Partial<Record<AppRole, string[]>> = {
+  supervisor: ['/operator/my-work'],
+  lab_tech: ['/lab/queue', '/lab/checkpoint/'],
+  gm: ['/lab/approvals', '/gm/progress'],
+};
+
+export const ROLE_HOME: Record<AppRole, string> = isNativeApp()
+  ? { ...WEB_HOME, supervisor: '/operator/my-work', lab_tech: '/lab/queue', gm: '/lab/approvals' }
+  : WEB_HOME;
+
+/** In the Android app, whether this role may open this path. The web allows every route its guard allows. */
+export function pathAllowedHere(role: AppRole, pathname: string): boolean {
+  if (!isNativeApp()) return true;
+  const allowed = APP_PATHS[role];
+  if (!allowed) return false;
+  return allowed.some((p) => (p.endsWith('/') ? pathname.startsWith(p) : pathname === p));
+}
 
 /**
  * The two roles that work on the factory floor. `BUILD_SEQUENCE_KIRO.md §C-FIELD`.
@@ -50,6 +74,22 @@ export const FIELD_ROLES: readonly AppRole[] = ['operator', 'lab_tech'];
 
 export function isFieldRole(role: AppRole | null): boolean {
   return role !== null && FIELD_ROLES.includes(role);
+}
+
+/**
+ * THE ANDROID APP HAS THREE LOGINS: Supervisor, Lab and General Manager (user decision, 14 Sep 2026).
+ * Admin, manager and operator use the web. This decides which screens the app offers; it is not the
+ * authorisation boundary — RLS and the server functions still decide what any account may do.
+ */
+export const APP_ROLES: readonly AppRole[] = ['supervisor', 'lab_tech', 'gm'];
+
+export function isNativeApp(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+/** False only for a signed-in role the Android app does not serve. The web serves every role. */
+export function roleAllowedHere(role: AppRole | null): boolean {
+  return role === null || !isNativeApp() || APP_ROLES.includes(role);
 }
 
 export const ROLE_LABEL: Record<AppRole, string> = {

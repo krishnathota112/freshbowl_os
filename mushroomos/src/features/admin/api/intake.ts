@@ -9,8 +9,8 @@
  * NOTHING IS COMPUTED HERE. No percentage of a batch, no "on time", no lateness — the product has
  * no field for a running task being overdue (CT-001), so the home screen does not imply one.
  */
-import { supabase } from './client';
-import { listBatchContexts, type BatchContext } from './work';
+import { supabase } from '../../../shared/api/client';
+import { listBatchContexts, type BatchContext } from '../../../shared/api/work';
 
 export type AdminHome = {
   active: BatchContext[];
@@ -46,7 +46,7 @@ export async function loadAdminHome(): Promise<AdminHome> {
  * the server expects, so a person does not have to know that order.
  * ───────────────────────────────────────────────────────────────────────────── */
 
-import { createBatch, factoryInstant, regeneratePlan, type RoleBindingInput } from './batch';
+import { createBatch, factoryInstant, regeneratePlan, type RoleBindingInput } from '../../../shared/api/batch';
 import { assignActivity, loadSchedule, validateBatch, type Finding, type ScheduleRow } from './schedule';
 
 export type Person = { id: string; display_name: string; role: string };
@@ -110,7 +110,7 @@ export async function requiredMaterialRoles(processDefinitionId: string): Promis
     .eq('is_optional', false)
     .not('material_role', 'is', null);
   if (error) throw error;
-  return [...new Set((data ?? []).map((r) => r.material_role as string))];
+  return [...new Set((data ?? []).map((r: { material_role: string | null }) => r.material_role as string))];
 }
 
 export type CrewRow = {
@@ -200,7 +200,7 @@ export async function loadPrepare(batchId: string): Promise<PrepareState> {
  *     screen reports it in the server's own words rather than pretending otherwise.
  * ───────────────────────────────────────────────────────────────────────────── */
 
-import { submitActivity } from './batch';
+import { submitActivity } from '../../../shared/api/batch';
 
 export type EvidenceNeed = { required: number; satisfied: number };
 

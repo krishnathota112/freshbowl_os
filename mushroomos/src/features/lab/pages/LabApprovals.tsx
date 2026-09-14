@@ -8,11 +8,12 @@ import {
   loadResults,
   type LabApprovalRow,
 } from '../api/lab';
-import { loadEvidenceState } from '../api/batch';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, EmptyState, Skeleton } from '../components/primitives';
-import { humanError } from '../lib/humanError';
-import { useAuth } from '../lib/auth';
+import { loadEvidenceState } from '../../../shared/api/batch';
+import { listBatchContexts } from '../../../shared/api/work';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
+import { humanError } from '../../../shared/utilities/humanError';
+import { useAuth } from '../../../shared/auth/auth';
 
 /**
  * The decision that opens a gate.
@@ -160,10 +161,54 @@ export function LabApprovals() {
         </Band>
       )}
 
+      {/* Read-only Process Progress for GM & Management Overview */}
+      <ProcessProgressSection />
+
       {question.data && question.data.some((x) => x.still_open) && (
         <OpenQuestion readings={question.data} />
       )}
     </>
+  );
+}
+
+function ProcessProgressSection() {
+  const batches = useQuery({
+    queryKey: ['gm-process-progress'],
+    queryFn: listBatchContexts,
+    refetchInterval: 60_000,
+  });
+
+  const list = (batches.data ?? []).filter((b) => b.status === 'active');
+  if (list.length === 0) return null;
+
+  return (
+    <div className="mt-8 pt-4 border-t border-line space-y-3">
+      <h2 className="text-[12px] font-mono font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-accent" />
+        Process Progress (Active Batches)
+      </h2>
+      <div className="grid gap-3">
+        {list.map((b) => (
+          <div key={b.master_batch_id} className="mos-card p-4 flex flex-col gap-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="label-caps text-muted">Active Batch</span>
+                <p className="font-head text-[16px] font-bold text-ink">{b.code}</p>
+                <p className="text-[12px] text-muted">{b.process_code} · Standard H{b.standard_hr ?? '—'}</p>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-ok/15 text-ok">
+                In Production
+              </span>
+            </div>
+            {b.planned_end_at && (
+              <p className="text-[11px] text-muted pt-1 border-t border-line/50">
+                Planned End: <strong className="font-mono">{new Date(b.planned_end_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

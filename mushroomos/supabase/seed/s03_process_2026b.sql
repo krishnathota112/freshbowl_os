@@ -6,6 +6,38 @@
 --
 -- NO material name appears in any code. NO literal count appears in any cardinality rule.
 -- Both are enforced by the database, not by review.
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- RE-RUNNABILITY. `process_activity_rel_day_derived` (0011) holds rel_day = standard_start_hour/24.
+-- The upsert below restores rel_day from this file; the hour beside it was derived by s10 from
+-- whatever rel_day the row carried BEFORE. If those two ever diverge — a definition edited in the
+-- database rather than here — the upsert trips the constraint and the whole seed set stops, which
+-- is what a re-seed is supposed to repair.
+--
+-- So the DERIVED hours are cleared first and s10 re-derives them from the restored rel_day a few
+-- files later. Only `derived_from_rel_day` rows are touched: a `factory_stated` hour is a real
+-- reading and must fail loudly against a contradicting rel_day rather than be silently discarded.
+-- Same predicate 0011 already uses for the same reason. A no-op on a healthy database.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ⚠ THE DRAFT WINDOW OPENS HERE, BEFORE THE FIRST WRITE, NOT AT THE UPSERT BELOW.
+--
+-- 0044 freezes a published definition's activities at the table, and the very next statement
+-- writes to them — so opening the window at the definition upsert further down was still too
+-- late and the seed run stopped on file three. s13 closes it, after every seed that writes a
+-- 2026B activity has run.
+--
+-- Nothing can be planned against a draft standard (0044 refuses it in create_master_batch), so
+-- the window cannot be used to generate a baseline from a half-seeded definition.
+do $$
+begin
+  update public.process_definition
+     set status = 'draft'
+   where code = 'PROCESS-2026B' and version = 1 and status <> 'draft';
+end $$;
+
+update public.process_activity
+   set standard_start_hour = null, standard_end_hour = null, standard_hour_source = null
+ where coalesce(standard_hour_source, 'derived_from_rel_day') = 'derived_from_rel_day';
 
 insert into public.process_definition
   (code, name, version, status, source_ref, anchor_day_label, total_days)
@@ -13,7 +45,17 @@ values
   ('PROCESS-2026B','Current factory operational process',1,'published',
    'factory walkthrough 20 Aug 2026','Day 0 = Fibre Weighment',22)
 on conflict (code, version) do update set
-  status = excluded.status, name = excluded.name, total_days = excluded.total_days;
+  name = excluded.name, total_days = excluded.total_days,
+  -- ⚠ DRAFT, NOT `excluded.status`, AND s13 PUBLISHES IT AGAIN AT THE END OF THE SEED RUN.
+  --
+  -- 0044 freezes a PUBLISHED definition's activities at the table, so from s03 onwards every
+  -- seed that writes a 2026B activity — s05, s08, s09, s10 — was refused, and the whole seed
+  -- run stopped at file three. Dropping back to draft for the length of the run is the same
+  -- window 0043 opens for PROCESS-2026C, for the same reason, and it closes in the same run.
+  --
+  -- It is NOT a way around the freeze: nothing can create a batch against a draft standard
+  -- (0044), so no baseline can be generated while the window is open.
+  status = 'draft';
 
 with pd as (select id from public.process_definition where code = 'PROCESS-2026B' and version = 1)
 insert into public.process_activity (

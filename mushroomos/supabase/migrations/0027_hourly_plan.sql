@@ -126,7 +126,7 @@ begin
                               + public.hour_within_batch_day(mb.start_at, ba.planned_time))
                              * 3600)::int)
            when pa.standard_start_hour is not null
-             then mb.start_at + make_interval(hours => pa.standard_start_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_start_hour * 3600)::int)
          end,
          planned_end_at = case
            when mb.start_at is null then null
@@ -145,11 +145,11 @@ begin
            -- STANDARD. Unchanged from 0011.
            when pa.standard_start_hour is null then null
            when coalesce(ba.day0_duration_hr, ba.duration_target_max_hr) is not null
-             then mb.start_at + make_interval(hours => pa.standard_start_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_start_hour * 3600)::int)
                   + make_interval(secs => (coalesce(ba.day0_duration_hr,
                                                     ba.duration_target_max_hr) * 3600)::int)
            when pa.standard_end_hour is not null
-             then mb.start_at + make_interval(hours => pa.standard_end_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_end_hour * 3600)::int)
          end
     from master_batch mb, process_activity pa
    where ba.master_batch_id = p_batch
@@ -199,7 +199,7 @@ begin
                               + public.hour_within_batch_day(mb.start_at, ba.planned_time))
                              * 3600)::int)
            when pa.standard_start_hour is not null
-             then mb.start_at + make_interval(hours => pa.standard_start_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_start_hour * 3600)::int)
          end,
          planned_end_at = case
            when mb.start_at is null then null
@@ -214,11 +214,11 @@ begin
              end
            when pa.standard_start_hour is null then null
            when coalesce(ba.day0_duration_hr, ba.duration_target_max_hr) is not null
-             then mb.start_at + make_interval(hours => pa.standard_start_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_start_hour * 3600)::int)
                   + make_interval(secs => (coalesce(ba.day0_duration_hr,
                                                     ba.duration_target_max_hr) * 3600)::int)
            when pa.standard_end_hour is not null
-             then mb.start_at + make_interval(hours => pa.standard_end_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_end_hour * 3600)::int)
          end
     from master_batch mb, process_activity pa
    where ba.id = p_activity

@@ -1,0 +1,14 @@
+import pg from 'pg'; import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+const c=new pg.Client({connectionString:process.env.SUPABASE_DB_URL,ssl:{rejectUnauthorized:false}});
+await c.connect(); await c.query('begin');
+const q=async(l,s,v)=>{try{const r=await c.query(s,v);console.log('\n== '+l+' ==');r.rows.length?console.table(r.rows):console.log('(no rows)')}catch(e){console.log('\n== '+l+' ==\nERR '+e.message)}};
+await q('policies on profiles now',`select policyname,cmd,permissive,roles::text,coalesce(qual,'-')q,coalesce(with_check,'-')wc from pg_policies where tablename='profiles' order by cmd,policyname`);
+await q('role attrs',`select rolname,rolbypassrls,rolsuper from pg_roles where rolname in ('authenticated','anon','postgres')`);
+await c.query(`select set_config('request.jwt.claims',$1,true)`,[JSON.stringify({sub:'9dc49f5e-a4d4-4915-a305-bffb3f7e582f'})]);
+await c.query('set local role authenticated');
+await q('who am i',`select current_user, session_user, auth.uid()::text as uid`);
+await q('ESCALATION ATTEMPT',`update profiles set role='admin' where id=auth.uid() returning id, role::text`);
+await c.query('reset role');
+await q('after',`select role::text from profiles where id='9dc49f5e-a4d4-4915-a305-bffb3f7e582f'`);
+await c.query('rollback'); await c.end();

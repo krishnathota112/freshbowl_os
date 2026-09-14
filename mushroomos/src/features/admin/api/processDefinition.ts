@@ -1,4 +1,4 @@
-import { supabase } from './client';
+import { supabase } from '../../../shared/api/client';
 import type {
   ActivityVariant,
   ConflictEntry,
@@ -7,7 +7,7 @@ import type {
   Material,
   ProcessActivity,
   RoleEligibility,
-} from '../domain/types';
+} from '../../../domain/types';
 
 /**
  * Reads the process definition. Read-only: nothing in Steps 1–2 writes process state.
@@ -48,7 +48,7 @@ export async function loadProcessDefinition(code: string): Promise<ProcessDefini
     .order('seq');
   if (actErr) throw actErr;
 
-  const ids = (activities ?? []).map((a) => a.id);
+  const ids = (activities ?? []).map((a: { id: string }) => a.id);
 
   const [ev, gates, variants] = await Promise.all([
     supabase
@@ -97,7 +97,7 @@ export async function loadMaterialRoles(): Promise<RoleBinding[]> {
   if (mErr) throw mErr;
   if (eErr) throw eErr;
 
-  const byId = new Map((materials ?? []).map((m) => [m.id, m as Material]));
+  const byId = new Map((materials ?? []).map((m: { id: string }) => [m.id, m as unknown as Material]));
   const grouped = new Map<string, RoleBinding>();
 
   for (const e of (elig ?? []) as RoleEligibility[]) {

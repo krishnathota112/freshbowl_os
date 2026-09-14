@@ -30,7 +30,7 @@
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
-import { batchDay, wallClock } from '../../domain/time';
+import { batchDay, wallClock } from '../../../domain/time';
 import { ConflictMarker } from '../primitives';
 
 export type TimeLabelProps = {

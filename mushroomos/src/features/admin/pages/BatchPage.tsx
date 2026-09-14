@@ -4,14 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 
 import { loadBatchPage } from '../api/batchPage';
 import { loadIndividualBatches, loadMovements } from '../api/movements';
-import type { BatchPageData, BatchVariance } from '../domain/contracts';
-import { EventStream } from '../components/composite/EventStream';
-import { HourRail } from '../components/composite/HourRail';
-import { Narrative } from '../components/composite/Narrative';
-import { PlayheadProvider, usePlayhead } from '../components/domain/PlayheadContext';
-import { humanDuration } from '../components/domain/HumanDuration';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, EmptyState, Skeleton } from '../components/primitives';
+import type { BatchPageData, BatchVariance, Contributor } from '../../../domain/contracts';
+import { EventStream } from '../../../shared/ui/composite/EventStream';
+import { HourRail } from '../../../shared/ui/composite/HourRail';
+import { Narrative } from '../../../shared/ui/composite/Narrative';
+import { PlayheadProvider, usePlayhead } from '../../../shared/ui/domain/PlayheadContext';
+import { humanDuration } from '../../../shared/ui/domain/HumanDuration';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
+import { BatchMonitor } from '../components/BatchMonitor';
 /*
   The activity list is LAZY, and stays lazy for the same reason `AppShell` is: the overview is the
   tab that opens, and `BatchDetail` drags `TaskDrawer` and the whole per-activity editing surface
@@ -46,18 +47,44 @@ const BatchDetail = lazy(() =>
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
-type Tab = 'overview' | 'activities';
+type Tab = 'monitor' | 'overview' | 'activities';
 
 export function BatchPage() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get('tab') === 'activities' ? 'activities' : 'overview';
+  const rawTab = params.get('tab');
+  // The verification console is what an Admin opens a batch for (operating flow §6), so it is the default.
+  const tab: Tab = rawTab === 'activities' ? 'activities' : rawTab === 'overview' ? 'overview' : 'monitor';
 
   const q = useQuery({
     queryKey: ['batch-page', id],
     queryFn: () => loadBatchPage(id),
     refetchInterval: 60_000,
+    enabled: tab !== 'monitor',
   });
+
+  const selectTab = (t: Tab) => {
+    const next = new URLSearchParams(params);
+    if (t === 'monitor') next.delete('tab');
+    else next.set('tab', t);
+    setParams(next, { replace: true });
+  };
+
+  // The console reads its own views and does not depend on the hour-axis page loading — a process
+  // with unresolved planning hours still has a record to verify.
+  if (tab === 'monitor') {
+    return (
+      <>
+        <PageHeading title="Batch record" subtitle="What happened, when, who did it, what was measured, and what is blocked" />
+        <nav className="mb-4 flex gap-1" aria-label="Batch views">
+          <TabButton current={tab} value="monitor" onSelect={selectTab}>Monitor</TabButton>
+          <TabButton current={tab} value="overview" onSelect={selectTab}>Overview</TabButton>
+          <TabButton current={tab} value="activities" onSelect={selectTab}>Activities</TabButton>
+        </nav>
+        <BatchMonitor batchId={id} />
+      </>
+    );
+  }
 
   if (q.isLoading) {
     return (
@@ -82,12 +109,7 @@ export function BatchPage() {
   }
 
   const d = q.data!;
-  const setTab = (t: Tab) => {
-    const next = new URLSearchParams(params);
-    if (t === 'overview') next.delete('tab');
-    else next.set('tab', t);
-    setParams(next, { replace: true });
-  };
+  const setTab = selectTab;
 
   return (
     <>
@@ -111,6 +133,9 @@ export function BatchPage() {
       />
 
       <nav className="mb-4 flex gap-1" aria-label="Batch views">
+        <TabButton current={tab} value="monitor" onSelect={setTab}>
+          Monitor
+        </TabButton>
         <TabButton current={tab} value="overview" onSelect={setTab}>
           Overview
         </TabButton>
@@ -294,7 +319,7 @@ function WhereTheTimeWent({
         Where the time went · {variance.worstStream?.toLowerCase().replace(/_/g, ' ')} stream
       </SectionLabel>
       <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--line)' }}>
-        {variance.contributors.map((c) => (
+        {variance.contributors.map((c: Contributor) => (
           <li key={c.activityId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
             <button
               type="button"

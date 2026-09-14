@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { nowMs } from '../lib/now';
+import { nowMs } from '../../../shared/utilities/now';
 
 import { loadPlant, type PlantRow, type Vessel } from '../api/plant';
-import { PageHeading } from '../components/layout/PageHeading';
-import { ConflictMarker, EmptyState, Skeleton } from '../components/primitives';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { ConflictMarker, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 
 /**
  * THE PLANT — the factory as a place, not as a list of batches.

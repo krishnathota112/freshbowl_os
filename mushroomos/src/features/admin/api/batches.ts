@@ -1,4 +1,4 @@
-import { supabase } from './client';
+import { supabase } from '../../../shared/api/client';
 
 /** Plain-English names for the material roles. The codes stay in the database. */
 export const ROLE_PLAIN: Record<string, { title: string; help: string }> = {

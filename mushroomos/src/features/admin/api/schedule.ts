@@ -1,4 +1,4 @@
-import { supabase } from './client';
+import { supabase } from '../../../shared/api/client';
 
 /**
  * The schedule builder's data.

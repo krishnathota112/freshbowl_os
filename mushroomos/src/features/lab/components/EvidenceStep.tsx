@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { captureEvidence, signedEvidenceUrl, type EvidenceItem } from '../../api/batch';
-import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } from '../../lib/camera';
-import { humanError } from '../../lib/humanError';
+import { captureEvidence, signedEvidenceUrl, type EvidenceItem } from '../../../shared/api/batch';
+import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } from '../../../shared/camera/camera';
+import { humanError } from '../../../shared/utilities/humanError';
 
 /**
  * One evidence requirement, as a step in the work. `UI-SYSTEM.md` — "Evidence is part of the work,

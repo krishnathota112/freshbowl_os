@@ -14,22 +14,17 @@ import {
   type Finding,
   type ScheduleRow,
 } from '../api/schedule';
-import { activateBatch, getBatch, getPreBatchMaterialCheck } from '../api/batch';
+import { activateBatch, getBatch, getPreBatchMaterialCheck } from '../../../shared/api/batch';
 import { getBatchProcessVersion } from '../api/process';
-import {
-  listPrebatchCheckpoints,
-  takePrebatchMaterialCheck,
-  acceptOutstandingPrebatchResults,
-  PREBATCH_PARAMETERS,
-} from '../api/prebatch';
+import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
 import { loadVesselOptions } from '../api/plant';
 import {
   loadIndividualBatches,
   loadMovements,
   setMovementVessel,
 } from '../api/movements';
-import { MovementPlan } from '../components/composite/MovementPlan';
-import { Chip, ConflictMarker, EmptyState } from '../components/primitives';
+import { MovementPlan } from '../../../shared/ui/composite/MovementPlan';
+import { Chip, ConflictMarker, EmptyState } from '../../../shared/ui/primitives';
 
 /**
  * The master batch schedule. Day 0 → Day 23, read top to bottom.
@@ -74,27 +69,17 @@ export function ScheduleBuilder() {
     queryKey: ['prebatch', id],
     queryFn: () => getPreBatchMaterialCheck(id),
   });
-  const prebatchCps = useQuery({ queryKey: ['prebatch-checkpoints'], queryFn: listPrebatchCheckpoints });
   const [assay, setAssay] = useState<Record<string, string>>({});
   const [assayError, setAssayError] = useState<string | null>(null);
 
+  // Initial material data: the values entered, no acceptance step (0085).
   const takeCheck = useMutation({
-    mutationFn: () =>
-      takePrebatchMaterialCheck({
-        batchId: id,
-        checkpointId: prebatchCps.data![0].id,
-        label: 'Incoming material assay',
-        readings: PREBATCH_PARAMETERS.map((p) => ({
-          parameter: p.code,
-          value: Number(assay[p.code]),
-        })),
-      }),
+    mutationFn: () => recordInitialMaterialForBatch(id, 'Initial material data', assay),
     onSuccess: () => {
       setAssayError(null);
       qc.invalidateQueries({ queryKey: ['prebatch', id] });
       refresh();
     },
-    // The server's own sentence. It names the roles that may accept when this one may not.
     onError: (e) => setAssayError((e as Error).message),
   });
 
@@ -105,15 +90,7 @@ export function ScheduleBuilder() {
    * recorded on top of the first. That left the only screen naming the problem with nothing for
    * the person who can solve it to press, and the batch could not be activated by anyone.
    */
-  const acceptOutstanding = useMutation({
-    mutationFn: () => acceptOutstandingPrebatchResults(id),
-    onSuccess: () => {
-      setAssayError(null);
-      qc.invalidateQueries({ queryKey: ['prebatch', id] });
-      refresh();
-    },
-    onError: (e) => setAssayError((e as Error).message),
-  });
+
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['schedule', id] });
@@ -354,83 +331,28 @@ export function ScheduleBuilder() {
         <div
           className="mb-5 rounded-2xl border p-4 shadow-sm"
           style={{
-            borderColor: prebatch.data?.accepted ? 'var(--ok)' : 'var(--warn)',
-            background: prebatch.data?.accepted ? 'var(--surface)' : 'var(--warn-soft)',
+            borderColor: prebatch.data?.accepted || prebatch.data?.results_current ? 'var(--ok)' : 'var(--warn)',
+            background: prebatch.data?.accepted || prebatch.data?.results_current ? 'var(--surface)' : 'var(--warn-soft)',
           }}
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-head text-[13px] font-700" style={{ color: 'var(--ink)' }}>
-              Incoming material check
+              Pre-H0 / initial material data
             </h3>
             <span className="mono text-[11px]" style={{ color: 'var(--muted)' }}>
-              required before H0
+              recorded before H0
             </span>
           </div>
 
-          {/*
-            THREE STATES, NOT TWO.
-
-            A sample whose results were recorded but never ACCEPTED blocks activation just as
-            firmly as no sample at all — "0 of 1 result(s) accepted as final" — and an admin
-            looking at a screen that only counted acceptances would see nothing to explain it.
-            Recording a second sample makes it worse, so the form is deliberately withheld in that
-            state and the screen names who has to finish the first one.
-
-            Found by leaving exactly that state behind while testing an admin's refusal.
-          */}
-          {prebatch.data && prebatch.data.results_current > prebatch.data.accepted ? (
-            <div className="mt-2 text-[12px]" style={{ color: 'var(--ink-2)' }}>
-              <p>
-                <span className="mono">{prebatch.data.checkpoint_code}</span> has{' '}
-                {prebatch.data.accepted} of {prebatch.data.results_current} result
-                {prebatch.data.results_current === 1 ? '' : 's'} accepted as final.
-              </p>
-              <p className="mt-1" style={{ color: 'var(--warn)' }}>
-                A lab technician or supervisor must accept the rest before this batch can start.
-                Do not record a second sample — it will not clear this one.
-              </p>
-              {/*
-                The way out. Shown to everyone, because the server decides: a role that may not
-                accept gets the refusal that names who may, which is more useful than a hidden
-                button that leaves them wondering what to do next.
-              */}
-              <button
-                type="button"
-                className="mt-2 rounded-lg px-4 py-2.5 font-head text-[13px] font-700"
-                style={{
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  opacity: acceptOutstanding.isPending ? 0.5 : 1,
-                }}
-                disabled={acceptOutstanding.isPending}
-                onClick={() => acceptOutstanding.mutate()}
-              >
-                {acceptOutstanding.isPending
-                  ? 'Accepting…'
-                  : `Accept the ${prebatch.data.results_current - prebatch.data.accepted} outstanding reading${
-                      prebatch.data.results_current - prebatch.data.accepted === 1 ? '' : 's'
-                    }`}
-              </button>
-            </div>
-          ) : prebatch.data && prebatch.data.accepted > 0 ? (
-            <div className="mt-2 text-[12px]" style={{ color: 'var(--ink-2)' }}>
-              <p>
-                {prebatch.data.accepted} of {prebatch.data.tests_requested} reading
-                {prebatch.data.tests_requested === 1 ? '' : 's'} accepted ·{' '}
-                <span className="mono">{prebatch.data.checkpoint_code}</span>
-              </p>
-              <p className="mt-1" style={{ color: 'var(--muted)' }}>
-                Collected {new Date(prebatch.data.collected_at).toLocaleString()}
-                {prebatch.data.before_h0 === false && (
-                  <span style={{ color: 'var(--warn)' }}> — after H0, which the record will show</span>
-                )}
-              </p>
+          {prebatch.data && (prebatch.data.accepted > 0 || prebatch.data.results_current > 0) ? (
+            <div className="mt-2 text-[12px] font-medium text-ok flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              Pre-H0 material measurements recorded. Post-H0 lab checkpoints will be handled by the Lab team.
             </div>
           ) : (
             <>
               <p className="mt-1 text-[12px]" style={{ color: 'var(--ink-2)' }}>
-                The material must be sampled and its result accepted before the batch clock starts.
-                Activation is refused until it is.
+                Record the initial material measurements (moisture, pH, dry weight) prior to H0 start.
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 {PREBATCH_PARAMETERS.map((p) => (
@@ -454,29 +376,15 @@ export function ScheduleBuilder() {
                 <button
                   type="button"
                   className="self-end rounded-lg px-4 py-2.5 font-head text-[13px] font-700"
-                  style={{
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    opacity:
-                      takeCheck.isPending ||
-                      PREBATCH_PARAMETERS.some((p) => !Number.isFinite(Number(assay[p.code])) || !assay[p.code])
-                        ? 0.5
-                        : 1,
-                  }}
-                  disabled={
-                    takeCheck.isPending ||
-                    prebatchCps.data === undefined ||
-                    prebatchCps.data.length === 0 ||
-                    PREBATCH_PARAMETERS.some((p) => !assay[p.code] || !Number.isFinite(Number(assay[p.code])))
-                  }
+                  style={{ background: 'var(--accent)', color: '#fff', opacity: takeCheck.isPending ? 0.5 : 1 }}
+                  disabled={takeCheck.isPending}
                   onClick={() => takeCheck.mutate()}
                 >
-                  {takeCheck.isPending ? 'Recording…' : 'Record and accept'}
+                  {takeCheck.isPending ? 'Recording…' : 'Record'}
                 </button>
               </div>
               <p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-                Dry weight is not requested: no source states a method for it, and a test nobody can
-                report would leave this permanently unaccepted.
+                Starting material information — leave a field blank if it is not known.
               </p>
               {assayError && (
                 <p className="mt-2 text-[12px]" style={{ color: 'var(--crit)' }}>
@@ -522,7 +430,7 @@ export function ScheduleBuilder() {
         loading={movements.isLoading}
         busy={pickVessel.isPending}
         error={vesselError}
-        onPick={(v) => pickVessel.mutate(v)}
+        onPick={(v: { movement: string; locationId: string; individualBatchId: string | null }) => pickVessel.mutate(v)}
       />
 
       {/* The timeline */}

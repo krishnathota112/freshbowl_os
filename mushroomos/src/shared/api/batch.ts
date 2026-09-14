@@ -74,6 +74,8 @@ export type BatchValueRow = {
   variance_flag: string | null;
   operator_input: string;
   display_order: number | null;
+  /** 'numeric' | 'text' | 'duration' | 'check' (a checklist item, 0081). */
+  datatype: string | null;
 };
 
 export type BatchEvidenceRow = {
@@ -262,7 +264,7 @@ export async function getActivityDetail(activityId: string) {
     supabase
       .from('batch_activity_value')
       .select(
-        'id, batch_activity_id, field_key, label, unit, sop_value, sop_min, sop_max, sop_source_ref, conflict_id, day0_value, variance_allowed, actual_value, variance_flag, operator_input, display_order'
+        'id, batch_activity_id, field_key, label, unit, sop_value, sop_min, sop_max, sop_source_ref, conflict_id, day0_value, variance_allowed, actual_value, variance_flag, operator_input, display_order, datatype'
       )
       .eq('batch_activity_id', activityId)
       .order('display_order'),
@@ -497,6 +499,40 @@ export async function loadEvidenceState(activityId: string): Promise<EvidenceIte
   if (error) throw error;
 
   return (data ?? []).map((r) => ({
+    requirementId: r.requirement_id as string,
+    key: r.key as string,
+    label: r.label as string,
+    mediaKinds: (r.media_kinds as string[]) ?? [],
+    minCount: r.min_count as number,
+    satisfiedCount: r.satisfied_count as number,
+    gatesSubmission: r.gates_submission as boolean,
+    captureHint: (r.capture_hint as string | null) ?? null,
+    ordering: r.ordering as number,
+    mediaId: (r.media_id as string | null) ?? null,
+    storagePath: (r.storage_path as string | null) ?? null,
+    mediaKind: (r.media_kind as string | null) ?? null,
+    uploadedAt: (r.uploaded_at as string | null) ?? null,
+    uploadedByName: (r.uploaded_by_name as string | null) ?? null,
+    supersededById: (r.superseded_by_id as string | null) ?? null,
+  }));
+}
+
+export type BatchFullEvidenceItem = EvidenceItem & { activityId: string };
+
+/** All evidence requirements and uploaded photos for a whole batch. */
+export async function loadBatchFullEvidence(masterBatchId: string): Promise<BatchFullEvidenceItem[]> {
+  const { data, error } = await supabase
+    .from('v_evidence_state')
+    .select(
+      'batch_activity_id, requirement_id, key, label, media_kinds, min_count, satisfied_count, gates_submission, capture_hint, ordering, media_id, storage_path, media_kind, uploaded_at, uploaded_by_name, superseded_by_id'
+    )
+    .eq('master_batch_id', masterBatchId)
+    .order('ordering')
+    .order('uploaded_at', { ascending: true, nullsFirst: true });
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    activityId: r.batch_activity_id as string,
     requirementId: r.requirement_id as string,
     key: r.key as string,
     label: r.label as string,

@@ -93,6 +93,15 @@ $$;
 -- returned `total` is 0, so a caller can tell "satisfied because complete" from "satisfied because
 -- absent".
 -- ─────────────────────────────────────────────────────────────────────────────
+-- ⚠ DROPPED FIRST. 0051 adds `last_actual_end` to this function's return type so a predecessor
+-- gate can require a rest measured from when the predecessor ACTUALLY ended. `create or
+-- replace` cannot change a return type, so on the next full replay this file failed with
+-- "cannot change return type of existing function" and the run stopped at file twelve.
+-- Nothing holds a hard dependency on it — `evaluate_gates` resolves it at runtime — and 0051
+-- re-creates the wider form a few files later.
+drop function if exists public.gate_predecessor_status(uuid, int, jsonb, text);
+drop function if exists public.gate_predecessor_status(uuid, integer, jsonb, text);
+
 create or replace function public.gate_predecessor_status(
   p_batch uuid, p_instance_no int, p_codes jsonb, p_binding text
 ) returns table (ok boolean, blocker_title text, blocker_stream text, total int, done int)

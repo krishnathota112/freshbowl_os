@@ -251,10 +251,16 @@ async function main() {
       [testId, new Date(h0Ms - 3600 * 1000).toISOString()]
     );
     const resultId = labRes.rows[0].id;
+    // `accept_lab_result` asserts lab_tech or supervisor. Before 0035 §3 a roleless caller
+    // slipped through `assert_role`; this script has to name itself now.
+    await db.query(`select set_config('request.jwt.claims', $1, true)`, [
+      JSON.stringify({ app_metadata: { app_role: 'lab_tech' } }),
+    ]);
     await db.query(
       `select public.accept_lab_result($1, 'Incoming straw moisture 12.4% accepted within SOP spec')`,
       [resultId]
     );
+    await db.query(`select set_config('request.jwt.claims', '', true)`);
     console.log('Pre-batch material sample tested & accepted by Lab Technician.');
   }
 

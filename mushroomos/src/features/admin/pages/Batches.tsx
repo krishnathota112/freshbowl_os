@@ -1,13 +1,27 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { listBatches } from '../api/batch';
-import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, EmptyState } from '../components/primitives';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { listBatches } from '../../../shared/api/batch';
+import { supabase } from '../../../shared/api/client';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Card, Chip, EmptyState } from '../../../shared/ui/primitives';
+import { createDemoTestBatch } from '../api/demoTestBatch';
 
 /** Every batch, newest first, with what each is waiting on. */
 export function Batches() {
+  const qc = useQueryClient();
   const batches = useQuery({ queryKey: ['batches'], queryFn: listBatches });
+
+  const createDemo = useMutation({
+    mutationFn: createDemoTestBatch,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['batches'] });
+      qc.invalidateQueries({ queryKey: ['batch-progress'] });
+      qc.invalidateQueries({ queryKey: ['tower'] });
+      qc.invalidateQueries({ queryKey: ['lab-queue'] });
+      qc.invalidateQueries({ queryKey: ['my-work'] });
+    },
+  });
 
   const progress = useQuery({
     queryKey: ['batch-progress'],
@@ -23,29 +37,55 @@ export function Batches() {
         e.total += 1;
         if (r.state === 'COMPLETED') e.done += 1;
         if (r.state === 'READY' || r.state === 'IN_PROGRESS') e.open += 1;
-        if (r.state === 'DEVIATION' || r.state === 'BLOCKED') e.flagged += 1;
+        if (r.state === 'IN_DEVIATION') e.flagged += 1;
         m.set(k, e);
       }
       return m;
     },
   });
 
+  const [showCancelled, setShowCancelled] = useState(false);
+
   if (batches.isLoading) return <p className="text-sm text-muted">Loading…</p>;
-  const rows = batches.data ?? [];
+  const all = (batches.data ?? []) as any[];
+  // Cancelled batches stay on record (audited, never deleted) but are not live work, so they are
+  // hidden unless asked for.
+  const cancelledCount = all.filter((b) => b.status === 'cancelled').length;
+  const rows = showCancelled ? all : all.filter((b) => b.status !== 'cancelled');
 
   return (
     <>
       <PageHeading
         title="Batches"
-        subtitle="A batch is a graph of parallel streams, not a linear checklist"
+        subtitle={`${rows.length} shown${cancelledCount > 0 && !showCancelled ? ` · ${cancelledCount} cancelled hidden` : ''}`}
         right={
-          <Link
-            to="/admin/batch/start"
-            className="inline-flex items-center rounded px-4 font-head text-[12px] font-700"
-            style={{ minHeight: 44, background: 'var(--accent)', color: '#fff' }}
-          >
-            Start a new batch
-          </Link>
+          <div className="flex items-center gap-2">
+            {cancelledCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowCancelled((v) => !v)}
+                className="inline-flex items-center rounded border px-3 py-1.5 font-head text-[13px] font-600"
+                style={{ minHeight: 44, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
+              >
+                {showCancelled ? 'Hide cancelled' : `Show cancelled (${cancelledCount})`}
+              </button>
+            )}
+            <button
+              onClick={() => createDemo.mutate()}
+              disabled={createDemo.isPending}
+              className="inline-flex items-center rounded px-3 py-1.5 font-head text-[13px] font-700 bg-surface-2 border border-line text-ink hover:bg-surface-3"
+              style={{ minHeight: 44 }}
+            >
+              {createDemo.isPending ? 'Creating Test Batch…' : '+ Demo/Test Batch'}
+            </button>
+            <Link
+              to="/admin/batch/start"
+              className="inline-flex items-center rounded px-3 py-1.5 font-head text-[13px] font-700"
+              style={{ minHeight: 44, background: 'var(--accent)', color: '#fff' }}
+            >
+              Start a new batch
+            </Link>
+          </div>
         }
       />
 
@@ -56,7 +96,7 @@ export function Batches() {
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map((b) => {
+          {rows.map((b: any) => {
             const p = progress.data?.get(b.id);
             return (
               <Link

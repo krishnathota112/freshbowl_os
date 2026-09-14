@@ -1,56 +1,100 @@
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { factoryInstant } from '../api/batch';
-import { evidenceNeeds, markRunning, recordHistory, type HistoryOutcome } from '../api/intake';
-import { loadSchedule, type ScheduleRow } from '../api/schedule';
-import { getBatchContext } from '../api/work';
-import { ErrorPanel } from '../components/field/ErrorPanel';
-import { fmtWhen, labStatus } from '../components/field/labWords';
-import { Chip, Skeleton } from '../components/primitives';
-import { useAuth } from '../lib/auth';
+import { getPreBatchMaterialCheck } from '../../../shared/api/batch';
+import { getBatchContext } from '../../../shared/api/work';
+import { supabase } from '../../../shared/api/client';
+import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
+import { Chip, Skeleton } from '../../../shared/ui/primitives';
+import { fmtWhen } from '../../../shared/utilities/labWords';
+import { resolveH0 } from '../api/intake';
+import { listBatchStreams, onboardBatch, type BatchStream } from '../api/onboarding';
+import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
 
 /**
- * Onboarding a batch the factory is already running. `WORKSTATIONS.md` §4, the ONGOING door.
+ * Onboard a batch the factory is already running. Operating flow, 14 Sep 2026.
  *
- * WHAT THIS IS
- *   A helper for one moment: MushroomOS is introduced while a batch is mid-flight, and somebody has
- *   to tell it where that batch has got to. It adds no authority and no new server behaviour — it
- *   calls `submit_activity` with stated times (the paper-slip path) and `start_activity` +
- *   `correct_actual` for work that is running now.
+ *   1 · actual H0            when the physical batch started (set when it was registered; correctable)
+ *   2 · initial material     the pre-H0 values already known — starting information, never "accepted"
+ *   3 · where it is now      for EACH stream: not started · at an activity · completed
  *
- * WHAT IT REFUSES TO DO
- *   Pretend. Three rules of the unchanged backend shape this screen, and each is said out loud:
- *
- *   · Only a SUPERVISOR (or a lab technician, for lab checkpoints) may state a past time. An admin
- *     is refused by the server, so the screen tells an admin that plainly instead of offering
- *     buttons that will fail.
- *   · An activity whose required photograph is missing is NOT completed — the times are recorded and
- *     it stays open. Historical work has no photograph, so this is the ordinary outcome here, and
- *     the row says so in the server's own words.
- *   · Nothing is written twice: a row that has been recorded shows what the server now holds.
- *
- * The normal operator flow — START, work, COMPLETE — is untouched and lives somewhere else. What
- * MushroomOS watched and what it was told about must never look the same.
+ * Confirming calls `onboard_batch`: everything before the positions is "before MushroomOS tracking"
+ * (no invented times, people, photos or readings), the positions open, the batch activates, and the
+ * process engine takes it from there. Streams, stages and activities come from the batch's own plan.
  */
+type StreamChoice = { mode: 'not_started' | 'at' | 'completed'; positions: string[] };
+
 export function OnboardBatch() {
   const { id = '' } = useParams();
-  const { role } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
-  const [showAll, setShowAll] = useState(false);
 
-  const batch = useQuery({ queryKey: ['batch-context', id], queryFn: () => getBatchContext(id) });
-  const rows = useQuery({ queryKey: ['schedule', id], queryFn: () => loadSchedule(id) });
-  const needs = useQuery({ queryKey: ['evidence-needs', id], queryFn: () => evidenceNeeds(id) });
+  const batch = useQuery({ queryKey: ['batch-context', id], queryFn: () => getBatchContext(id), enabled: id !== '' });
+  const material = useQuery({ queryKey: ['prebatch', id], queryFn: () => getPreBatchMaterialCheck(id), enabled: id !== '' });
+  const streams = useQuery({ queryKey: ['batch-streams', id], queryFn: () => listBatchStreams(id), enabled: id !== '' });
+  const materials = useQuery({
+    queryKey: ['batch-materials', id],
+    enabled: id !== '',
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('batch_material_role')
+        .select('role, material:material(code, name)')
+        .eq('master_batch_id', id);
+      if (error) throw error;
+      return (data ?? []) as unknown as { role: string; material: { code: string; name: string | null } | null }[];
+    },
+  });
 
-  const refresh = () => {
-    for (const k of ['schedule', 'evidence-needs', 'batch-context', 'admin-home']) {
-      qc.invalidateQueries({ queryKey: [k] });
-    }
-  };
+  const [h0Date, setH0Date] = useState('');
+  const [h0Time, setH0Time] = useState('');
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [choices, setChoices] = useState<Record<string, StreamChoice>>({});
+  const [note, setNote] = useState('');
 
-  const canRecord = role === 'supervisor' || role === 'lab_tech';
+  const materialRecorded = (material.data?.results_current ?? 0) > 0;
+  const choiceFor = (s: string): StreamChoice => choices[s] ?? { mode: 'not_started', positions: [] };
+  const setChoice = (s: string, c: StreamChoice) => setChoices((p) => ({ ...p, [s]: c }));
+
+  const positions = useMemo(
+    () => Object.values(choices).flatMap((c) => (c.mode === 'at' ? c.positions.filter(Boolean) : [])),
+    [choices]
+  );
+  const completed = useMemo(
+    () => Object.entries(choices).filter(([, c]) => c.mode === 'completed').map(([s]) => s),
+    [choices]
+  );
+
+  const confirm = useMutation({
+    mutationFn: async () => {
+      const b = batch.data;
+      if (!b) throw new Error('The batch could not be read.');
+      let actualH0 = b.h0;
+      if (h0Date !== '' || h0Time !== '') {
+        if (h0Date === '' || h0Time === '') throw new Error('Give both the date and the time of the actual start.');
+        actualH0 = await resolveH0(h0Date, h0Time);
+      }
+      if (!actualH0) throw new Error('Give the actual date and time the batch started.');
+      const unfinished = Object.entries(choices).find(([, c]) => c.mode === 'at' && c.positions.filter(Boolean).length === 0);
+      if (unfinished) throw new Error('Pick the current activity for every stream marked "at an activity".');
+      if (positions.length === 0 && completed.length === 0) {
+        throw new Error('Give the current position of at least one stream.');
+      }
+      if (!materialRecorded) {
+        await recordInitialMaterialForBatch(id, 'Initial material data (onboarding)', values);
+      }
+      return onboardBatch({ batchId: id, actualH0, positions, completedStreams: completed, note: note.trim() || null });
+    },
+    onSuccess: () => {
+      for (const k of ['batch-context', 'prebatch', 'admin-home', 'my-work', 'batch-monitor']) {
+        qc.invalidateQueries({ queryKey: [k] });
+      }
+      navigate(`/batch/${id}`);
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ['prebatch', id] });
+    },
+  });
 
   const back = (
     <Link
@@ -62,20 +106,7 @@ export function OnboardBatch() {
     </Link>
   );
 
-  const all = rows.data ?? [];
-  const recorded = all.filter((r) => r.actual_end !== null || r.actual_start !== null);
-  const byDay = useMemo(() => {
-    const visible = showAll ? all : all.filter((r) => r.actual_end === null);
-    const m = new Map<number, ScheduleRow[]>();
-    for (const r of visible) {
-      const list = m.get(r.rel_day) ?? [];
-      list.push(r);
-      m.set(r.rel_day, list);
-    }
-    return [...m.entries()].sort((a, b) => a[0] - b[0]);
-  }, [all, showAll]);
-
-  if (batch.isLoading || rows.isLoading) {
+  if (batch.isLoading || streams.isLoading || material.isLoading) {
     return (
       <>
         {back}
@@ -83,331 +114,210 @@ export function OnboardBatch() {
       </>
     );
   }
-  if (batch.error || rows.error || !batch.data) {
+  if (batch.error || streams.error || !batch.data) {
     return (
       <>
         {back}
-        <ErrorPanel
-          error={batch.error ?? rows.error}
-          prefix="This batch could not be opened."
-          onRetry={() => {
-            batch.refetch();
-            rows.refetch();
-          }}
-        />
+        <ErrorPanel error={batch.error ?? streams.error} prefix="This batch could not be opened." />
       </>
     );
   }
 
   const b = batch.data;
+  if (b.status !== 'draft') {
+    return (
+      <>
+        {back}
+        <p className="text-[15px] text-ink2">
+          {b.code} is {b.status}. Only a batch still being set up can be onboarded.{' '}
+          <Link to={`/batch/${id}`}>Open the batch</Link>
+        </p>
+      </>
+    );
+  }
 
   return (
-    <>
+    <div className="mx-auto max-w-3xl pb-20">
       {back}
-
-      <header className="mb-4">
-        <h1 className="font-head text-[22px] font-800 leading-tight">Where has {b.code} got to?</h1>
+      <header className="mb-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h1 className="font-head text-[22px] font-800 leading-tight">Onboard running batch · {b.code}</h1>
+          <Chip tone="accent">ONBOARDING</Chip>
+        </div>
         <p className="mt-1 text-[14px] text-ink2">
           <span className="mono">{b.process_code}</span>
-          {b.standard_hr !== null && <> · standard H{b.standard_hr}</>}
-          {b.h0 && <> · H0 {fmtWhen(b.h0)}</>}
+          {materials.data && materials.data.length > 0 && (
+            <> · {materials.data.map((m) => m.material?.name ?? m.material?.code).filter(Boolean).join(', ')}</>
+          )}
         </p>
-        <p className="mt-0.5 text-[13px] text-muted">
-          {recorded.length} of {all.length} activities have times on record.
+        <p className="mt-1 max-w-[65ch] text-[13px] text-muted">
+          Tell MushroomOS where each physical stream is right now. Work before that is recorded as
+          “before MushroomOS tracking” — no times, people, photos or readings are invented for it.
         </p>
       </header>
 
-      <div
-        className="mb-5 rounded-lg border px-4 py-3 text-[14px] leading-relaxed"
-        style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}
-      >
-        This records work the factory did <strong>before MushroomOS was watching</strong>. Entries are
-        marked as stated by the person recording them — they are never presented as work done through
-        the app. Anything from here on is recorded normally, by the people doing it.
-      </div>
-
-      {!canRecord && (
-        <div
-          className="mb-5 rounded-lg border px-4 py-3 text-[14px] leading-relaxed"
-          style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)', color: 'var(--ink)' }}
-        >
-          <strong>Recording past work needs a supervisor.</strong> The server accepts a stated time
-          only from a supervisor — or a lab technician, for a lab checkpoint — and refuses everyone
-          else, including an admin. You can see the position below; sign in as the supervisor to
-          record it.
+      <Step n={1} title="Actual H0 — when the batch really started">
+        <p className="text-[14px] text-ink2">
+          Registered as <strong className="mono">{b.h0 ? fmtWhen(b.h0) : 'not set'}</strong>. Change it only if that is wrong.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <input type="date" value={h0Date} onChange={(e) => setH0Date(e.target.value)}
+                 className="mono rounded-md border bg-surface px-3" style={{ minHeight: 48, borderColor: 'var(--line-2)' }} />
+          <input type="time" value={h0Time} onChange={(e) => setH0Time(e.target.value)}
+                 className="mono rounded-md border bg-surface px-3" style={{ minHeight: 48, borderColor: 'var(--line-2)' }} />
         </div>
-      )}
+      </Step>
 
-      <label className="mb-4 flex items-center gap-2 text-[13px] text-ink2">
-        <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
-        Show activities that already have times
-      </label>
+      <Step n={2} title="Initial material data (pre-H0)">
+        {materialRecorded ? (
+          <p className="text-[14px] text-ok">Recorded ({material.data?.results_current} value(s)).</p>
+        ) : (
+          <>
+            <p className="mb-2 text-[14px] text-ink2">The values already known. Leave a field blank if it is not known.</p>
+            <div className="grid gap-2">
+              {PREBATCH_PARAMETERS.map((p) => (
+                <label key={p.code} className="flex items-center gap-2">
+                  <span className="w-28 shrink-0 font-head text-[15px] font-700">{p.label}</span>
+                  <input
+                    inputMode="decimal"
+                    value={values[p.code] ?? ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [p.code]: e.target.value }))}
+                    placeholder={p.unit ? `Value in ${p.unit}` : 'Value'}
+                    className="mono min-w-0 flex-1 rounded-md border bg-surface px-3 text-[17px]"
+                    style={{ minHeight: 48, borderColor: 'var(--line-2)' }}
+                  />
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+      </Step>
 
-      {byDay.length === 0 && (
-        <p className="text-[14px] text-muted">Every activity already has times on record.</p>
-      )}
+      <Step n={3} title="Where is each stream now?">
+        <div className="grid gap-3">
+          {(streams.data ?? []).map((s) => (
+            <StreamRow key={s.stream} stream={s} choice={choiceFor(s.stream)} onChange={(c) => setChoice(s.stream, c)} />
+          ))}
+        </div>
+      </Step>
 
-      {byDay.map(([day, list]) => (
-        <section key={day} className="mb-6">
-          <h2 className="mb-2 font-head text-[12px] font-800 uppercase tracking-wider text-muted">
-            Day {day}
-          </h2>
-          <div className="grid gap-2">
-            {list.map((r) => (
-              <ActivityRow
-                key={r.id}
-                row={r}
-                need={needs.data?.get(r.id) ?? null}
-                canRecord={canRecord}
-                onDone={refresh}
-              />
-            ))}
+      <Step n={4} title="Confirm">
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          placeholder="Note (optional) — e.g. who in the factory gave these positions"
+          className="mb-3 w-full rounded-md border bg-surface px-3 py-2 text-[14px]"
+          style={{ borderColor: 'var(--line-2)' }}
+        />
+        <p className="mb-2 text-[13px] text-muted">
+          {positions.length} current position(s) · {completed.length} stream(s) completed. Confirming activates the
+          batch; it cannot be undone.
+        </p>
+        <button
+          type="button"
+          disabled={confirm.isPending}
+          onClick={() => confirm.mutate()}
+          className="w-full rounded-lg font-head text-[17px] font-800 disabled:opacity-50"
+          style={{ minHeight: 60, background: 'var(--accent)', color: 'var(--on-accent)' }}
+        >
+          {confirm.isPending ? 'Onboarding…' : 'Confirm and start tracking'}
+        </button>
+        {confirm.error && (
+          <div className="mt-3">
+            <ErrorPanel error={confirm.error} prefix="The batch was not onboarded." />
           </div>
-        </section>
-      ))}
-    </>
+        )}
+      </Step>
+    </div>
   );
 }
 
-type Mode = null | 'done' | 'running';
-
-function ActivityRow({
-  row,
-  need,
-  canRecord,
-  onDone,
-}: {
-  row: ScheduleRow;
-  need: { required: number; satisfied: number } | null;
-  canRecord: boolean;
-  onDone: () => void;
-}) {
-  const [mode, setMode] = useState<Mode>(null);
-  const [outcome, setOutcome] = useState<HistoryOutcome | null>(null);
-
-  const status = labStatus(row.state, null, null);
-  const photoShort = need !== null && need.satisfied < need.required;
-  const open = ['READY', 'IN_PROGRESS', 'RETURNED'].includes(row.state);
+function StreamRow({ stream, choice, onChange }: { stream: BatchStream; choice: StreamChoice; onChange: (c: StreamChoice) => void }) {
+  const options: { mode: StreamChoice['mode']; label: string }[] = [
+    { mode: 'not_started', label: 'Not started' },
+    { mode: 'at', label: 'At an activity' },
+    { mode: 'completed', label: 'Completed' },
+  ];
+  const setPosition = (i: number, activityId: string) => {
+    const next = [...choice.positions];
+    next[i] = activityId;
+    onChange({ mode: 'at', positions: next });
+  };
+  const slots = choice.positions.length === 0 ? [''] : choice.positions;
 
   return (
-    <div className="rounded-lg border bg-surface p-4" style={{ borderColor: 'var(--line)' }}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-head text-[15px] font-800 leading-snug">{row.title}</p>
-          <p className="mt-0.5 text-[13px] text-muted">
-            {row.scope_label}
-            {row.planned_start_at && <> · planned {fmtWhen(row.planned_start_at)}</>}
-          </p>
-        </div>
-        <Chip tone={status.tone}>{status.label}</Chip>
+    <div className="rounded-lg border bg-surface p-3" style={{ borderColor: 'var(--line)' }}>
+      <p className="font-head text-[15px] font-800">{stream.label}</p>
+      <p className="text-[12px] text-muted">{stream.stages.join(' · ')}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {options.map((o) => (
+          <button
+            key={o.mode}
+            type="button"
+            onClick={() => onChange({ mode: o.mode, positions: o.mode === 'at' ? choice.positions : [] })}
+            className="rounded-md border px-3 font-head text-[13px] font-700"
+            style={{
+              minHeight: 40,
+              borderColor: choice.mode === o.mode ? 'var(--accent)' : 'var(--line-2)',
+              background: choice.mode === o.mode ? 'var(--accent-soft)' : 'transparent',
+              color: choice.mode === o.mode ? 'var(--accent-ink)' : 'var(--ink-2)',
+            }}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
-
-      {(row.actual_start || row.actual_end) && (
-        <p className="mt-2 text-[13px]" style={{ color: 'var(--ok)' }}>
-          {row.actual_start && <>Started {fmtWhen(row.actual_start)}</>}
-          {row.actual_start && row.actual_end && ' · '}
-          {row.actual_end && <>Finished {fmtWhen(row.actual_end)}</>}
-        </p>
-      )}
-
-      {photoShort && open && (
-        <p className="mt-2 text-[13px]" style={{ color: 'var(--warn)' }}>
-          The process requires a photograph here ({need!.satisfied} of {need!.required}). MushroomOS
-          cannot mark this complete from this screen — the times can still be recorded, and the
-          activity stays open for whoever finishes it.
-        </p>
-      )}
-
-      {outcome && <Outcome outcome={outcome} />}
-
-      {canRecord && open && mode === null && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {choice.mode === 'at' && (
+        <div className="mt-2 grid gap-2">
+          {slots.map((value, i) => (
+            <select
+              key={i}
+              value={value}
+              onChange={(e) => setPosition(i, e.target.value)}
+              className="rounded-md border bg-surface px-2 text-[14px]"
+              style={{ minHeight: 44, borderColor: 'var(--line-2)' }}
+            >
+              <option value="">Choose the current activity…</option>
+              {stream.stages.map((stage) => (
+                <optgroup key={stage} label={stage}>
+                  {stream.activities
+                    .filter((a) => a.stage === stage)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.title}
+                        {a.isHold ? ' (hold)' : ''}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          ))}
           <button
             type="button"
-            onClick={() => setMode('done')}
-            className="rounded-md border font-head text-[14px] font-700"
-            style={{ minHeight: 48, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
+            onClick={() => onChange({ mode: 'at', positions: [...slots, ''] })}
+            className="justify-self-start text-[13px] font-700"
+            style={{ color: 'var(--accent-ink)' }}
           >
-            Already done
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('running')}
-            className="rounded-md border font-head text-[14px] font-700"
-            style={{ minHeight: 48, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
-          >
-            Running now
+            + another position in this stream (e.g. a second pile or bunker)
           </button>
         </div>
-      )}
-
-      {canRecord && mode !== null && (
-        <RecordForm
-          row={row}
-          mode={mode}
-          onCancel={() => setMode(null)}
-          onResult={(o) => {
-            setOutcome(o);
-            setMode(null);
-            onDone();
-          }}
-        />
       )}
     </div>
   );
 }
 
-function Outcome({ outcome }: { outcome: HistoryOutcome }) {
-  if (outcome.kind === 'completed') {
-    return (
-      <p className="mt-2 text-[13px]" style={{ color: 'var(--ok)' }}>
-        Recorded as completed.
-      </p>
-    );
-  }
-  if (outcome.kind === 'held') {
-    return (
-      <p className="mt-2 text-[13px]" style={{ color: 'var(--warn)' }}>
-        The times are on record, but the activity is not complete — {outcome.outstanding}.
-      </p>
-    );
-  }
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
-    <div className="mt-2">
-      <ErrorPanel error={new Error(outcome.message)} prefix="Nothing was recorded." />
-    </div>
-  );
-}
-
-/**
- * The form for one entry. Dates and times become real instants through `factory_instant`, the same
- * server function H0 uses — never a locally-built timestamp, which is silently wrong across a DST
- * boundary and would be frozen into the record.
- */
-function RecordForm({
-  row,
-  mode,
-  onCancel,
-  onResult,
-}: {
-  row: ScheduleRow;
-  mode: 'done' | 'running';
-  onCancel: () => void;
-  onResult: (o: HistoryOutcome) => void;
-}) {
-  const base = row.planned_start_at ? new Date(row.planned_start_at) : new Date();
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-  const [startDate, setStartDate] = useState(iso(base));
-  const [startTime, setStartTime] = useState(hhmm(base));
-  const [endDate, setEndDate] = useState(iso(base));
-  const [endTime, setEndTime] = useState(hhmm(new Date(base.getTime() + 3_600_000)));
-  const [note, setNote] = useState('');
-
-  const run = useMutation({
-    mutationFn: async (): Promise<HistoryOutcome> => {
-      if (note.trim().length < 5) {
-        throw new Error('Say where this came from — the log sheet, the supervisor, the weighbridge slip.');
-      }
-      const startAt = await factoryInstant(startDate, startTime);
-      if (startAt === null) throw new Error('The factory timezone is not set, so this time cannot be recorded.');
-
-      if (mode === 'running') {
-        await markRunning({ activityId: row.id, realStart: startAt, reason: note.trim() });
-        return { kind: 'completed' };
-      }
-      const endAt = await factoryInstant(endDate, endTime);
-      if (endAt === null) throw new Error('The factory timezone is not set, so this time cannot be recorded.');
-      return recordHistory({ activityId: row.id, actualStart: startAt, actualEnd: endAt, remark: note.trim() });
-    },
-    onSuccess: onResult,
-  });
-
-  return (
-    <div className="mt-3 rounded-md border p-3" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
-      <p className="mb-2 font-head text-[13px] font-800 uppercase tracking-wider text-muted">
-        {mode === 'done' ? 'When was it done?' : 'When did it start?'}
-      </p>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 text-[13px] text-ink2">{mode === 'done' ? 'Started' : 'Started'}</span>
-        <input
-          type="date"
-          aria-label="Start date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className="rounded-md border bg-surface px-2 text-[15px]"
-          style={{ minHeight: 48, borderColor: 'var(--line-2)' }}
-        />
-        <input
-          type="time"
-          aria-label="Start time"
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="rounded-md border bg-surface px-2 text-[15px]"
-          style={{ minHeight: 48, borderColor: 'var(--line-2)' }}
-        />
-      </div>
-
-      {mode === 'done' && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="w-16 text-[13px] text-ink2">Finished</span>
-          <input
-            type="date"
-            aria-label="Finish date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-md border bg-surface px-2 text-[15px]"
-            style={{ minHeight: 48, borderColor: 'var(--line-2)' }}
-          />
-          <input
-            type="time"
-            aria-label="Finish time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="rounded-md border bg-surface px-2 text-[15px]"
-            style={{ minHeight: 48, borderColor: 'var(--line-2)' }}
-          />
-        </div>
-      )}
-
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Where does this come from? e.g. day log sheet, checked with M. Rao"
-        className="mt-2 w-full rounded-md border bg-surface px-3 text-[15px]"
-        style={{ minHeight: 48, borderColor: 'var(--line-2)' }}
-        aria-label="Where this information came from"
-      />
-
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={run.isPending}
-          className="rounded-md border font-head text-[14px] font-700 disabled:opacity-50"
-          style={{ minHeight: 48, borderColor: 'var(--line-2)', color: 'var(--ink-2)' }}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => run.mutate()}
-          disabled={run.isPending}
-          className="rounded-md font-head text-[14px] font-800 disabled:opacity-50"
-          style={{ minHeight: 48, background: 'var(--accent)', color: 'var(--on-accent)' }}
-        >
-          {run.isPending ? 'Recording…' : 'Record it'}
-        </button>
-      </div>
-
-      {run.error && (
-        <div className="mt-2">
-          <ErrorPanel error={run.error} prefix="Nothing was recorded." />
-        </div>
-      )}
-    </div>
+    <section className="mb-6">
+      <h2 className="mb-2 flex items-center gap-2 font-head text-[13px] font-800 uppercase tracking-wider">
+        <span className="mono inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px]"
+              style={{ background: 'var(--surface-3)', color: 'var(--ink-2)' }} aria-hidden>
+          {n}
+        </span>
+        <span style={{ color: 'var(--ink)' }}>{title}</span>
+      </h2>
+      {children}
+    </section>
   );
 }

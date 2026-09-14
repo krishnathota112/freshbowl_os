@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { loadAdminToday } from '../api/adminToday';
-import { getFactoryClock } from '../api/batch';
-import { factoryDate } from '../components/composite/geometry';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, EmptyState, Skeleton } from '../components/primitives';
-import { nowMs } from '../lib/now';
-import { LabGateBoard, LiveBatches } from '../components/domain/AdminLive';
-import { listBatchContexts } from '../api/work';
-import { loadLabApprovals } from '../api/lab';
+import { getFactoryClock } from '../../../shared/api/batch';
+import { factoryDate } from '../../../shared/ui/composite/geometry';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
+import { nowMs } from '../../../shared/utilities/now';
+import { LabGateBoard, LiveBatches } from '../../../shared/ui/domain/AdminLive';
+import { listBatchContexts } from '../../../shared/api/work';
+import { loadLabApprovals } from '../../lab/api/lab';
 
 /*
  * C4 HAS LANDED, so these point at `/batch/:id` — the shared management batch page.
@@ -126,7 +126,7 @@ export function AdminToday() {
           />
         ) : (
           <div className="grid gap-2 md:grid-cols-2">
-            {d.startingToday.map((b) => (
+            {d.startingToday.map((b: any) => (
               <Card key={b.batchId} className="p-3" rail={b.overdue ? 'var(--crit)' : 'var(--accent)'}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-head text-[15px] font-800">{b.code}</span>
@@ -176,7 +176,7 @@ export function AdminToday() {
           />
         ) : (
           <div className="grid gap-2">
-            {d.running.map((b) => (
+            {d.running.map((b: any) => (
               <Link
                 key={b.batchId}
                 to={`/batch/${b.batchId}`}
@@ -215,7 +215,7 @@ export function AdminToday() {
           />
         ) : (
           <div className="grid gap-2">
-            {d.needsAdmin.map((b, i) => (
+            {d.needsAdmin.map((b: any, i: number) => (
               <Card key={`${b.batchId}-${b.code}-${i}`} className="p-3" rail="var(--warn)">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   {/*

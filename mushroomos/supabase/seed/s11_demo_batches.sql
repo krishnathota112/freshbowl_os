@@ -209,6 +209,8 @@ declare
   slot   record;
   new_id uuid;
   roles  jsonb;
+  -- Which standard the demo set is staged against. Named, never inherited — see below.
+  demo_process_code text;
 begin
   -- The role bindings are READ from material_role_eligibility.is_default_lead, not written here.
   --
@@ -230,6 +232,8 @@ begin
     raise exception 'No default role leads in material_role_eligibility — s02 has not run';
   end if;
 
+  demo_process_code := 'PROCESS-2026B';
+
   for slot in
     select * from (values
       -- days_back is a multiple of the 48-hour cadence in every row. See the header.
@@ -239,9 +243,35 @@ begin
     ) as s(code, label, days_back, supervisor, weather)
   loop
     if exists (select 1 from master_batch where code = slot.code) then
+      -- ⚠ AND SAY SO IF IT IS ON THE WRONG STANDARD.
+      --
+      -- These fixtures are staged once and never regenerated, so a demo batch created against a
+      -- different process definition stays wrong for ever and silently. That happened: this block
+      -- called create_master_batch WITHOUT naming a process, so it followed process_catalogue —
+      -- and the moment the catalogue moved to PROCESS-2026C the demo set was regenerated against
+      -- a standard whose activity codes no suite written for 2026B knows. Recreating them is
+      -- destructive (they carry staged history), so this reports rather than acts.
+      if not exists (
+        select 1 from master_batch mb
+        join process_definition pd on pd.id = mb.process_definition_id
+        where mb.code = slot.code and pd.code = demo_process_code)
+      then
+        raise warning
+          'Demo batch % was staged against a different process than %. Its activity codes will '
+          'not match the suites written for that standard. Recreate the demo set deliberately; '
+          'this seed will not delete a batch that carries history.', slot.code, demo_process_code;
+      end if;
       continue;
     end if;
 
+    -- ⚠ THE STANDARD IS NAMED, NOT INHERITED FROM THE CATALOGUE.
+    --
+    -- A fixture must be reproducible. Leaving it to `process_catalogue` means the demo set changes
+    -- shape whenever the factory standard moves, which is the one thing a fixture must not do.
+    --
+    -- PROCESS-2026B is named because that is what the existing suites assert against — `FIB1-*`,
+    -- `TR-T1`, a 54-activity plan. Moving the demo set to PROCESS-2026C is a deliberate task with
+    -- its own migration of the assertions, not a side effect of publishing a new standard.
     new_id := public.create_master_batch(
       slot.code,
       slot.label,
@@ -250,7 +280,10 @@ begin
       roles,
       slot.supervisor,
       slot.weather,
-      public.factory_h0_instant(current_date - slot.days_back)
+      public.factory_h0_instant(current_date - slot.days_back),
+      (select id from process_definition
+        where code = demo_process_code and status = 'published'
+        order by version desc limit 1)
     );
   end loop;
 end $$;
@@ -462,6 +495,13 @@ begin
       least(now(), (select mb.start_at - interval '1 hour'
                       from public.master_batch mb where mb.id = b.id)));
 
+    -- ACT AS THE LAB TECHNICIAN, EXPLICITLY.
+    -- `accept_lab_result` asserts lab_tech or supervisor. Until 0035 §3, `assert_role` returned
+    -- normally for a caller with no role at all, so this seed passed by accident. It now has to
+    -- say who it is. Transaction-local, and put back after the two accepts.
+    perform set_config('request.jwt.claims',
+      json_build_object('app_metadata', json_build_object('app_role','lab_tech'))::text, true);
+
     -- Moisture 56.2 % — S3f, via LAB_MODEL §3.2.
     t := public.request_lab_test(sample, 'moisture_pct', 'system');
     r := public.record_lab_result(t, 56.2);
@@ -474,6 +514,8 @@ begin
     r := public.record_lab_result(t, 5.63);
     perform public.accept_lab_result(
       r, 'Incoming assay accepted — S3f recorded value, above S4a Table 1 band, accepted on record');
+
+    perform set_config('request.jwt.claims', '', true);
   end loop;
 end $$;
 

@@ -1,5 +1,5 @@
-import { supabase } from './client';
-import type { IndividualBatch, Movement } from '../domain/contracts';
+import { supabase } from '../../../shared/api/client';
+import type { IndividualBatch, Movement } from '../../../domain/contracts';
 
 
 

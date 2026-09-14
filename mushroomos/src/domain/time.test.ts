@@ -355,7 +355,7 @@ const THIS_FILE = relative(APP_ROOT, fileURLToPath(import.meta.url)).split(sep).
  */
 const KNOWN_VIOLATIONS: { file: string; count: number; clearedBy: string; note: string }[] = [
   {
-    file: 'src/routes/NewBatch.tsx',
+    file: 'src/features/admin/pages/NewBatch.tsx',
     count: 0,
     clearedBy: 'A2',
     note: 'CLEARED at A2 — the Stat now reads baseline_days/baseline_hours from process_definition',
@@ -367,7 +367,7 @@ const KNOWN_VIOLATIONS: { file: string; count: number; clearedBy: string; note: 
     note: 'CLEARED at A2 — DAY_TITLES moved to the process_day table, seeded in s10',
   },
   {
-    file: 'src/routes/ScheduleBuilder.tsx',
+    file: 'src/features/admin/pages/ScheduleBuilder.tsx',
     count: 2,
     clearedBy: 'C8',
     // Was 4. Two of them were in a comment, and the scanner now strips comments before counting —

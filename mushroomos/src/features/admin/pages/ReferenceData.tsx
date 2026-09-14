@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, ConflictMarker } from '../components/primitives';
+import { supabase } from '../../../shared/api/client';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Card, Chip, ConflictMarker } from '../../../shared/ui/primitives';
+
+type Mat = { id: string; code: string; name: string; category: string };
+type Elig = { role: string; material_id: string; is_default_lead: boolean; tbd_marker: string | null };
+type Spec = { checkpoint_code: string; parameter_code: string; min_value: number | null; max_value: number | null; unit: string | null; source_ref: string; conflict_id: string | null };
+type Method = { code: string; name: string; calculation_formula: string | null; conflict_id: string | null };
+type Conflict = { conflict_id: string; kind: string; severity: string; status: string; question: string; ship_with_default: string | null };
 
 /** Reference data as seeded: materials and their roles, lab specs, the conflict register. */
 export function ReferenceData() {
@@ -23,19 +29,19 @@ export function ReferenceData() {
       ]);
       for (const r of [mats, elig, specs, methods, conflicts]) if (r.error) throw r.error;
       return {
-        mats: mats.data ?? [],
-        elig: elig.data ?? [],
-        specs: specs.data ?? [],
-        methods: methods.data ?? [],
-        conflicts: conflicts.data ?? [],
+        mats: (mats.data ?? []) as Mat[],
+        elig: (elig.data ?? []) as Elig[],
+        specs: (specs.data ?? []) as Spec[],
+        methods: (methods.data ?? []) as Method[],
+        conflicts: (conflicts.data ?? []) as Conflict[],
       };
     },
   });
 
   if (q.isLoading) return <p className="text-sm text-muted">Loading…</p>;
   const d = q.data!;
-  const nameOf = (id: string) => d.mats.find((m) => m.id === id)?.name ?? '—';
-  const roles = [...new Set(d.elig.map((e) => e.role))];
+  const nameOf = (id: string) => d.mats.find((m: Mat) => m.id === id)?.name ?? '—';
+  const roles = [...new Set(d.elig.map((e: Elig) => e.role))];
 
   return (
     <>
@@ -51,8 +57,8 @@ export function ReferenceData() {
           </p>
           <div className="mt-3 flex flex-col gap-3">
             {roles.map((role) => {
-              const rows = d.elig.filter((e) => e.role === role);
-              const tbd = rows.find((r) => r.tbd_marker)?.tbd_marker;
+              const rows = d.elig.filter((e: Elig) => e.role === role);
+              const tbd = rows.find((r: Elig) => r.tbd_marker)?.tbd_marker;
               return (
                 <div key={role}>
                   <div className="flex items-center gap-2">
@@ -60,7 +66,7 @@ export function ReferenceData() {
                     {tbd && <ConflictMarker id={tbd} />}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {rows.map((r) => (
+                    {rows.map((r: Elig) => (
                       <span
                         key={r.material_id}
                         className="rounded border px-1.5 py-0.5 text-[11px]"
@@ -92,7 +98,7 @@ export function ReferenceData() {
           </p>
           <table className="mt-2 w-full text-left">
             <tbody>
-              {d.methods.map((m) => (
+              {d.methods.map((m: Method) => (
                 <tr key={m.code} style={{ borderTop: '1px solid var(--line)' }}>
                   <td className="mono py-1 align-top text-[11px]">{m.code}</td>
                   <td className="py-1 align-top text-[12px] text-ink2">
@@ -129,7 +135,7 @@ export function ReferenceData() {
               </tr>
             </thead>
             <tbody>
-              {d.specs.map((s) => (
+              {d.specs.map((s: Spec) => (
                 <tr
                   key={`${s.checkpoint_code}-${s.parameter_code}`}
                   style={{ borderTop: '1px solid var(--line)' }}
@@ -162,7 +168,7 @@ export function ReferenceData() {
         <div className="mt-2 max-h-96 overflow-auto">
           <table className="w-full text-left">
             <tbody>
-              {d.conflicts.map((c) => (
+              {d.conflicts.map((c: Conflict) => (
                 <tr key={c.conflict_id} style={{ borderTop: '1px solid var(--line)' }}>
                   <td className="mono py-1.5 pr-2 align-top text-[11px] font-600">
                     {c.conflict_id}

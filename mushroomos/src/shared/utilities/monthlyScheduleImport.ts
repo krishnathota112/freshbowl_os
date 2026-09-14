@@ -1,4 +1,4 @@
-import type { ScheduleImportRow } from '../api/monthlySchedule';
+import type { ScheduleImportRow } from '../../features/admin/api/monthlySchedule';
 
 export type ScheduleRowValidation = {
   isValid: boolean;

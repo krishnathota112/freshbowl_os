@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { supabase } from '../api/client';
+import { supabase } from '../../../shared/api/client';
 import { loadMaterialRoles } from '../api/processDefinition';
 import {
   DEFAULT_STRUCTURE,
@@ -9,11 +9,12 @@ import {
   factoryInstant,
   getFactoryClock,
   type RoleBindingInput,
-} from '../api/batch';
+} from '../../../shared/api/batch';
 import { setIndividualBatches } from '../api/movements';
 import { listSelectableProcessVersions, type ProcessVersion } from '../api/process';
-import { humanError } from '../lib/humanError';
-import { PageHeading } from '../components/layout/PageHeading';
+import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
+import { humanError } from '../../../shared/utilities/humanError';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 
 /**
  * Phase 3 · Admin 7-Step Batch Creation Wizard.
@@ -23,15 +24,10 @@ import { PageHeading } from '../components/layout/PageHeading';
  * 0. Schedule (Imported schedule group selection or ad-hoc)
  * 1. Identity (Master batch code, label, supervisor, date)
  * 2. Materials & Quantity (Real calculator: MT ÷ Capacity -> Full + Tail loads)
- * 3. Individual Batches (Sub-batch numbers & MT split)
- * 4. Physical Movement Plan (Bunkers auto-configured, tunnel allocation due by H240)
- * 5. Process & H0 (which SOP this batch is planned against, and the factory clock anchor)
- * 6. Review & Activate (Timeline preview & activation)
- *
- * THE STANDARD IS A PROPERTY OF THE PROCESS, NOT OF THIS SCREEN.
- * PROCESS-2026C computes 470 h from its own stages; another standard computes its own number.
- * Step 5 picks the version and step 6 shows THAT version's standard — this file contains no
- * hour figure and derives none.
+ * 3. Individual Batches (Physical breakdown)
+ * 4. Movement Plan (Location routing)
+ * 5. Process & H0 (Process definition selection + H0 standard time)
+ * 6. Review & Activate (Confirmation before DB insert)
  */
 const STEPS = [
   'Schedule',
@@ -43,7 +39,8 @@ const STEPS = [
   'Review & Activate',
 ] as const;
 
-function factoryClockTime(c: { h0HourOfDay: number; h0MinuteOfHour: number }): string {
+function factoryClockTime(c: { h0HourOfDay: number; h0MinuteOfHour: number } | null | undefined): string {
+  if (!c) return '00:00';
   return `${String(c.h0HourOfDay).padStart(2, '0')}:${String(c.h0MinuteOfHour).padStart(2, '0')}`;
 }
 
@@ -77,6 +74,11 @@ export function NewBatch() {
     { code: '367', targetMT: 25.0 },
     { code: '368', targetMT: 25.0 },
   ]);
+
+  // Initial pre-H0 material values. Empty until typed: a value nobody entered is never recorded.
+  const [initMoisture, setInitMoisture] = useState('');
+  const [initPh, setInitPh] = useState('');
+  const [initDryWeight, setInitDryWeight] = useState('');
 
   /**
    * WHICH STANDARD. Null means "whatever the catalogue says is current", which is what the
@@ -183,6 +185,16 @@ export function NewBatch() {
         } catch (err) {
           console.error('Failed to set individual batches:', err);
         }
+      }
+
+      // Initial pre-H0 material data, only the values actually entered. No acceptance step (0085).
+      const initial: Record<string, string> = {
+        [PREBATCH_PARAMETERS[0].code]: initMoisture,
+        [PREBATCH_PARAMETERS[1].code]: initPh,
+        [PREBATCH_PARAMETERS[2].code]: initDryWeight,
+      };
+      if (Object.values(initial).some((v) => v.trim() !== '')) {
+        await recordInitialMaterialForBatch(newId, 'Initial material data (batch creation)', initial);
       }
 
       return newId;
@@ -392,6 +404,52 @@ export function NewBatch() {
                   <div className="p-2 rounded-lg bg-surface border border-line">
                     <span className="text-[10px] text-muted block uppercase font-bold">Total Loads</span>
                     <span className="font-mono font-bold text-accent">{totalLoads} Loads ({targetFibreMT} MT)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pre-H0 / Initial Material Lab Entry */}
+              <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-accent">
+                    Pre-H0 / Initial Material Lab Measurements
+                  </span>
+                  <span className="text-[11px] text-muted">Recorded before H0 start</span>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-ink-2 mb-1">Moisture (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={initMoisture}
+                      onChange={(e) => setInitMoisture(e.target.value)}
+                      placeholder="72.5"
+                      className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono text-ink"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-ink-2 mb-1">pH</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={initPh}
+                      onChange={(e) => setInitPh(e.target.value)}
+                      placeholder="7.8"
+                      className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono text-ink"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-ink-2 mb-1">Dry Weight (MT)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={initDryWeight}
+                      onChange={(e) => setInitDryWeight(e.target.value)}
+                      placeholder="45.0"
+                      className="w-full rounded-xl border border-line-2 bg-surface px-3 py-2 text-sm font-mono text-ink"
+                    />
                   </div>
                 </div>
               </div>

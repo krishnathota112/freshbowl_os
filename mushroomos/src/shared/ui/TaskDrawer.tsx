@@ -6,12 +6,14 @@ import {
   loadEvidenceState,
   signedEvidenceUrl,
   startActivity,
-  submitActivity,
   type BatchValueRow,
   type EvidenceItem,
 } from '../api/batch';
 import { supabase } from '../api/client';
-import { Chip, ConflictMarker, Countdown } from '../components/primitives';
+import { completeActivity } from '../api/work';
+import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } from '../camera/camera';
+import { Chip, ConflictMarker, Countdown } from './primitives';
+import { LateTicketPanel } from './LateTicketPanel';
 
 /**
  * Human-readable state labels — same map as BatchDetail.
@@ -52,7 +54,8 @@ type TaskDetail = {
   source: { label: string } | null;
   destination: { label: string } | null;
   machine: { code: string } | null;
-  process_activity: { admin_question: string | null } | null;
+  is_hold: boolean;
+  process_activity: { admin_question: string | null; instructions: string | null; stage: string | null } | null;
 };
 
 /**
@@ -88,7 +91,7 @@ export function TaskDrawer({
       const { data, error: e } = await supabase
         .from('batch_activity')
         .select(
-          'id, code, title, scope_label, rel_day, state, blocked_reason, golden_rule, tbd_marker, planned_qty_mt, day0_duration_hr, duration_target_min_hr, duration_target_max_hr, actual_start, unblocks_at, master_batch_id, variant_code, assigned_machine_id, source_location_id, destination_location_id, source:location!batch_activity_source_location_id_fkey(label), destination:location!batch_activity_destination_location_id_fkey(label), machine:machine!batch_activity_assigned_machine_id_fkey(code), process_activity(admin_question)'
+          'id, code, title, scope_label, rel_day, state, is_hold, blocked_reason, golden_rule, tbd_marker, planned_qty_mt, day0_duration_hr, duration_target_min_hr, duration_target_max_hr, actual_start, unblocks_at, master_batch_id, variant_code, assigned_machine_id, source_location_id, destination_location_id, source:location!batch_activity_source_location_id_fkey(label), destination:location!batch_activity_destination_location_id_fkey(label), machine:machine!batch_activity_assigned_machine_id_fkey(code), process_activity(admin_question, instructions, stage)'
         )
         .eq('id', activityId)
         .single();
@@ -142,8 +145,27 @@ export function TaskDrawer({
     },
     onError: (e) => setError(`Capture failed — nothing was recorded. ${(e as Error).message}`),
   });
+
+  /**
+   * In the Android app the CAMERA opens — never the gallery (camera.ts). A file input with
+   * `capture` opened the system photo picker on the 10 Sep device run, so the web path is kept for
+   * browsers only.
+   */
+  const captureWithCamera = async (requirementKey: string) => {
+    setError(null);
+    try {
+      const file = await takeNativePhoto();
+      await assertIsImage(file);
+      evidence.mutate({ requirementKey, file, mediaKind: 'photo' });
+    } catch (err) {
+      if (err instanceof CaptureCancelled) return;
+      setError(`Camera — nothing was recorded. ${(err as Error).message}`);
+    }
+  };
   const submit = useMutation({
-    mutationFn: () => submitActivity(activityId, values, remarks),
+    // The live path (complete_activity): the server stamps the finish and refuses to finish production
+    // work that was never started. submit_activity with stated times is the paper-backfill path only.
+    mutationFn: () => completeActivity(activityId, values, remarks),
     onSuccess: (r) => {
       setError(null);
       setResult(
@@ -216,10 +238,15 @@ export function TaskDrawer({
           </div>
         )}
 
-        {/* What this task is, in plain language, from the process definition. */}
-        {a?.process_activity?.admin_question && (
-          <p className="mb-3 max-w-prose text-[13px] text-ink">
-            {a.process_activity.admin_question}
+        {/* What this task is: the stage and the SOP's own wording, from the process definition. */}
+        {a?.process_activity?.stage && (
+          <p className="mb-1 font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
+            {a.process_activity.stage}
+          </p>
+        )}
+        {(a?.process_activity?.instructions ?? a?.process_activity?.admin_question) && (
+          <p className="mb-3 max-w-prose whitespace-pre-line text-[13px] text-ink">
+            {a?.process_activity?.instructions ?? a?.process_activity?.admin_question}
           </p>
         )}
 
@@ -295,7 +322,7 @@ export function TaskDrawer({
           </p>
         )}
 
-        {a?.state === 'READY' && batchStatus === 'active' && (
+        {a?.state === 'READY' && batchStatus === 'active' && !a.is_hold && (
           <button
             onClick={() => start.mutate()}
             className="mb-4 w-full rounded px-3 py-3 font-head text-sm font-700"
@@ -319,6 +346,23 @@ export function TaskDrawer({
             <div className="flex flex-col gap-3">
               {vals.map((v) => {
                 const bad = outOfRange(v);
+                // A checklist item is ticked or not; the server accepts 'true' / 'false' only (0081).
+                if (v.datatype === 'check') {
+                  return (
+                    <label key={v.id} className="flex items-center gap-3" style={{ minHeight: 44 }}>
+                      <input
+                        type="checkbox"
+                        checked={values[v.field_key] === 'true'}
+                        disabled={!editable}
+                        onChange={(e) =>
+                          setValues((p) => ({ ...p, [v.field_key]: e.target.checked ? 'true' : 'false' }))
+                        }
+                        className="h-5 w-5 shrink-0"
+                      />
+                      <span className="text-[13px] text-ink">{v.label}</span>
+                    </label>
+                  );
+                }
                 return (
                   <div key={v.id}>
                     <div className="flex flex-wrap items-center gap-2">
@@ -377,7 +421,18 @@ export function TaskDrawer({
                         {met ? '✓ ' : '○ '}
                         {e.label}
                       </span>
-                      {!met && editable && (
+                      {!met && editable && cameraIsGuaranteed() && (
+                        <button
+                          type="button"
+                          disabled={evidence.isPending}
+                          onClick={() => captureWithCamera(e.key)}
+                          className="shrink-0 rounded border px-3 py-2 font-head text-[11px] font-600"
+                          style={{ borderColor: 'var(--accent)', color: 'var(--accent-ink)', minHeight: 44 }}
+                        >
+                          {evidence.isPending ? 'Uploading…' : 'Take photo'}
+                        </button>
+                      )}
+                      {!met && editable && !cameraIsGuaranteed() && (
                         <label
                           className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
                           style={{
@@ -422,6 +477,14 @@ export function TaskDrawer({
             </div>
           )}
         </section>
+
+        {a && (
+          <LateTicketPanel
+            batchId={a.master_batch_id}
+            activityId={activityId}
+            taskOpen={['READY', 'IN_PROGRESS', 'RETURNED'].includes(a.state) && batchStatus === 'active'}
+          />
+        )}
 
         <section className="mb-4">
           <p className="mb-1 font-head text-[11px] font-700 uppercase tracking-wider text-ink2">

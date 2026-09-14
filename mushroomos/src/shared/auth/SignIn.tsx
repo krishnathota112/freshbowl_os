@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { ROLE_HOME, ROLE_LABEL, signIn, useAuth } from '../lib/auth';
-import { humanError } from '../lib/humanError';
-import { Chip } from '../components/primitives';
+import { APP_ROLES, ROLE_HOME, ROLE_LABEL, isNativeApp, roleAllowedHere, signIn, signOut, useAuth } from './auth';
+import type { AppRole } from '../../domain/types';
+import { humanError } from '../../lib/humanError';
+import { Chip } from '../ui/primitives';
 
-const DEMO_ACCOUNTS = [
+const ALL_DEMO_ACCOUNTS = [
   { email: 'admin@freshbowl.demo', role: 'admin' as const },
   { email: 'operator@freshbowl.demo', role: 'operator' as const },
   { email: 'lab@freshbowl.demo', role: 'lab_tech' as const },
@@ -12,6 +13,47 @@ const DEMO_ACCOUNTS = [
   { email: 'manager@freshbowl.demo', role: 'manager' as const },
   { email: 'gm@freshbowl.demo', role: 'gm' as const },
 ];
+
+// The Android app offers only its three logins; the web keeps every account.
+const DEMO_ACCOUNTS = isNativeApp()
+  ? ALL_DEMO_ACCOUNTS.filter((a) => APP_ROLES.includes(a.role))
+  : ALL_DEMO_ACCOUNTS;
+
+// The quick-fill list and its password are for the phone app and local development only. A page
+// served on a public link (tunnel / hosting) shows a plain sign-in form.
+const SHOW_DEMO_ACCOUNTS =
+  isNativeApp() || ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+/** Shown when an account the Android app does not serve is signed in on the phone. */
+export function RoleNotInApp({ role }: { role: AppRole }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
+      <div className="mos-card w-full max-w-md space-y-4 border border-line p-6 shadow-card">
+        <p className="font-head text-[18px] font-extrabold text-ink">
+          {ROLE_LABEL[role]} accounts use the web
+        </p>
+        <p className="text-[14px] text-ink-2">
+          This app is for Supervisor, Lab and General Manager. Sign out and sign in with one of those
+          accounts, or open MushroomOS in a browser.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await signOut();
+            } finally {
+              window.location.href = '/sign-in';
+            }
+          }}
+          className="w-full rounded-xl py-3.5 font-head text-[15px] font-bold"
+          style={{ background: 'var(--accent)', color: '#ffffff' }}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const DEMO_PASSWORD = 'mushroom2026';
 
@@ -35,12 +77,13 @@ function MushroomMark() {
 
 export function SignIn() {
   const { session, role, loading } = useAuth();
-  const [email, setEmail] = useState('admin@freshbowl.demo');
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState(SHOW_DEMO_ACCOUNTS ? (DEMO_ACCOUNTS[0]?.email ?? '') : '');
+  const [password, setPassword] = useState(SHOW_DEMO_ACCOUNTS ? DEMO_PASSWORD : '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
 
+  if (!loading && session && role && !roleAllowedHere(role)) return <RoleNotInApp role={role} />;
   if (!loading && session && role) return <Navigate to={ROLE_HOME[role]} replace />;
 
   async function submit(e: React.FormEvent) {
@@ -57,60 +100,47 @@ export function SignIn() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        {/*
-          THE FIRST SCREEN ANYONE SEES, so it says who this is for and nothing else.
-
-          It used to read "Fresh Bowl Horticulture · compost operations · PROCESS-2026B" and close
-          with "Real Supabase Auth. The role is carried as a signed claim in the access token."
-          Both were true and both were written for an engineer. `PROCESS-2026B` is an internal
-          definition code; the second sentence describes how the login is implemented. Neither
-          means anything to the person holding the phone.
-        */}
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12 page-in">
+      <div className="w-full max-w-md space-y-6">
+        {/* Brand Header */}
         <div className="flex flex-col items-center gap-3 text-center">
-          <span
-            className="flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ background: 'var(--accent)' }}
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-2xl shadow-card"
+            style={{ background: 'linear-gradient(135deg, #16794a 0%, #1a9c62 100%)' }}
           >
             <MushroomMark />
-          </span>
+          </div>
           <div>
-            <h1 className="font-head text-[28px] font-800 leading-none tracking-tight">
+            <h1 className="font-head text-[30px] font-extrabold tracking-tight text-ink">
               Mushroom OS
             </h1>
-            <p className="mt-1.5 text-[14px] font-500" style={{ color: 'var(--muted)' }}>
-              Fresh Bowl Horticulture
+            <p className="mt-1 text-[13px] font-semibold text-muted tracking-wide uppercase">
+              Fresh Bowl Horticulture Operations
             </p>
           </div>
         </div>
 
+        {/* Login Form */}
         <form
           onSubmit={submit}
-          className="mt-7 border p-5"
-          style={{
-            borderColor: 'var(--line)',
-            background: 'var(--surface)',
-            borderRadius: 'var(--radius-card)',
-            boxShadow: 'var(--shadow-card)',
-          }}
+          className="mos-card p-6 border border-line space-y-4 shadow-card"
         >
-          <label className="flex flex-col gap-1">
-            <span className="font-head text-[11px] font-600 uppercase tracking-wider text-ink2">
-              Email
+          <div className="space-y-1">
+            <span className="label-caps text-muted">
+              Account Email
             </span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
-              className="rounded border bg-surface px-2 py-2 text-sm"
+              className="w-full rounded-xl border bg-surface px-3.5 py-3 font-mono text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30"
               style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
             />
-          </label>
+          </div>
 
-          <label className="mt-3 flex flex-col gap-1">
-            <span className="font-head text-[11px] font-600 uppercase tracking-wider text-ink2">
+          <div className="space-y-1">
+            <span className="label-caps text-muted">
               Password
             </span>
             <input
@@ -118,86 +148,91 @@ export function SignIn() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="rounded border bg-surface px-2 py-2 text-sm"
+              className="w-full rounded-xl border bg-surface px-3.5 py-3 font-mono text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30"
               style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}
             />
-          </label>
+          </div>
 
           {error && (
-            /*
-              The failure, in words a person can act on. This used to print the browser's own
-              `Failed to fetch`, which is what made the app get described as "empty" — it says
-              nothing about signal, nothing about the clock, and nothing about whether the work
-              was lost.
-            */
             <div
-              className="mt-4 border px-3 py-2.5"
+              className="rounded-xl border p-3.5"
               style={{
-                borderRadius: 12,
                 borderColor: 'var(--crit)',
                 background: 'var(--crit-soft)',
                 color: 'var(--crit)',
               }}
             >
-              <p className="font-head text-[13px] font-700">{humanError(error).title}</p>
-              <p className="mt-0.5 text-[12px] leading-snug">{humanError(error).detail}</p>
+              <p className="font-head text-[13px] font-bold flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">error</span>
+                {humanError(error).title}
+              </p>
+              <p className="mt-1 text-[12px] leading-snug">{humanError(error).detail}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={busy}
-            className="mt-5 w-full font-head text-[15px] font-700"
+            className="w-full font-head text-[15px] font-bold py-3.5 rounded-xl transition-all shadow-card tappable flex items-center justify-center gap-2"
             style={{
-              minHeight: 52,
-              borderRadius: 999,
-              background: 'var(--accent)',
-              color: 'var(--on-accent)',
-              opacity: busy ? 0.6 : 1,
+              background: 'linear-gradient(135deg, #16794a 0%, #1a9c62 100%)',
+              color: '#ffffff',
+              opacity: busy ? 0.7 : 1,
             }}
           >
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy ? (
+              <>
+                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                Signing in…
+              </>
+            ) : (
+              <>
+                <span>Sign in to Mushroom OS</span>
+                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+              </>
+            )}
           </button>
         </form>
 
-        <div className="mt-5">
-          {/*
-            `uppercase` on the paragraph rendered `mushroom2026` as `MUSHROOM2026`, and the password
-            is case-sensitive. Anyone typing what the screen showed was rejected. The label keeps
-            the styling; the value is excluded from it and marked `normal-case`.
-          */}
-          <p className="font-head text-[11px] font-600 tracking-wider text-muted">
-            <span className="uppercase">Demo accounts · password </span>
-            <span className="mono normal-case" style={{ color: 'var(--ink-2)' }}>
-              {DEMO_PASSWORD}
-            </span>
-          </p>
-          <div className="mt-2 grid gap-1">
+        {/* Demo Account Quick-Fill */}
+        {SHOW_DEMO_ACCOUNTS && (
+        <div className="mos-card p-5 border border-line space-y-3 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="label-caps text-muted">Demo Accounts</span>
+            <span className="font-mono text-[11px] text-muted">Password: <strong className="text-ink">{DEMO_PASSWORD}</strong></span>
+          </div>
+          <div className="grid gap-2">
             {DEMO_ACCOUNTS.map((a) => (
               <button
                 key={a.email}
+                type="button"
                 onClick={() => {
                   setEmail(a.email);
                   setPassword(DEMO_PASSWORD);
                 }}
-                className="flex items-center justify-between border px-3 text-left"
+                className="flex items-center justify-between border px-3.5 py-2.5 rounded-xl text-left transition-all hover:border-accent/40 hover:bg-surface-2 tappable"
                 style={{
-                  minHeight: 48,
-                  borderRadius: 12,
                   borderColor: 'var(--line)',
                   background: 'var(--surface)',
                 }}
               >
-                <span className="mono text-[12px]">{a.email}</span>
+                <div className="flex items-center gap-2">
+                  <div className="mos-icon-tile w-7 h-7 bg-surface-2 text-accent">
+                    <span className="material-symbols-outlined text-sm">person</span>
+                  </div>
+                  <span className="font-mono text-[12px] font-semibold text-ink">{a.email}</span>
+                </div>
                 <Chip tone="accent">{ROLE_LABEL[a.role]}</Chip>
               </button>
             ))}
           </div>
-          <p className="mt-3 text-[11px]" style={{ color: 'var(--muted)' }}>
-            Tap an account to fill the form. These are for trying the app out.
+          <p className="text-[11px] text-muted text-center pt-1">
+            Select an account above to test role-specific workflows.
           </p>
         </div>
+        )}
       </div>
     </div>
+
   );
 }

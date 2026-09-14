@@ -1,5 +1,5 @@
-import { supabase } from './client';
-import { loadTower } from './tower';
+import { supabase } from '../../../shared/api/client';
+import { loadTower } from '../../../shared/api/tower';
 import type {
   AwaitingRelease,
   Band,
@@ -7,8 +7,8 @@ import type {
   DeviationRow,
   LabFailure,
   UrgentGate,
-} from '../domain/contracts';
-import { nowMs } from '../lib/now';
+} from '../../../domain/contracts';
+import { nowMs } from '../../../shared/utilities/now';
 
 /**
  * S11's data. `UI_IMPLEMENTATION_PLAN §S11`, `ROLE_AND_APPROVAL_MODEL §3.3`.

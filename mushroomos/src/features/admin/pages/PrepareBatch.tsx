@@ -2,18 +2,13 @@ import { useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { activateBatch, getPreBatchMaterialCheck } from '../api/batch';
+import { activateBatch, getPreBatchMaterialCheck } from '../../../shared/api/batch';
 import { loadPrepare } from '../api/intake';
-import {
-  PREBATCH_PARAMETERS,
-  acceptOutstandingPrebatchResults,
-  listPrebatchCheckpoints,
-  takePrebatchMaterialCheck,
-} from '../api/prebatch';
-import { getBatchContext } from '../api/work';
-import { ErrorPanel } from '../components/field/ErrorPanel';
-import { fmtWhen } from '../components/field/labWords';
-import { Chip, Skeleton } from '../components/primitives';
+import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
+import { getBatchContext } from '../../../shared/api/work';
+import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
+import { fmtWhen } from '../../../shared/utilities/labWords';
+import { Chip, Skeleton } from '../../../shared/ui/primitives';
 
 /**
  * A4 · A5 · Prepare the batch, then activate it. `WORKSTATIONS.md` §4.
@@ -143,7 +138,7 @@ export function PrepareBatch() {
         </Step>
       ) : (
         <>
-          <Step n={1} title="Incoming material check" done={(check.data?.accepted ?? 0) > 0 && (check.data?.accepted ?? 0) >= (check.data?.tests_requested ?? 1)}>
+          <Step n={1} title="Pre-H0 / initial material data" done={(check.data?.results_current ?? 0) > 0}>
             <MaterialCheck batchId={id} row={check.data ?? null} loading={check.isLoading} onDone={refresh} />
           </Step>
 
@@ -182,15 +177,26 @@ export function PrepareBatch() {
               Activating freezes the plan permanently. It cannot be undone — a batch that must not run
               is cancelled, never returned to draft.
             </p>
-            <button
-              type="button"
-              disabled={activate.isPending || blocking.length > 0}
-              onClick={() => activate.mutate()}
-              className="w-full rounded-lg font-head text-[17px] font-800 disabled:opacity-50"
-              style={{ minHeight: 60, background: 'var(--accent)', color: 'var(--on-accent)' }}
-            >
-              {activate.isPending ? 'Activating…' : 'Activate the batch'}
-            </button>
+            {ongoing ? (
+              <Link
+                to={`/admin/batch/${id}/onboard`}
+                className="w-full rounded-lg text-center font-head text-[16px] font-800 no-underline flex items-center justify-center gap-2"
+                style={{ minHeight: 60, background: 'var(--accent)', color: 'var(--on-accent)' }}
+              >
+                <span>Continue Onboarding Ongoing Batch (Position & Activity)</span>
+                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled={activate.isPending || blocking.length > 0}
+                onClick={() => activate.mutate()}
+                className="w-full rounded-lg font-head text-[17px] font-800 disabled:opacity-50"
+                style={{ minHeight: 60, background: 'var(--accent)', color: 'var(--on-accent)' }}
+              >
+                {activate.isPending ? 'Activating…' : 'Activate the batch'}
+              </button>
+            )}
             {activate.error && (
               <div className="mt-3">
                 <ErrorPanel error={activate.error} prefix="The batch was not activated." />
@@ -204,10 +210,8 @@ export function PrepareBatch() {
 }
 
 /**
- * The incoming assay, in its three real states: none recorded, recorded but not accepted as final,
- * and accepted. The middle state exists because accepting is a LABORATORY act — an admin who
- * records the readings is refused at the accept, and the batch is then stuck until a lab technician
- * or supervisor finishes it. That refusal is shown, with the button that clears it.
+ * Pre-H0 Material Entry: Record physical starting measurements (moisture, pH, dry weight).
+ * Post-H0 checkpoints are recorded by the Lab team during active production.
  */
 function MaterialCheck({
   batchId,
@@ -220,71 +224,34 @@ function MaterialCheck({
   loading: boolean;
   onDone: () => void;
 }) {
-  const checkpoints = useQuery({ queryKey: ['prebatch-checkpoints'], queryFn: listPrebatchCheckpoints });
   const [values, setValues] = useState<Record<string, string>>({});
 
   const take = useMutation({
-    mutationFn: () => {
-      const cps = checkpoints.data ?? [];
-      if (cps.length === 0) throw new Error('No incoming-material checkpoint is defined in this process.');
-      const readings = PREBATCH_PARAMETERS.map((p) => {
-        const raw = (values[p.code] ?? '').replace(',', '.');
-        const n = Number(raw);
-        if (raw.trim() === '' || !Number.isFinite(n)) throw new Error(`Enter the ${p.label.toLowerCase()} reading.`);
-        return { parameter: p.code, value: n };
-      });
-      return takePrebatchMaterialCheck({
-        batchId,
-        checkpointId: cps[0].id,
-        label: 'Incoming material',
-        readings,
-      });
-    },
+    mutationFn: () => recordInitialMaterialForBatch(batchId, 'Initial material data', values),
     onSettled: onDone,
   });
 
-  const accept = useMutation({ mutationFn: () => acceptOutstandingPrebatchResults(batchId), onSettled: onDone });
+  if (loading) return <Skeleton label="Checking pre-H0 material record" lines={2} />;
 
-  if (loading) return <Skeleton label="Checking the incoming material" lines={2} />;
-
-  if (row && row.accepted >= row.tests_requested && row.tests_requested > 0) {
+  if (row && row.results_current > 0) {
     return (
-      <p className="text-[14px]" style={{ color: 'var(--ok)' }}>
-        {row.accepted} of {row.tests_requested} readings accepted as final · sampled {fmtWhen(row.collected_at)}
-        {row.collected_by_name ? ` by ${row.collected_by_name}` : ''}.
-      </p>
-    );
-  }
-
-  if (row && row.results_current > row.accepted) {
-    return (
-      <>
-        <p className="text-[14px] text-ink2">
-          {row.accepted} of {row.results_current} readings accepted as final. A lab technician or
-          supervisor accepts the rest before the batch can start.
+      <div className="p-4 rounded-xl border border-ok/40 bg-ok-soft space-y-1">
+        <p className="font-head text-sm font-bold text-ok flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-base">check_circle</span>
+          Pre-H0 Material Measurements Recorded
         </p>
-        <button
-          type="button"
-          disabled={accept.isPending}
-          onClick={() => accept.mutate()}
-          className="mt-2 w-full rounded-lg font-head text-[15px] font-800 disabled:opacity-50"
-          style={{ minHeight: 52, background: 'var(--accent)', color: 'var(--on-accent)' }}
-        >
-          {accept.isPending ? 'Accepting…' : `Accept the ${row.results_current - row.accepted} outstanding reading(s)`}
-        </button>
-        {accept.error && (
-          <div className="mt-2">
-            <ErrorPanel error={accept.error} prefix="Nothing was accepted." />
-          </div>
-        )}
-      </>
+        <p className="text-xs text-ink-2">
+          Recorded starting measurements prior to H0 start. Post-H0 checkpoints will be handled by the Lab team.
+        </p>
+      </div>
     );
   }
 
   return (
     <>
       <p className="mb-2 max-w-[60ch] text-[14px] text-ink2">
-        The material is sampled before the batch clock starts. Record what the laboratory measured.
+        Record the material values already known before H0 (moisture, pH, dry weight). They are the
+        batch's starting information — leave a field blank if it is not known.
       </p>
       <div className="grid gap-2">
         {PREBATCH_PARAMETERS.map((p) => (
@@ -311,11 +278,11 @@ function MaterialCheck({
         className="mt-3 w-full rounded-lg font-head text-[15px] font-800 disabled:opacity-50"
         style={{ minHeight: 52, background: 'var(--accent)', color: 'var(--on-accent)' }}
       >
-        {take.isPending ? 'Recording…' : 'Record the incoming check'}
+        {take.isPending ? 'Saving Pre-H0 Entry…' : 'Save Pre-H0 Material Entry'}
       </button>
       {take.error && (
         <div className="mt-2">
-          <ErrorPanel error={take.error} prefix="The check was not completed." />
+          <ErrorPanel error={take.error} prefix="The pre-H0 entry was not completed." />
         </div>
       )}
     </>

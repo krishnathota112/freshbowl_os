@@ -6,9 +6,10 @@ import { ROLE_ORDER, ROLE_PLAIN } from '../api/batches';
 import { createAndPlan, requiredMaterialRoles, resolveH0 } from '../api/intake';
 import { listSelectableProcessVersions, type ProcessVersion } from '../api/process';
 import { loadMaterialRoles } from '../api/processDefinition';
-import { ErrorPanel } from '../components/field/ErrorPanel';
-import { fmtWhen } from '../components/field/labWords';
-import { Skeleton } from '../components/primitives';
+import { supabase } from '../../../shared/api/client';
+import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
+import { fmtWhen } from '../../../shared/utilities/labWords';
+import { Skeleton } from '../../../shared/ui/primitives';
 
 /**
  * A3 · Starting a batch. Two doors, one flow — `WORKSTATIONS.md` §4.
@@ -41,6 +42,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   );
   const [time, setTime] = useState('06:00');
+  const [demo, setDemo] = useState(false);
 
   const list = versions.data ?? [];
   // The current standard is pre-selected; the admin can still choose another published version.
@@ -72,7 +74,7 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         const material = r.materials.find((m) => m.id === id);
         return material ? [{ role: r.role, material_code: material.code, lead: true }] : [];
       });
-      return createAndPlan({
+      const batchId = await createAndPlan({
         code: code.trim(),
         label: label.trim() === '' ? code.trim() : label.trim(),
         date,
@@ -80,8 +82,16 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         processDefinitionId: chosen.id,
         roles: bindings,
       });
+      if (demo) {
+        // DEMO / TEST identity lives on the batch row, so every screen and view can label it.
+        // master_batch is not writable by the app directly; mark_batch_demo (0089) sets the flag.
+        const { error } = await supabase.rpc('mark_batch_demo', { p_batch: batchId });
+        if (error) throw error;
+      }
+      return batchId;
     },
-    onSuccess: (batchId) => nav(`/admin/batch/${batchId}/prepare${ongoing ? '?ongoing=1' : ''}`),
+    onSuccess: (batchId) =>
+      nav(ongoing ? `/admin/batch/${batchId}/onboard` : `/admin/batch/${batchId}/prepare`),
   });
 
   const baseline =
@@ -97,8 +107,8 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
         </h1>
         <p className="mt-1 max-w-[60ch] text-[14px] text-muted">
           {ongoing
-            ? 'For a batch the factory is already running. Register it here, then record where it has actually got to. Nothing is claimed to have happened inside MushroomOS.'
-            : 'Plan it against a published process, check the incoming material, assign the crew, then activate.'}
+            ? 'For a batch the factory is already running. Register it here with its actual start, then record where each stream is now. Nothing is claimed to have happened inside MushroomOS.'
+            : 'Plan it against a published process, record the initial material data, then activate.'}
         </p>
       </header>
 
@@ -219,6 +229,10 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
           className="mt-1 w-full rounded-md border bg-surface px-3 text-[16px]"
           style={{ minHeight: 52, borderColor: 'var(--line-2)' }}
         />
+        <label className="mt-3 flex items-center gap-2 text-[14px] text-ink2">
+          <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} className="h-5 w-5" />
+          This is a DEMO / TEST batch (labelled everywhere it appears)
+        </label>
       </Step>
 
       <Step n={chosen ? 4 : 3} title={ongoing ? 'When did it actually start?' : 'When does it start?'}>

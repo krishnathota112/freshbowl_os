@@ -146,11 +146,25 @@ alter table public.process_activity drop constraint if exists process_activity_h
 alter table public.process_activity add constraint process_activity_hour_not_before_h0 check (
   standard_start_hour is null or standard_start_hour >= 0);
 
--- TIME_CONTRACT §5 · rel_day = floor(standard_start_hour / 24). Integer division truncates
--- toward zero and the hour is never negative, so this is floor.
+-- TIME_CONTRACT §5 · rel_day = floor(standard_start_hour / 24).
+--
+-- ⚠ `floor()` IS EXPLICIT, AND THAT ONE WORD IS WHY THIS FILE STILL REPLAYS.
+--
+-- It was written as bare `standard_start_hour / 24`, relying on INTEGER division to truncate.
+-- That was true and correct while the column was `int`. 0042 widened it to `numeric` so
+-- PROCESS-2026C's Turner could hold H175.5, and numeric division does not truncate:
+--
+--     int      175 / 24 = 7            numeric  175.5 / 24 = 7.3125
+--
+-- so on the next full replay this constraint rejected every half-hour row it had itself
+-- allowed, and `npm run db` stopped at file eleven of forty-eight.
+--
+-- Stating `floor` changes NOTHING for an integer hour — `floor(7)` is 7 — and makes the rule
+-- survive the widening. It is the same rule 0042 restates; the two now agree by construction
+-- rather than by whichever ran last.
 alter table public.process_activity drop constraint if exists process_activity_rel_day_derived;
 alter table public.process_activity add constraint process_activity_rel_day_derived check (
-  standard_start_hour is null or rel_day = standard_start_hour / 24);
+  standard_start_hour is null or rel_day = floor(standard_start_hour / 24));
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4 · process_day · the day headings, as data.
@@ -329,18 +343,18 @@ begin
          baseline_end_hour   = pa.standard_end_hour,
          planned_start_at    = case
            when mb.start_at is not null and pa.standard_start_hour is not null
-             then mb.start_at + make_interval(hours => pa.standard_start_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_start_hour * 3600)::int)
          end,
          planned_end_at      = case
            when mb.start_at is null or pa.standard_start_hour is null then null
            -- The Day-0 answer wins over the template band: it is what this batch plans to do.
            when coalesce(ba.day0_duration_hr, ba.duration_target_max_hr) is not null
-             then mb.start_at + make_interval(hours => pa.standard_start_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_start_hour * 3600)::int)
                   + make_interval(secs => (coalesce(ba.day0_duration_hr,
                                                     ba.duration_target_max_hr) * 3600)::int)
            -- No duration is stated anywhere. NULL, not zero: TBD-21, frozen decision 2.
            when pa.standard_end_hour is not null
-             then mb.start_at + make_interval(hours => pa.standard_end_hour)
+             then mb.start_at + make_interval(secs => (pa.standard_end_hour * 3600)::int)
          end
     from master_batch mb, process_activity pa
    where ba.master_batch_id = p_batch
@@ -737,7 +751,20 @@ grant execute on function public.validate_batch(uuid) to authenticated;
 do $$
 declare bid uuid;
 begin
-  for bid in select id from master_batch loop
+  -- ⚠ DRAFT BATCHES ONLY. `where status = 'draft'` is what makes this file replayable.
+  --
+  -- `scripts/db.mjs` replays every migration and seed on every run. This backfill repoints every
+  -- batch it can see, and the moment one batch is ACTIVE the F1 freeze refuses the write — for
+  -- exactly the right reason: "the plan of an activated batch is evidence, not a working
+  -- document". So a backfill written to repair plans stopped the whole run against any database
+  -- with a live batch in it, which is every real one.
+  --
+  -- An active batch does not want repointing. Its baseline is frozen against the hours it was
+  -- activated with, and a backfill that moved it would be the freeze being bypassed by a
+  -- migration rather than by a person — the one path F1 did not close.
+  for bid in select id from master_batch
+   where status = 'draft'
+  loop
     perform public.repoint_batch_activities(bid);
   end loop;
 end $$;

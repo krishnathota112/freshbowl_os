@@ -137,7 +137,20 @@ on conflict (process_definition_id, rel_day) do update set
 do $$
 declare bid uuid;
 begin
-  for bid in select id from public.master_batch loop
+  -- ⚠ DRAFT BATCHES ONLY. `where status = 'draft'` is what makes this file replayable.
+  --
+  -- `scripts/db.mjs` replays every migration and seed on every run. This backfill repoints every
+  -- batch it can see, and the moment one batch is ACTIVE the F1 freeze refuses the write — for
+  -- exactly the right reason: "the plan of an activated batch is evidence, not a working
+  -- document". So a backfill written to repair plans stopped the whole run against any database
+  -- with a live batch in it, which is every real one.
+  --
+  -- An active batch does not want repointing. Its baseline is frozen against the hours it was
+  -- activated with, and a backfill that moved it would be the freeze being bypassed by a
+  -- migration rather than by a person — the one path F1 did not close.
+  for bid in select id from public.master_batch
+   where status = 'draft'
+  loop
     perform public.repoint_batch_activities(bid);
   end loop;
 end $$;

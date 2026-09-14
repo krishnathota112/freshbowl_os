@@ -8,12 +8,13 @@ import {
   getPreBatchMaterialCheck,
   releaseElapsedRests,
   type BatchActivityRow,
-} from '../api/batch';
-import { supabase } from '../api/client';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Card, Chip, ConflictMarker, EmptyState, Stat } from '../components/primitives';
-import { TaskDrawer } from './TaskDrawer';
-import { nowMs } from '../lib/now';
+} from '../../../shared/api/batch';
+import { supabase } from '../../../shared/api/client';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Card, Chip, ConflictMarker, EmptyState, Stat } from '../../../shared/ui/primitives';
+import { TaskDrawer } from '../../../shared/ui/TaskDrawer';
+import { nowMs } from '../../../shared/utilities/now';
+import { BatchMonitor } from '../components/BatchMonitor';
 
 /**
  * The batch, day by day. This is the plan a supervisor or admin reads.
@@ -28,6 +29,7 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient();
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
 
   const batch = useQuery({ queryKey: ['batch', id], queryFn: () => getBatch(id) });
   const acts = useQuery({ queryKey: ['batch-activities', id], queryFn: () => getBatchActivities(id) });
@@ -103,6 +105,41 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
           right={actions}
         />
       )}
+
+      {/* View Mode Selector */}
+      <div className="mb-5 flex items-center justify-between border-b border-line pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('timeline')}
+            className={`px-4 py-2 rounded-xl text-xs font-head font-bold transition-all tappable flex items-center gap-1.5 ${
+              viewMode === 'timeline'
+                ? 'bg-accent text-white shadow-card'
+                : 'bg-surface border border-line text-ink-2 hover:border-accent/40'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">timeline</span>
+            <span>Batch Verification & Evidence Timeline</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={`px-4 py-2 rounded-xl text-xs font-head font-bold transition-all tappable flex items-center gap-1.5 ${
+              viewMode === 'grid'
+                ? 'bg-accent text-white shadow-card'
+                : 'bg-surface border border-line text-ink-2 hover:border-accent/40'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">grid_view</span>
+            <span>Day-by-Day Activity Grid</span>
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'timeline' ? (
+        <BatchMonitor batchId={id} />
+      ) : (
+        <>
 
       {error && (
         <div
@@ -258,6 +295,8 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
             qc.invalidateQueries({ queryKey: ['my-work'] });
           }}
         />
+      )}
+        </>
       )}
     </>
   );

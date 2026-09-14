@@ -1,5 +1,5 @@
-import { PageHeading } from '../components/layout/PageHeading';
-import { Chip, EmptyState } from '../components/primitives';
+import { PageHeading } from './ui/layout/PageHeading';
+import { Chip, EmptyState } from './ui/primitives';
 
 /**
  * A role home whose screen belongs to a later step, stated rather than faked.

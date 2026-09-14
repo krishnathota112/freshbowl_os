@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { loadLabWork, type LabWorkItem } from '../api/lab';
-import { PageHeading } from '../components/layout/PageHeading';
-import { Chip, EmptyState, Skeleton } from '../components/primitives';
-import { ErrorPanel } from '../components/field/ErrorPanel';
-import { fmtWhen, labStatus, paramLabel } from '../components/field/labWords';
+import { PageHeading } from '../../../shared/ui/layout/PageHeading';
+import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
+import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
+import { fmtWhen, labStatus, paramLabel } from '../../../shared/utilities/labWords';
 
 /**
  * L1 · the Lab queue — "Take the sample, record the result, submit it." `WORKSTATIONS.md` §3.

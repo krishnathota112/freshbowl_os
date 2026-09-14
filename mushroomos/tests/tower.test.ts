@@ -34,8 +34,8 @@ import {
   placeBars,
   railGeometry,
   sortByStartAt,
-} from '../src/components/composite/geometry';
-import { countersFor } from '../src/api/tower';
+} from '../src/shared/ui/composite/geometry';
+import { countersFor } from '../src/shared/api/tower';
 import { fixtureStaircase, type FixtureGeometry } from '../src/fixtures';
 import { DB_URL, NO_DB_REASON, REPO_ROOT, all, one, withRollback } from './db';
 

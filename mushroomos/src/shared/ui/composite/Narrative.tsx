@@ -38,8 +38,8 @@
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
-import type { BatchBar, BatchVariance, Contributor } from '../../domain/contracts';
-import { batchInstant } from '../../domain/time';
+import type { BatchBar, BatchVariance, Contributor } from '../../../domain/contracts';
+import { batchInstant } from '../../../domain/time';
 import { humanDuration } from '../domain/HumanDuration';
 import { ConflictMarker } from '../primitives';
 
