@@ -1,5 +1,592 @@
 # MushroomOS — engineering entry and Claude handoff
 
+## 0. FINAL BUILD DIRECTIVE — authoritative (user, 14 Sep 2026)
+
+This section is the top-level instruction for every agent. Where anything below it, or any other document, conflicts with it, **this section wins**. Before any change ask: *is this a core product capability, an Admin configuration, or a process-version data change?*
+
+```text
+MUSHROOMOS — FINAL BUILD DIRECTIVE
+
+This is the authoritative product direction for completing MushroomOS.
+
+Do not redesign the product architecture again.
+Do not create another architecture.
+Do not create another competing process model.
+Use the existing repository and database.
+
+==================================================
+1. PRODUCT DEFINITION
+==================================================
+
+MushroomOS is a factory process execution and monitoring system.
+
+Its CORE is fixed.
+
+The FACTORY SOP is replaceable/versioned data.
+
+ADMIN CONFIGURATION is where factory-specific setup belongs.
+
+The system must allow the factory to change its SOP without requiring
+developers to rewrite React/business logic for every process change.
+
+The core product must remain stable while process definitions change.
+
+==================================================
+2. FIXED PRODUCT CORE
+==================================================
+
+The fixed core includes:
+
+- authentication
+- role/permission model
+- Admin web
+- Supervisor mobile
+- Lab mobile
+- GM mobile
+- batch lifecycle
+- batch creation
+- existing-running-batch onboarding
+- process versions
+- process execution
+- task state
+- parallel streams
+- dependencies/gates
+- passive holds
+- evidence
+- native camera
+- readings/checklists
+- timestamps
+- performer accountability
+- Lab submission
+- GM approval
+- extensions / late tickets
+- monitoring
+- audit/history
+
+Do not redesign these because the SOP changes.
+
+==================================================
+3. ADMIN IS THE SYSTEM CONFIGURATION AUTHORITY
+==================================================
+
+ADMIN is responsible for:
+
+A. USERS
+- create real accounts
+- assign department/role
+- provide real login credentials
+- manage active/inactive access
+
+Current operating scale is small:
+approximately 13 Supervisors and 4 Lab technicians,
+plus GM and Admin users.
+
+B. SOP / PROCESS AUTHORING
+Admin must eventually be able to create a new process version
+without developer code changes.
+
+The authoring layer should configure:
+- stages
+- activities/tasks
+- streams
+- sequencing/dependencies
+- durations
+- holds
+- readings
+- Lab checkpoints
+- evidence requirements
+- gates/approvals
+- skip rules
+- process-specific instructions
+
+Draft -> validate -> review -> publish.
+
+Published versions are immutable.
+
+For the current delivery, generic SOP authoring does not need to be
+fully feature-rich, but the core architecture must keep the process
+as data rather than React conditionals.
+
+C. BATCHES
+Admin:
+- creates new batch
+- enters starting/pre-H0 information
+- activates new batch
+- onboards existing/running batch
+- sets current position per stream
+- monitors all batches
+
+D. MONITORING
+Admin can inspect:
+- batch
+- process/version
+- current stage/activity
+- progress
+- actual timestamps
+- performer
+- readings
+- evidence
+- Lab state
+- GM state
+- blocked reasons
+- extensions/tickets
+
+==================================================
+4. ROLE BOUNDARIES
+==================================================
+
+ADMIN
+Configure + onboard + monitor.
+
+SUPERVISOR
+Physical production execution only.
+
+LAB
+Post-H0 laboratory execution only.
+
+GM
+Lab approval + process progress oversight.
+
+Do not use UI hiding as the only permission system.
+Server-side permissions remain authoritative.
+
+Admin does not perform Supervisor work.
+Supervisor does not onboard batches.
+Lab does not perform production tasks.
+GM does not perform production/Lab execution.
+
+==================================================
+5. NEW BATCH
+==================================================
+
+For a NEW batch:
+
+Admin:
+- select process/version
+- enter batch information
+- enter required initial/pre-H0 material information
+- enter actual H0 when appropriate
+- prepare/activate
+
+Pre-H0 values are starting material information, not ordinary
+post-H0 Lab approval.
+
+Do not force Admin through a generic Lab approval workflow for
+these starting values.
+
+==================================================
+6. EXISTING RUNNING BATCH
+==================================================
+
+This is the canonical onboarding model.
+
+Admin is the only role responsible for onboarding.
+
+The physical batch already exists and is already running.
+
+Admin tells MushroomOS:
+
+- which process version applies
+- where each relevant stream is CURRENTLY
+- whether a stream has not started
+
+Example:
+
+Main/CM stream -> current activity
+Paddy stream -> current activity
+Turner -> current activity
+Bunker -> current activity
+Tunnel -> not started/current activity
+
+Do not ask Admin to reconstruct the original start time of the
+physical batch unless the process specifically requires it.
+
+Do not ask Supervisor to participate in onboarding.
+
+Do not fabricate historical:
+- timestamps
+- performers
+- photos
+- readings
+- task completion
+
+Earlier physical work is BEFORE TRACKING context.
+
+The selected activity/position becomes the live tracking entry point.
+
+MushroomOS starts tracking from that position.
+
+The selected current activity must be available for live execution
+unless a confirmed factory rule explicitly says otherwise.
+
+Supervisor then sees the next valid work.
+
+==================================================
+7. PROCESS MODEL
+==================================================
+
+The factory SOP is structured data.
+
+Never implement process-specific rules by hardcoding stage/activity
+logic in React.
+
+React renders backend/process answers.
+
+A process version contains:
+- stages
+- streams
+- tasks
+- durations
+- dependencies
+- holds
+- readings
+- evidence
+- Lab
+- approvals
+- unresolved items
+
+When an SOP changes:
+create a new process version.
+
+Never rewrite an active batch baseline.
+
+==================================================
+8. PROCESS CHANGE CASCADE
+==================================================
+
+When a process activity changes, review its impact on:
+
+- upstream/downstream tasks
+- streams
+- convergence
+- dependencies
+- holds
+- durations
+- Lab checkpoints
+- readings
+- units
+- evidence
+- approvals
+- onboarding positions
+- monitoring
+- planned timing
+- forecast
+- unresolved questions
+
+Do not only edit the visible timeline row.
+
+Example:
+if another hopper pass is inserted, review every downstream
+dependency/timing/Lab/evidence implication before publishing the
+new process version.
+
+==================================================
+9. TASK DECOMPOSITION
+==================================================
+
+The current SOP must be understood and decomposed into executable
+tasks based on what the source actually says.
+
+For each task determine:
+- stage
+- stream
+- activity
+- instruction
+- human work vs passive hold
+- predecessor/dependency
+- duration if known
+- required readings
+- checklist
+- evidence
+- Lab dependency
+- skip policy
+- unresolved/conflict
+
+Do not invent missing values.
+
+A '+' in a source sentence does not automatically mean separate tasks.
+Split only where the source clearly represents distinct executable work.
+
+==================================================
+10. LAB DATA TYPES
+==================================================
+
+Do not render every Lab field as a numeric input.
+
+Parameter type must follow the Lab definition:
+
+numeric -> numeric input
+observation -> observation/text input
+controlled qualitative -> predefined choices
+
+For example:
+Smell = observation
+Colour = observation
+Spring/squeeze = controlled qualitative observation
+
+Spring/squeeze values are:
+Too dry / Normal / Too wet / Dripping
+
+Do not accept arbitrary numbers for those fields.
+
+==================================================
+11. SUPERVISOR EXPERIENCE
+==================================================
+
+Supervisor opens the mobile app and asks:
+
+"What work can I do now?"
+
+My Work shows executable production work across all active batches.
+
+Human work:
+Start
+-> required before evidence
+-> work
+-> reading/checklist
+-> required after evidence
+-> Finish
+
+Passive hold:
+no manual Start
+confirm when condition is met
+hold timing is process-derived
+
+Supervisor must never need to understand database/gate terminology.
+
+Use normal factory language.
+
+==================================================
+12. LAB EXPERIENCE
+==================================================
+
+Lab opens the mobile app and asks:
+
+"What tests do I need to do?"
+
+Queue:
+batch
+checkpoint
+sample
+reading
+observation
+evidence
+submit
+
+Lab work is post-H0.
+
+==================================================
+13. GM EXPERIENCE
+==================================================
+
+GM mobile app contains two main areas:
+
+LAB APPROVALS
+- submitted results requiring GM decision
+- approve/reject
+- reason
+
+PROGRESS
+- read-only view of batch progress
+- current stage
+- current activity
+- Lab waiting/approval state
+- blocked/deviation/late state
+
+Do not give GM production-execution controls.
+
+==================================================
+14. ADMIN MONITORING
+==================================================
+
+Admin monitoring must answer:
+
+What happened?
+When?
+Who did it?
+What was measured?
+What evidence was captured?
+What did Lab report?
+What did GM decide?
+What is blocked?
+What needs attention?
+
+For each activity show where available:
+- activity
+- stage
+- status
+- performer
+- actual start
+- actual finish
+- reading
+- observation
+- before photo
+- after photo
+- Lab state
+- GM state
+- ticket/extension
+- blocked reason
+
+Use real persisted evidence.
+No mock/fake production data.
+
+==================================================
+15. DEMO / TEST
+==================================================
+
+Demo data must be clearly DEMO/TEST.
+
+Use real server timestamps during live demo execution.
+
+Do not fabricate historical production execution.
+
+A test batch should allow this complete test:
+
+ADMIN
+-> create/onboard DEMO batch
+-> enter required initial material information
+-> establish current position
+-> confirm
+
+SUPERVISOR
+-> see task
+-> Start
+-> native camera
+-> before evidence
+-> reading/checklist
+-> after evidence
+-> Finish
+
+LAB
+-> checkpoint
+-> sample
+-> reading
+-> photo
+-> submit
+
+GM
+-> approval
+
+ADMIN
+-> monitor batch
+-> see actual photo
+-> performer
+-> timestamps
+-> reading
+-> Lab result
+-> GM decision
+
+==================================================
+16. CURRENT COMPLETION CRITERIA
+==================================================
+
+The product is considered READY FOR FIELD TEST when:
+
+1. Admin can create a new batch.
+2. Admin can onboard an existing running batch without Supervisor help.
+3. Admin can set current position per stream.
+4. Supervisor can see the correct executable work.
+5. Supervisor can use the native phone camera.
+6. Evidence is actually stored and linked correctly.
+7. Real performer and server timestamps are stored.
+8. Required readings/checklists persist.
+9. Lab can complete a real checkpoint.
+10. GM can approve/reject where required.
+11. Admin monitoring shows the complete trace.
+12. Multiple concurrent batches work.
+13. Unresolved process dependencies remain blocked.
+14. No role is being asked to perform another role's work.
+15. Android APK works on a real phone.
+16. Admin web works against the real Supabase project.
+
+==================================================
+17. ENGINEERING BEHAVIOUR
+==================================================
+
+Do not:
+- create another architecture
+- create another process engine
+- create duplicate ticket systems
+- create duplicate evidence systems
+- create another onboarding model
+- hardcode process-specific logic into React
+- invent factory rules
+- fabricate historical execution
+- add unrelated features
+- refactor unrelated files
+
+Before changing code:
+inspect current source, current database contracts and current process
+data.
+
+Reuse existing infrastructure wherever it already satisfies the contract.
+
+Only add a backend capability when the current system genuinely cannot
+represent an approved requirement.
+
+==================================================
+18. FUTURE SOP CHANGES
+==================================================
+
+Future SOP changes are expected.
+
+Therefore:
+
+FACTORY CHANGE
+-> new process version
+-> Admin/editor updates process data
+-> validate
+-> review
+-> publish
+-> new batches use new version
+-> existing active batches retain their old baseline
+
+The core MushroomOS application remains unchanged.
+
+==================================================
+19. EXECUTION MODE
+==================================================
+
+From this point forward, stop re-litigating settled architecture.
+
+Work in this order:
+
+PHASE 1
+Audit current repository/database against this directive.
+
+PHASE 2
+Identify only concrete mismatches.
+
+PHASE 3
+Fix the highest-value mismatches required for field use.
+
+PHASE 4
+Run the complete DEMO/TEST workflow.
+
+PHASE 5
+Build Android APK and test on device.
+
+PHASE 6
+Freeze for field testing.
+
+At each phase report:
+- what is already correct
+- what is missing
+- what was changed
+- what test proves it
+
+Do not invent a new project plan unless the current system cannot satisfy
+this directive.
+
+If a requirement is genuinely unresolved, ask only one concise question
+at a time and explain exactly which implementation decision it changes.
+
+The objective is COMPLETION, not continued analysis.
+```
+
+---
+
+
 13 September 2026. **Single starting point for Claude Code and all coding agents.** This is a router and operating contract, not another product specification. The user wants the entire application completed using the existing implementation and these documents.
 
 ## 1. Product and session scope
