@@ -121,6 +121,7 @@ export function TaskDrawer({
     qc.invalidateQueries({ queryKey: ['evidence-full', activityId] });
     qc.invalidateQueries({ queryKey: ['time-gate', activityId] });
     qc.invalidateQueries({ queryKey: ['late-block', activityId] });
+    qc.invalidateQueries({ queryKey: ['start-block', activityId] });
     onChanged();
   };
 
@@ -211,6 +212,17 @@ export function TaskDrawer({
     refetchInterval: 60_000,
   });
   const lateReason = late.data ?? null;
+  // 0106 · a task cannot be started before its planned time (minus the early window)
+  const startBlock = useQuery({
+    queryKey: ['start-block', activityId],
+    queryFn: async () => {
+      const { data, error: e } = await supabase.rpc('start_block_reason', { p_activity: activityId });
+      if (e) throw e;
+      return (data as string | null) ?? null;
+    },
+    refetchInterval: 60_000,
+  });
+  const startReason = startBlock.data ?? null;
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setClock(Date.now()), 15_000);
@@ -474,13 +486,27 @@ export function TaskDrawer({
         )}
 
         {executes && a?.state === 'READY' && batchStatus === 'active' && !a.is_hold && (
-          <button
-            onClick={() => start.mutate()}
-            className="mb-4 w-full rounded px-3 py-3 font-head text-sm font-700"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >
-            Start work
-          </button>
+          <>
+            {startReason && (
+              <p
+                className="mb-2 rounded border px-3 py-2 text-[13px] font-600"
+                style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}
+              >
+                {startReason}
+              </p>
+            )}
+            <button
+              onClick={() => start.mutate()}
+              disabled={startReason !== null || start.isPending}
+              className="mb-4 w-full rounded px-3 py-3 font-head text-sm font-700 disabled:opacity-50"
+              style={{ background: startReason ? 'var(--lock)' : 'var(--accent)', color: '#fff' }}
+            >
+              {startReason ? 'Not yet — see the planned time' : 'Start work'}
+            </button>
+            {start.error && (
+              <p className="mb-3 text-[13px]" style={{ color: 'var(--crit)' }}>{(start.error as Error).message}</p>
+            )}
+          </>
         )}
 
         {batchStatus !== 'active' && (
