@@ -2,221 +2,180 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { loadAdminHome } from '../api/intake';
-import type { BatchContext } from '../../../shared/api/work';
+import { listBatchMonitors, type BatchMonitor } from '../../../shared/api/monitor';
+import { listTickets } from '../../../shared/api/tickets';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
-import { fmtWhen } from '../../../shared/utils/labWords';
-import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
+import { Chip, Skeleton } from '../../../shared/ui/primitives';
 
 /**
- * A1 · Admin home — "Control the factory." `docs/05-ui/WORKSTATIONS.md` §4.
- *
- * TWO THINGS ARE IMPOSSIBLE TO MISS, because they are the two things an admin comes here to do:
- * start a new batch, or bring a batch the factory is ALREADY RUNNING into MushroomOS. They are
- * deliberately separate doors — what happens behind them is different in kind, and mixing them is
- * how a system ends up claiming it watched work it never saw.
- *
- * Below them: what needs a person, then the batches themselves. No percentages, no charts, no
- * "on time" — the product has no field for a running task being late (CT-001), so this screen
- * does not imply one. Every number is a view's own count.
+ * Admin home (simplified 15 Sep 2026). Three questions, top to bottom:
+ *   1 · What do I want to do?      start a batch, or add one already running
+ *   2 · What is waiting for me?    late tickets to decide, batches not finished setting up
+ *   3 · How are the batches doing? one card per running batch: where it is, what is open, what is late
+ * Every number is the server's (v_batch_monitor, v_extension_request).
  */
 export function AdminHome() {
-  const q = useQuery({ queryKey: ['admin-home'], queryFn: loadAdminHome, refetchInterval: 60_000 });
+  const home = useQuery({ queryKey: ['admin-home'], queryFn: loadAdminHome, refetchInterval: 60_000 });
+  const running = useQuery({ queryKey: ['batch-monitor', 'active'], queryFn: () => listBatchMonitors(['active']), refetchInterval: 60_000 });
+  const tickets = useQuery({ queryKey: ['admin-tickets', 'open'], queryFn: () => listTickets('open'), refetchInterval: 30_000 });
+
+  const ticketCount = tickets.data?.length ?? 0;
+  const drafts = home.data?.draft ?? [];
+  const batches = running.data ?? [];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-16 page-in">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
-        <div>
-          <span className="label-caps text-muted">Factory Operations Dashboard</span>
-          <h1 className="font-head text-2xl font-extrabold text-ink">Control Tower</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/admin/users"
-            className="rounded-xl border border-line bg-surface px-3.5 py-2 font-head text-xs font-bold text-ink-2 hover:bg-surface-2 flex items-center gap-1.5 no-underline tappable"
-          >
-            <span className="material-symbols-outlined text-base">group</span>
-            User Management
-          </Link>
-          <Link
-            to="/admin/batches"
-            className="rounded-xl border border-line bg-surface px-3.5 py-2 font-head text-xs font-bold text-ink-2 hover:bg-surface-2 flex items-center gap-1.5 no-underline tappable"
-          >
-            <span className="material-symbols-outlined text-base">view_module</span>
-            All Batches
-          </Link>
-        </div>
+    <div className="mx-auto max-w-4xl space-y-8 pb-16">
+      <header>
+        <h1 className="font-head text-[28px] font-800 leading-tight">Home</h1>
+        <p className="mt-1 text-[15px] text-muted">
+          {batches.length === 0 ? 'No batch is running.' : `${batches.length} batch${batches.length === 1 ? '' : 'es'} running`}
+          {ticketCount > 0 ? ` · ${ticketCount} ticket${ticketCount === 1 ? '' : 's'} waiting for you` : ''}
+        </p>
       </header>
 
-      {/* Action Doors */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link
+      {/* 1 · what to do */}
+      <section className="grid gap-3 sm:grid-cols-2">
+        <ActionCard
           to="/admin/batch/start"
-          className="mos-next-card p-6 text-white no-underline shadow-raised tappable flex flex-col justify-between"
-          style={{ minHeight: 120 }}
-        >
-          <div className="flex items-start justify-between relative z-10">
-            <div>
-              <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-extrabold tracking-wider uppercase">
-                NEW PRODUCTION
-              </span>
-              <h2 className="font-head text-xl font-extrabold text-white mt-1">Start New Batch</h2>
-            </div>
-            <div className="mos-icon-tile bg-white/20 text-white backdrop-blur-md">
-              <span className="material-symbols-outlined text-xl">add_circle</span>
-            </div>
-          </div>
-          <p className="text-xs text-white/80 relative z-10 mt-2">
-            Initialize and schedule a fresh batch from published SOP specs.
-          </p>
-        </Link>
-
-        <Link
+          primary
+          title="Start a new batch"
+          detail="The batch starts now or at a set time (H0). Every task is planned from there."
+        />
+        <ActionCard
           to="/admin/batch/ongoing"
-          className="mos-card p-6 border border-line no-underline shadow-card tappable flex flex-col justify-between hover:border-accent/40"
-          style={{ minHeight: 120 }}
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="label-caps text-muted">ONBOARDING</span>
-              <h2 className="font-head text-xl font-extrabold text-ink mt-1">Add Ongoing Batch</h2>
-            </div>
-            <div className="mos-icon-tile bg-surface-2 text-accent">
-              <span className="material-symbols-outlined text-xl">move_to_inbox</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted mt-2">
-            Bring a batch currently running on the factory floor into Mushroom OS.
-          </p>
-        </Link>
-      </div>
+          title="Add a batch already running"
+          detail="Say where each part of the batch is today. Tracking starts from now."
+        />
+      </section>
 
-      {q.isLoading && <Skeleton label="Loading factory console…" lines={5} />}
-      {q.error && <ErrorPanel error={q.error} prefix="The factory console could not be loaded." onRetry={() => q.refetch()} />}
-
-      {q.data && (
-        <div className="space-y-6">
-          {(q.data.approvalsWaiting > 0 || q.data.deviationsOpen > 0) && (
-            <Section title="Attention Required">
-              {q.data.approvalsWaiting > 0 && (
-                <RowLink
-                  to="/gm/progress"
-                  label={`${q.data.approvalsWaiting} Lab ${q.data.approvalsWaiting === 1 ? 'submission' : 'submissions'} awaiting GM decision`}
-                  detail="Production gates remain locked until checkpoint approval is granted."
-                  icon="biotech"
-                />
-              )}
-              {q.data.deviationsOpen > 0 && (
-                <RowLink
-                  to="/gm/progress"
-                  label={`${q.data.deviationsOpen} open ${q.data.deviationsOpen === 1 ? 'deviation' : 'deviations'} on record`}
-                  detail="Supervisor or GM review required to clear active deviations."
-                  icon="warning"
-                />
-              )}
-
-            </Section>
+      {/* 2 · waiting for the admin */}
+      {(ticketCount > 0 || drafts.length > 0) && (
+        <section className="space-y-2">
+          <h2 className="font-head text-[13px] font-800 uppercase tracking-wider text-muted">Waiting for you</h2>
+          {ticketCount > 0 && (
+            <WaitingRow
+              to="/admin/tickets"
+              tone="warn"
+              title={`${ticketCount} late ticket${ticketCount === 1 ? '' : 's'} to decide`}
+              detail="The task stays blocked until you approve more time or reject."
+            />
           )}
-
-          {q.data.draft.length > 0 && (
-            <Section title="Draft Batches (Not Started)">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {q.data.draft.map((b) => (
-                  <BatchCard key={b.master_batch_id} b={b} to={`/admin/batch/${b.master_batch_id}/prepare`} cta="Continue Setup" />
-                ))}
-              </div>
-            </Section>
-          )}
-
-          <Section title={`Active Concurrent Batches (${q.data.active.length})`}>
-            {q.data.active.length === 0 ? (
-              <EmptyState
-                title="No batch is running right now"
-                detail="Start a new batch or onboard a running floor batch using the action buttons above."
-              />
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {q.data.active.map((b) => (
-                  <BatchCard key={b.master_batch_id} b={b} to={`/batch/${b.master_batch_id}`} />
-                ))}
-              </div>
-            )}
-          </Section>
-        </div>
+          {drafts.map((b) => (
+            <WaitingRow
+              key={b.master_batch_id}
+              to={`/admin/batch/${b.master_batch_id}/prepare`}
+              title={`Finish setting up ${b.code}`}
+              detail="Created but not started yet."
+            />
+          ))}
+        </section>
       )}
+
+      {/* 3 · running batches */}
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-head text-[13px] font-800 uppercase tracking-wider text-muted">Running batches</h2>
+          <Link to="/admin/batches" className="text-[14px] font-600">All batches →</Link>
+        </div>
+        {(home.isLoading || running.isLoading) && <Skeleton label="Loading batches" lines={3} />}
+        {running.error && <ErrorPanel error={running.error} prefix="Batches could not be loaded." onRetry={() => running.refetch()} />}
+        {running.data && batches.length === 0 && (
+          <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-[15px] text-muted" style={{ borderColor: 'var(--line-2)' }}>
+            Nothing is running. Use “Start a new batch” or “Add a batch already running”.
+          </p>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {batches.map((b) => (
+            <RunningBatch key={b.master_batch_id} b={b} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-2.5">
-      <h2 className="label-caps text-muted">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function RowLink({ to, label, detail, icon }: { to: string; label: string; detail: string; icon?: string }) {
+function ActionCard({ to, title, detail, primary }: { to: string; title: string; detail: string; primary?: boolean }) {
   return (
     <Link
       to={to}
-      className="mos-card flex items-start gap-3.5 p-4 border no-underline transition-all hover:border-warn text-ink shadow-card tappable"
-      style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}
+      className="flex items-center justify-between gap-4 rounded-2xl border p-5 no-underline transition-shadow hover:shadow-card"
+      style={{
+        minHeight: 108,
+        borderColor: primary ? 'var(--accent)' : 'var(--line)',
+        background: primary ? 'var(--accent)' : 'var(--surface)',
+        color: primary ? '#fff' : 'var(--ink)',
+      }}
     >
-      <div className="mos-icon-tile w-10 h-10 bg-amber-200 text-warn font-bold">
-        <span className="material-symbols-outlined text-lg">{icon ?? 'warning'}</span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="font-head text-base font-extrabold text-ink">{label}</p>
-        <p className="mt-0.5 text-xs text-ink-2 font-medium">{detail}</p>
-      </div>
-      <span className="material-symbols-outlined text-warn text-lg">chevron_right</span>
+      <span>
+        <span className="block font-head text-[19px] font-800 leading-tight">{title}</span>
+        <span className="mt-1 block text-[14px]" style={{ opacity: primary ? 0.9 : 1, color: primary ? '#fff' : 'var(--muted)' }}>
+          {detail}
+        </span>
+      </span>
+      <span aria-hidden className="text-[24px] font-700">→</span>
     </Link>
   );
 }
 
-/**
- * One batch: the four numbers that must never be collapsed — PROCESS, STANDARD, H0 — and the
- * server's own counts of what has finished and what is running.
- */
-function BatchCard({ b, to, cta }: { b: BatchContext; to: string; cta?: string }) {
-  const finished = Number(b.finished_count ?? 0);
-  const total = Number(b.activity_count ?? 0);
-  const running = Number(b.running_count ?? 0);
-  const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
-
+function WaitingRow({ to, title, detail, tone }: { to: string; title: string; detail: string; tone?: 'warn' }) {
   return (
     <Link
       to={to}
-      className={`mos-card block p-4 border no-underline transition-all hover:border-accent/40 shadow-card tappable ${
-        running > 0 ? 'border-accent' : 'border-line'
-      }`}
-      style={{ color: 'var(--ink)' }}
+      className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 no-underline"
+      style={{
+        borderColor: tone === 'warn' ? 'var(--warn)' : 'var(--line)',
+        background: tone === 'warn' ? 'var(--warn-soft)' : 'var(--surface)',
+        color: 'var(--ink)',
+      }}
+    >
+      <span className="min-w-0">
+        <span className="block font-head text-[16px] font-700">{title}</span>
+        <span className="block text-[13px] text-muted">{detail}</span>
+      </span>
+      <span aria-hidden className="text-[20px]">›</span>
+    </Link>
+  );
+}
+
+function RunningBatch({ b }: { b: BatchMonitor }) {
+  const tracked = Math.max(0, b.production_total - b.production_before_tracking);
+  const pct = tracked === 0 ? 0 : Math.round((b.production_completed / tracked) * 100);
+  const day = b.h0 ? Math.max(0, Math.floor((Date.now() - Date.parse(b.h0)) / 86_400_000)) : null;
+  const attention = b.open_tickets > 0 || b.overdue > 0 || b.deviations > 0;
+
+  return (
+    <Link
+      to={`/batch/${b.master_batch_id}`}
+      className="block rounded-2xl border bg-surface p-4 no-underline transition-shadow hover:shadow-card"
+      style={{ borderColor: attention ? 'var(--warn)' : 'var(--line)', color: 'var(--ink)' }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-extrabold text-ink">{b.code}</span>
-            <Chip tone={running > 0 ? 'accent' : 'inherit'}>{b.status.toUpperCase()}</Chip>
-          </div>
-          <p className="mt-1 text-xs text-muted font-medium">
-            SOP: <span className="font-mono font-bold text-ink-2">{b.process_code}</span>
-            {b.standard_hr !== null && <> · H{b.standard_hr}</>}
-            {b.h0 && <> · H0 {fmtWhen(b.h0)}</>}
+          <p className="truncate font-head text-[20px] font-800 leading-tight">{b.batch_code}</p>
+          <p className="truncate text-[13px] text-muted">
+            {day !== null ? `Day ${day}` : 'Added while running'}
+            {b.batch_label && b.batch_label !== b.batch_code ? ` · ${b.batch_label}` : ''}
           </p>
         </div>
-        {cta ? <Chip tone="accent">{cta}</Chip> : running > 0 ? <Chip tone="accent">{running} active</Chip> : null}
+        {b.is_demo && <Chip tone="warn">DEMO</Chip>}
       </div>
 
-      {total > 0 && (
-        <div className="mt-3 pt-2.5 border-t border-line space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-ink-2">
-            <span>Progress: <strong>{finished} / {total}</strong> tasks</span>
-            <span className="font-mono font-bold text-accent">{pct}%</span>
-          </div>
-          <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
-            <div className="bg-accent h-full rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
-          </div>
+      <p className="mt-3 line-clamp-2 text-[14px] text-ink2">{b.current_stages ?? 'No task open right now'}</p>
+
+      <div className="mt-3">
+        <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--surface-2)' }}>
+          <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+        </div>
+        <p className="mt-1 text-[12px] text-muted">
+          {b.production_completed} of {tracked} tasks done · {b.production_ready + b.production_in_progress} open now
+        </p>
+      </div>
+
+      {attention && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {b.open_tickets > 0 && <Chip tone="warn">{b.open_tickets} ticket{b.open_tickets === 1 ? '' : 's'}</Chip>}
+          {b.overdue > 0 && <Chip tone="warn">{b.overdue} over time</Chip>}
+          {b.deviations > 0 && <Chip tone="warn">{b.deviations} deviation{b.deviations === 1 ? '' : 's'}</Chip>}
         </div>
       )}
     </Link>

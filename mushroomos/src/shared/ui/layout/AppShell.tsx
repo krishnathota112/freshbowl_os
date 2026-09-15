@@ -14,18 +14,27 @@ const NAV_APP: Record<string, { to: string; label: string }[]> = {
 import { Chip } from '../primitives';
 import { isTimeTravelled, timeTravelOffsetMs } from '../../utils/now';
 
+// Less-used screens sit under "More" so the main menu stays short (15 Sep 2026).
+const NAV_MORE: Record<string, { to: string; label: string }[]> = {
+  admin: [
+    { to: '/admin/today', label: 'Today (checks)' },
+    { to: '/admin/schedule', label: 'Monthly schedule' },
+    { to: '/admin/process-explorer', label: 'Process steps' },
+    { to: '/admin/reference', label: 'Reference data' },
+  ],
+  gm: [
+    { to: '/admin/schedule', label: 'Monthly schedule' },
+    { to: '/admin/process-explorer', label: 'Process steps' },
+  ],
+};
+
 const NAV: Record<string, { to: string; label: string }[]> = {
   admin: [
     { to: '/admin', label: 'Home' },
-    { to: '/admin/today', label: 'Today' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/tickets', label: 'Tickets' },
     { to: '/gm/people', label: 'People' },
     { to: '/admin/logins', label: 'Logins' },
-    { to: '/admin/schedule', label: 'Schedule' },
-    { to: '/admin/batch/start', label: '+ New Batch' },
-    { to: '/admin/process-explorer', label: 'Process' },
-    { to: '/admin/reference', label: 'Reference' },
   ],
   operator: [{ to: '/operator/my-work', label: 'My Work' }],
   lab_tech: [{ to: '/lab/queue', label: 'Lab Queue' }],
@@ -40,11 +49,9 @@ const NAV: Record<string, { to: string; label: string }[]> = {
   ],
   gm: [
     { to: '/gm/progress', label: 'Progress' },
+    { to: '/lab/approvals', label: 'Approvals' },
     { to: '/gm/people', label: 'People' },
-    { to: '/lab/approvals', label: 'Lab Approvals' },
     { to: '/admin/batches', label: 'Batches' },
-    { to: '/admin/schedule', label: 'Schedule' },
-    { to: '/admin/process-explorer', label: 'Process' },
   ],
 };
 
@@ -87,7 +94,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full flex-col">
-      {roleSource === 'profile' && (
+      {/* A setup note for developers, not for factory users. */}
+      {import.meta.env.DEV && roleSource === 'profile' && (
         <div
           className="flex flex-wrap items-center gap-2 px-4 py-1.5 text-[12px]"
           style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}
@@ -106,15 +114,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2"
         style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
       >
-        <span className="font-head text-sm font-800 tracking-tight">MushroomOS</span>
-        <span className="text-[11px] text-muted">Fresh Bowl Horticulture</span>
+        <span className="font-head text-[16px] font-800 tracking-tight">MushroomOS</span>
 
-        <nav className="flex flex-wrap items-center gap-1">
+        <nav className="-mx-1 flex min-w-0 max-w-full items-center gap-1 overflow-x-auto px-1">
           {nav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
-              className="inline-flex items-center rounded px-3 font-head text-[12px] font-600"
+              end
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-3 font-head text-[14px] font-600"
               style={({ isActive }) =>
                 isActive
                   ? { minHeight: 44, background: 'var(--accent-soft)', color: 'var(--accent-ink)' }
@@ -124,6 +132,32 @@ export function AppShell({ children }: { children: ReactNode }) {
               {n.label}
             </NavLink>
           ))}
+          {role && !isNativeApp() && (NAV_MORE[role]?.length ?? 0) > 0 && (
+            <details className="relative shrink-0">
+              <summary
+                className="inline-flex cursor-pointer list-none items-center rounded-lg px-3 font-head text-[14px] font-600"
+                style={{ minHeight: 44, color: 'var(--ink-2)' }}
+              >
+                More ▾
+              </summary>
+              <div
+                className="absolute left-0 z-20 mt-1 grid min-w-[200px] gap-0.5 rounded-xl border p-1 shadow-card"
+                style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
+              >
+                {NAV_MORE[role].map((n) => (
+                  <NavLink
+                    key={n.to}
+                    to={n.to}
+                    className="rounded-lg px-3 py-2 text-[14px] no-underline"
+                    style={({ isActive }) => ({ color: isActive ? 'var(--accent-ink)' : 'var(--ink)', background: isActive ? 'var(--accent-soft)' : 'transparent' })}
+                    onClick={(e) => (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open')}
+                  >
+                    {n.label}
+                  </NavLink>
+                ))}
+              </div>
+            </details>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
@@ -140,7 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {ROLE_LABEL[role]}
             </Chip>
           )}
-          {displayName && <span className="text-[12px] text-muted">{displayName}</span>}
+          {displayName && <span className="hidden text-[13px] text-muted sm:inline">{displayName}</span>}
           {isTimeTravelled() && (
             <span
               className="inline-flex items-center rounded-full px-2.5 font-head text-[10px] font-700 uppercase tracking-wider"
