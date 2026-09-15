@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { ROLE_ORDER, ROLE_PLAIN } from '../api/batches';
@@ -42,7 +42,8 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   );
   const [time, setTime] = useState('06:00');
-  const [demo, setDemo] = useState(false);
+  const [params] = useSearchParams();
+  const [demo, setDemo] = useState(params.get('demo') === '1');
 
   const list = versions.data ?? [];
   // The current standard is pre-selected; the admin can still choose another published version.
@@ -235,6 +236,10 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
           <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} className="h-5 w-5" />
           This is a DEMO / TEST batch (labelled everywhere it appears)
         </label>
+        <p className="mt-1 max-w-[60ch] text-[12px] text-muted">
+          A DEMO / TEST batch has no clock: photos, Finish and rests are not held by time. Step order, photos,
+          readings, Lab checks, approvals and roles work exactly as on a real batch.
+        </p>
       </Step>
 
       {!ongoing && (

@@ -222,7 +222,8 @@ export function TaskDrawer({
   const timed = Boolean(tg?.hasGate);
   const started = Boolean(a?.actual_start) || Boolean(a?.is_hold);
   // Time part: open once the server's ready time has passed (a hold with no known start is not held on time).
-  const timeOpen = !tg?.hasGate || (tg.readyAt ? clock >= Date.parse(tg.readyAt) : Boolean(a?.is_hold));
+  const timeOpen =
+    !tg?.hasGate || tg.timeOk || (tg.readyAt ? clock >= Date.parse(tg.readyAt) : Boolean(a?.is_hold));
   const triggerField = tg?.triggerLabel ? vals.find((v) => v.label === tg.triggerLabel) : undefined;
   const typed = triggerField ? values[triggerField.field_key] : undefined;
   const triggerOpen =

@@ -99,6 +99,8 @@ export type TimeGate = {
   hours: number | null;
   readyAt: string | null;
   readyLabel: string | null;
+  /** The time part is met (server clock; always true on a DEMO / TEST batch, 0098). */
+  timeOk: boolean;
   triggerLabel: string | null;
   triggerMin: number | null;
   triggerJoin: 'and' | 'or' | null;
@@ -115,6 +117,7 @@ export async function loadTimeGate(activityId: string): Promise<TimeGate> {
     hours: (r?.hours as number | null) ?? null,
     readyAt: (r?.ready_at as string | null) ?? null,
     readyLabel: (r?.ready_label as string | null) ?? null,
+    timeOk: Boolean(r?.time_ok),
     triggerLabel: (r?.trigger_label as string | null) ?? null,
     triggerMin: (r?.trigger_min as number | null) ?? null,
     triggerJoin: (r?.trigger_join as 'and' | 'or' | null) ?? null,

@@ -1,27 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { listBatches } from '../../../shared/api/batch';
 import { supabase } from '../../../shared/api/client';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState } from '../../../shared/ui/primitives';
-import { createDemoTestBatch } from '../api/demoTestBatch';
 
 /** Every batch, newest first, with what each is waiting on. */
 export function Batches() {
-  const qc = useQueryClient();
   const batches = useQuery({ queryKey: ['batches'], queryFn: listBatches });
-
-  const createDemo = useMutation({
-    mutationFn: createDemoTestBatch,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['batches'] });
-      qc.invalidateQueries({ queryKey: ['batch-progress'] });
-      qc.invalidateQueries({ queryKey: ['tower'] });
-      qc.invalidateQueries({ queryKey: ['lab-queue'] });
-      qc.invalidateQueries({ queryKey: ['my-work'] });
-    },
-  });
 
   const progress = useQuery({
     queryKey: ['batch-progress'],
@@ -70,14 +57,15 @@ export function Batches() {
                 {showCancelled ? 'Hide cancelled' : `Show cancelled (${cancelledCount})`}
               </button>
             )}
-            <button
-              onClick={() => createDemo.mutate()}
-              disabled={createDemo.isPending}
+            {/* A DEMO / TEST batch is a real batch without the clock (0098): the same process, order,
+                photos, readings, approvals and roles, but no time gates or rests. Nothing is filled in for it. */}
+            <Link
+              to="/admin/batch/start?demo=1"
               className="inline-flex items-center rounded px-3 py-1.5 font-head text-[13px] font-700 bg-surface-2 border border-line text-ink hover:bg-surface-3"
               style={{ minHeight: 44 }}
             >
-              {createDemo.isPending ? 'Creating Test Batch…' : '+ Demo/Test Batch'}
-            </button>
+              + Demo/Test Batch
+            </Link>
             <Link
               to="/admin/batch/start"
               className="inline-flex items-center rounded px-3 py-1.5 font-head text-[13px] font-700"
