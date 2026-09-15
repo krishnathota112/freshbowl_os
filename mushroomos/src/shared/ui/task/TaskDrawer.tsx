@@ -16,6 +16,7 @@ import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } 
 import { Chip, Countdown } from '../primitives';
 import { LateTicketPanel } from './LateTicketPanel';
 import { AdminFixPanel } from './AdminFixPanel';
+import { DueCard } from './DueInfo';
 import { useAuth } from '../../auth/auth';
 
 /**
@@ -122,6 +123,7 @@ export function TaskDrawer({
     qc.invalidateQueries({ queryKey: ['time-gate', activityId] });
     qc.invalidateQueries({ queryKey: ['late-block', activityId] });
     qc.invalidateQueries({ queryKey: ['start-block', activityId] });
+    qc.invalidateQueries({ queryKey: ['activity-due', activityId] });
     onChanged();
   };
 
@@ -396,6 +398,9 @@ export function TaskDrawer({
             )}
           </div>
         )}
+
+        {/* When this task must be finished, including extra time granted on a late ticket (0100). */}
+        {a && !['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(a.state) && <DueCard activityId={activityId} />}
 
         {/* What this task is: the stage and the SOP's own wording, from the process definition. */}
         {a?.process_activity?.stage && (

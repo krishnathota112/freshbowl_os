@@ -13,6 +13,7 @@ import { TaskDrawer } from '../../../shared/ui/task/TaskDrawer';
 import { humanError, type HumanError } from '../../../shared/utils/humanError';
 import { dayLabel, isDueByToday } from '../../../shared/utils/day';
 import { useAuth } from '../../../shared/auth/auth';
+import { DueLine } from '../../../shared/ui/task/DueInfo';
 
 export function MyWork() {
   const qc = useQueryClient();
@@ -342,6 +343,11 @@ function TaskCard({
             <span className="material-symbols-outlined text-sm">schedule</span>
             Planned: <strong className="font-mono">{formatWindow(row.planned_start_at, row.planned_end_at)}</strong>
           </span>
+          {group !== 'done' && (
+            <span className="flex items-center gap-1">
+              <DueLine activityId={row.activity_id} tone="light" />
+            </span>
+          )}
           {row.required_count ? (
             <span className={`flex items-center gap-1 ${evidenceShort ? 'text-amber-200 font-bold' : ''}`}>
               <span className="material-symbols-outlined text-sm">photo_camera</span>
@@ -427,6 +433,7 @@ function TaskCard({
         <span>
           Planned <strong className="font-mono">{formatWindow(row.planned_start_at, row.planned_end_at)}</strong>
         </span>
+        {group !== 'done' && <DueLine activityId={row.activity_id} />}
         {row.actual_start && (
           <span>
             Started <strong className="font-mono">{formatInstant(row.actual_start)}</strong>

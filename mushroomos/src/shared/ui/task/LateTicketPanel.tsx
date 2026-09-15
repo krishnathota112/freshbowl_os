@@ -64,6 +64,7 @@ export function LateTicketPanel({
       setPhotos([]);
       qc.invalidateQueries({ queryKey: ['tickets', activityId] });
       qc.invalidateQueries({ queryKey: ['my-work'] });
+      qc.invalidateQueries({ queryKey: ['activity-due', activityId] });
     },
   });
 
@@ -229,7 +230,10 @@ function TicketLine({ t }: { t: Ticket }) {
       )}
       {t.admin_decision && (
         <p className="mt-1 text-ink2">
-          Admin {t.admin_decision}{t.admin_granted_hr ? ` · ${t.admin_granted_hr} h granted` : ''}: “{t.admin_reason}”
+          {t.admin_decision === 'approved' && t.admin_granted_hr
+            ? <strong style={{ color: 'var(--ok)' }}>Approved: +{Math.round(t.admin_granted_hr * 60) < 60 ? `${Math.round(t.admin_granted_hr * 60)} min` : `${t.admin_granted_hr} h`} extra time. The new finish time is shown at the top.</strong>
+            : <>Admin {t.admin_decision}</>}
+          {t.admin_reason ? ` “${t.admin_reason}”` : ''}
         </p>
       )}
     </div>

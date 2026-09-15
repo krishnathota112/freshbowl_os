@@ -7,6 +7,7 @@ import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { Thumb } from '../../../shared/ui/task/LateTicketPanel';
 import { humanError } from '../../../shared/utils/humanError';
+import { DueLine } from '../../../shared/ui/task/DueInfo';
 
 /**
  * Admin · late-task tickets (0088). Only Admin decides: approve (granting up to the hours asked) or
@@ -63,6 +64,7 @@ function TicketCard({ t }: { t: Ticket }) {
       qc.invalidateQueries({ queryKey: ['admin-tickets'] });
       qc.invalidateQueries({ queryKey: ['batch-monitor'] });
       qc.invalidateQueries({ queryKey: ['batch-timeline'] });
+      qc.invalidateQueries({ queryKey: ['activity-due'] });
     },
   });
 
@@ -90,6 +92,8 @@ function TicketCard({ t }: { t: Ticket }) {
         <strong>{t.requested_extension_hr} h</strong> more asked
       </p>
       <p className="mt-1 rounded border px-3 py-2 text-[14px]" style={{ borderColor: 'var(--line)' }}>{t.requested_reason}</p>
+      {/* The task's current finish time, including any extra time already granted (0100). */}
+      <p className="mt-1 text-[13px]"><DueLine activityId={t.batch_activity_id} /></p>
       {t.photos.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {t.photos.map((p) => <Thumb key={p.storage_path} path={p.storage_path} size={120} />)}

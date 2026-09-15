@@ -25,6 +25,7 @@ import { approverWords, fmtTime, fmtWhen, labStatus, paramLabel } from '../../..
 import { Chip, Skeleton } from '../../../shared/ui/primitives';
 import { LateTicketPanel } from '../../../shared/ui/task/LateTicketPanel';
 import { lateBlockReason } from '../../../shared/api/tickets';
+import { DueCard } from '../../../shared/ui/task/DueInfo';
 
 const RETEST_REASONS = [
   { value: 'sampling_error', label: 'The sample was wrong' },
@@ -213,6 +214,7 @@ function Checkpoint({
         taskOpen={['READY', 'IN_PROGRESS', 'RETURNED'].includes(item.state)}
       />
 
+      {open && <DueCard activityId={item.activityId} />}
       <LateBanner activityId={item.activityId} />
 
       {item.blockedReason && !open && item.state !== 'COMPLETED' && (
