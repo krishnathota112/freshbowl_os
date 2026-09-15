@@ -15,6 +15,8 @@ import { completeActivity } from '../../api/work';
 import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } from '../../camera/camera';
 import { Chip, Countdown } from '../primitives';
 import { LateTicketPanel } from './LateTicketPanel';
+import { AdminFixPanel } from './AdminFixPanel';
+import { useAuth } from '../../auth/auth';
 
 /**
  * Human-readable state labels — same map as BatchDetail.
@@ -220,7 +222,10 @@ export function TaskDrawer({
   const evs = detail.data?.evidence ?? [];
   const fullEvItems = fullEvidence.data ?? [];
   const outstanding = evs.filter((e) => e.gates_submission && e.satisfied_count < e.min_count);
-  const editable = a && ['READY', 'IN_PROGRESS', 'RETURNED'].includes(a.state) && batchStatus === 'active';
+  // Only the people who do the work get the work controls; Admin gets the repair panel instead (0105).
+  const { role: viewerRole } = useAuth();
+  const executes = viewerRole === 'supervisor' || viewerRole === 'lab_tech';
+  const editable = executes && a && ['READY', 'IN_PROGRESS', 'RETURNED'].includes(a.state) && batchStatus === 'active';
 
   const outOfRange = (v: BatchValueRow) => {
     const raw = values[v.field_key];
@@ -464,7 +469,11 @@ export function TaskDrawer({
           </p>
         )}
 
-        {a?.state === 'READY' && batchStatus === 'active' && !a.is_hold && (
+        {viewerRole === 'admin' && a && batchStatus === 'active' && (
+          <AdminFixPanel activityId={activityId} state={a.state} onChanged={refresh} />
+        )}
+
+        {executes && a?.state === 'READY' && batchStatus === 'active' && !a.is_hold && (
           <button
             onClick={() => start.mutate()}
             className="mb-4 w-full rounded px-3 py-3 font-head text-sm font-700"

@@ -70,6 +70,14 @@ const ACTION_WORDS: Record<string, string> = {
   bind_evidence: 'Took a photo',
   record_lab_result: 'Recorded a Lab reading',
   open_lab_sample: 'Took a Lab sample',
+  admin_force_open: 'Admin opened a stuck task',
+  admin_mark_done: 'Admin marked a task done',
+  admin_reopen_task: 'Admin reopened a task',
+  admin_create_user: 'Created a login',
+  admin_set_password: 'Changed a password',
+  admin_set_user_role: 'Changed a role',
+  admin_activate_user: 'Switched a login on',
+  admin_deactivate_user: 'Switched a login off',
 };
 
 const words = (a: string | null) => (a ? ACTION_WORDS[a] ?? a.replace(/_/g, ' ') : '—');
