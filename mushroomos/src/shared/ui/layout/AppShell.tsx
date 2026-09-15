@@ -21,6 +21,7 @@ const NAV: Record<string, { to: string; label: string }[]> = {
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/tickets', label: 'Tickets' },
     { to: '/gm/people', label: 'People' },
+    { to: '/admin/logins', label: 'Logins' },
     { to: '/admin/schedule', label: 'Schedule' },
     { to: '/admin/batch/start', label: '+ New Batch' },
     { to: '/admin/process-explorer', label: 'Process' },

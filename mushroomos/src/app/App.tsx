@@ -69,6 +69,7 @@ const LabApprovals = lazy(() =>
 const AdminTickets = lazy(() =>
   import('../features/admin/pages/AdminTickets').then((m) => ({ default: m.AdminTickets }))
 );
+const AdminLogins = lazy(() => import('../features/admin/pages/AdminLogins').then((m) => ({ default: m.AdminLogins })));
 const GmPeople = lazy(() => import('../features/gm/pages/GmPeople').then((m) => ({ default: m.GmPeople })));
 const GmProgress = lazy(() =>
   import('../features/gm/pages/GmProgress').then((m) => ({ default: m.GmProgress }))
@@ -211,6 +212,7 @@ export default function App() {
           hardcoding one.
         */}
         <Route path="/lab/approvals" element={<RoleGuard allow={['gm']}><LabApprovals /></RoleGuard>} />
+        <Route path="/admin/logins" element={<RoleGuard allow={['admin']}><AdminLogins /></RoleGuard>} />
         <Route path="/gm/people" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmPeople /></RoleGuard>} />
         <Route path="/gm/progress" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmProgress /></RoleGuard>} />
         <Route path="/admin/tickets" element={<RoleGuard allow={['admin', 'gm', 'manager']}><AdminTickets /></RoleGuard>} />
