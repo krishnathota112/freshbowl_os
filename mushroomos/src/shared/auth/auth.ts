@@ -42,7 +42,7 @@ const WEB_HOME: Record<AppRole, string> = {
 export const APP_PATHS: Partial<Record<AppRole, string[]>> = {
   supervisor: ['/operator/my-work'],
   lab_tech: ['/lab/queue', '/lab/checkpoint/'],
-  gm: ['/lab/approvals', '/gm/progress'],
+  gm: ['/lab/approvals', '/gm/progress', '/gm/people', '/batch/'],
 };
 
 export const ROLE_HOME: Record<AppRole, string> = isNativeApp()
@@ -116,7 +116,9 @@ export function roleFromSession(session: Session | null): AppRole | null {
   if (!session?.access_token) return null;
   const payload = decodeJwtPayload(session.access_token);
   const appMeta = payload?.app_metadata as { app_role?: string } | undefined;
-  return (appMeta?.app_role as AppRole) ?? null;
+  // Operator and supervisor are the same job (user, 15 Sep 2026): an operator account is a supervisor.
+  const r = (appMeta?.app_role as AppRole) ?? null;
+  return r === 'operator' ? 'supervisor' : r;
 }
 
 export type AuthState = {
@@ -159,7 +161,8 @@ export function useAuth(): AuthState {
       );
   }, [session]);
 
-  const role = claimRole ?? profile?.role ?? null;
+  const rawRole = claimRole ?? profile?.role ?? null;
+  const role: AppRole | null = rawRole === 'operator' ? 'supervisor' : rawRole;
 
   return {
     session,

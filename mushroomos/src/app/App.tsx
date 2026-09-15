@@ -69,6 +69,7 @@ const LabApprovals = lazy(() =>
 const AdminTickets = lazy(() =>
   import('../features/admin/pages/AdminTickets').then((m) => ({ default: m.AdminTickets }))
 );
+const GmPeople = lazy(() => import('../features/gm/pages/GmPeople').then((m) => ({ default: m.GmPeople })));
 const GmProgress = lazy(() =>
   import('../features/gm/pages/GmProgress').then((m) => ({ default: m.GmProgress }))
 );
@@ -210,6 +211,7 @@ export default function App() {
           hardcoding one.
         */}
         <Route path="/lab/approvals" element={<RoleGuard allow={['gm']}><LabApprovals /></RoleGuard>} />
+        <Route path="/gm/people" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmPeople /></RoleGuard>} />
         <Route path="/gm/progress" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmProgress /></RoleGuard>} />
         <Route path="/admin/tickets" element={<RoleGuard allow={['admin', 'gm', 'manager']}><AdminTickets /></RoleGuard>} />
         {/* Anything else — including the retired screens' old addresses — goes to the role's home. */}

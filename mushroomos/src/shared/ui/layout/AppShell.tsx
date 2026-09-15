@@ -6,8 +6,9 @@ const NAV_APP: Record<string, { to: string; label: string }[]> = {
   supervisor: [{ to: '/operator/my-work', label: 'My Work' }],
   lab_tech: [{ to: '/lab/queue', label: 'Lab Queue' }],
   gm: [
-    { to: '/lab/approvals', label: 'Lab Approvals' },
+    { to: '/lab/approvals', label: 'Approvals' },
     { to: '/gm/progress', label: 'Progress' },
+    { to: '/gm/people', label: 'People' },
   ],
 };
 import { Chip } from '../primitives';
@@ -19,6 +20,7 @@ const NAV: Record<string, { to: string; label: string }[]> = {
     { to: '/admin/today', label: 'Today' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/tickets', label: 'Tickets' },
+    { to: '/gm/people', label: 'People' },
     { to: '/admin/schedule', label: 'Schedule' },
     { to: '/admin/batch/start', label: '+ New Batch' },
     { to: '/admin/process-explorer', label: 'Process' },
@@ -37,6 +39,7 @@ const NAV: Record<string, { to: string; label: string }[]> = {
   ],
   gm: [
     { to: '/gm/progress', label: 'Progress' },
+    { to: '/gm/people', label: 'People' },
     { to: '/lab/approvals', label: 'Lab Approvals' },
     { to: '/admin/batches', label: 'Batches' },
     { to: '/admin/schedule', label: 'Schedule' },

@@ -21,8 +21,9 @@ const DEMO_ACCOUNTS = isNativeApp()
 
 // The quick-fill list and its password are for the phone app and local development only. A page
 // served on a public link (tunnel / hosting) shows a plain sign-in form.
-const SHOW_DEMO_ACCOUNTS =
-  isNativeApp() || ['localhost', '127.0.0.1'].includes(window.location.hostname);
+// 15 Sep 2026 · a shipped build never shows accounts or a password: the APK printed every login, Admin and GM
+// included, on its sign-in page. Only a local development server (npm run dev) keeps the quick-fill list.
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 /** Shown when an account the Android app does not serve is signed in on the phone. */
 export function RoleNotInApp({ role }: { role: AppRole }) {

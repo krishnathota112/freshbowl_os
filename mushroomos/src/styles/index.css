@@ -23,6 +23,11 @@
     align-items: center;
     justify-content: center;
     white-space: nowrap;
+    /* An icon is one glyph wide. Until (or unless) the icon font has loaded, its ligature name
+       ("arrow_forward") must not spill across the screen as text. */
+    width: 1em;
+    max-width: 1em;
+    overflow: hidden;
     word-wrap: normal;
     direction: ltr;
     -webkit-font-smoothing: antialiased;
