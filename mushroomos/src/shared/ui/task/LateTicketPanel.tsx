@@ -118,6 +118,28 @@ export function LateTicketPanel({
             className="w-full rounded border bg-surface px-2 py-2 text-[14px]"
             style={{ borderColor: 'var(--line-2)' }}
           />
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['0.5', '30 min more'],
+              ['1', '1 hour more'],
+              ['2', '2 hours more'],
+            ].map(([h, label]) => (
+              <button
+                key={h}
+                type="button"
+                aria-pressed={hours === h}
+                onClick={() => setHours(h)}
+                className="rounded border px-3 font-head text-[13px] font-700"
+                style={{
+                  minHeight: 44,
+                  borderColor: hours === h ? 'var(--accent)' : 'var(--line-2)',
+                  background: hours === h ? 'var(--accent-soft)' : 'transparent',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <label className="flex items-center gap-2 text-[14px]">
             <span className="text-ink2">More hours needed</span>
             <input

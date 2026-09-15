@@ -61,9 +61,21 @@ export async function listTickets(filter: 'open' | 'all'): Promise<Ticket[]> {
 
 /** Whether this activity is past its stated maximum duration (plus approved hours) — the server's answer. */
 export async function isActivityOverdue(activityId: string): Promise<boolean> {
-  const { data, error } = await supabase.from('v_batch_timeline').select('overdue').eq('activity_id', activityId).maybeSingle();
+  const [timeline, late] = await Promise.all([
+    supabase.from('v_batch_timeline').select('overdue').eq('activity_id', activityId).maybeSingle(),
+    // 0100 · past its due time on the day plan (+ granted hours + grace): the task is blocked until a ticket is approved.
+    supabase.rpc('late_block_reason', { p_activity: activityId }),
+  ]);
+  if (timeline.error) throw timeline.error;
+  if (late.error) throw late.error;
+  return Boolean((timeline.data as { overdue: boolean } | null)?.overdue) || Boolean(late.data);
+}
+
+/** Why this task is blocked for lateness, or null (0100 · late_block_reason). */
+export async function lateBlockReason(activityId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('late_block_reason', { p_activity: activityId });
   if (error) throw error;
-  return Boolean((data as { overdue: boolean } | null)?.overdue);
+  return (data as string | null) ?? null;
 }
 
 export async function raiseTicket(input: { activityId: string; hours: number; reason: string }): Promise<string> {

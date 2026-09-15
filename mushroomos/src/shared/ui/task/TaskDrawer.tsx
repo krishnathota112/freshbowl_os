@@ -118,6 +118,7 @@ export function TaskDrawer({
     qc.invalidateQueries({ queryKey: ['activity-detail', activityId] });
     qc.invalidateQueries({ queryKey: ['evidence-full', activityId] });
     qc.invalidateQueries({ queryKey: ['time-gate', activityId] });
+    qc.invalidateQueries({ queryKey: ['late-block', activityId] });
     onChanged();
   };
 
@@ -197,6 +198,17 @@ export function TaskDrawer({
     queryFn: () => loadTimeGate(activityId),
     refetchInterval: 60_000,
   });
+  // 0100 · past its due time (day plan + granted hours + grace) the task needs an approved late ticket.
+  const late = useQuery({
+    queryKey: ['late-block', activityId],
+    queryFn: async () => {
+      const { data, error: e } = await supabase.rpc('late_block_reason', { p_activity: activityId });
+      if (e) throw e;
+      return (data as string | null) ?? null;
+    },
+    refetchInterval: 60_000,
+  });
+  const lateReason = late.data ?? null;
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setClock(Date.now()), 15_000);
@@ -268,7 +280,8 @@ export function TaskDrawer({
   const renderEvidence = (e: (typeof evs)[number]) => {
     const met = e.satisfied_count >= e.min_count;
     // 0096 · the after photo shows finished work, so it waits for the SOP time since Start.
-    const waitsForTime = e.capture_phase === 'after_duration' && timed && (!a?.actual_start || !timeOpen);
+    const waitsForTime =
+      e.capture_phase === 'after_duration' && ((timed && (!a?.actual_start || !timeOpen)) || lateReason !== null);
     // Photos already captured for this requirement
     const captured = fullEvItems.filter((f) => f.key === e.key && f.mediaId !== null && f.supersededById === null);
     return (
@@ -280,7 +293,7 @@ export function TaskDrawer({
           </span>
           {!met && editable && waitsForTime && (
             <span className="shrink-0 text-right text-[11px] font-600 text-muted" style={{ maxWidth: 180 }}>
-              {a?.actual_start ? `Can be taken ${readyWords}` : 'After Start'}
+              {lateReason ? 'Late — ticket needed' : a?.actual_start ? `Can be taken ${readyWords}` : 'After Start'}
             </span>
           )}
           {!met && editable && !waitsForTime && cameraIsGuaranteed() && (
@@ -624,6 +637,15 @@ export function TaskDrawer({
           </p>
         )}
 
+        {lateReason && editable && (
+          <p
+            className="mb-3 rounded border px-3 py-2 text-[13px] font-600"
+            style={{ borderColor: 'var(--crit)', background: 'var(--crit-soft)', color: 'var(--crit)' }}
+          >
+            {lateReason} Use “Late ticket” above.
+          </p>
+        )}
+
         {gateLine && editable && (
           <p
             className="mb-3 rounded border px-3 py-2 text-[13px] font-600"
@@ -653,7 +675,7 @@ export function TaskDrawer({
         {editable && (
           <button
             onClick={() => submit.mutate()}
-            disabled={submit.isPending || remarkRequired || !finishOpen}
+            disabled={submit.isPending || remarkRequired || !finishOpen || lateReason !== null}
             className="w-full rounded px-3 py-3.5 font-head text-sm font-700"
             style={{
               background: outstanding.length > 0 || !finishOpen ? 'var(--lock)' : 'var(--accent)',

@@ -24,6 +24,7 @@ import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
 import { approverWords, fmtTime, fmtWhen, labStatus, paramLabel } from '../../../shared/utils/labWords';
 import { Chip, Skeleton } from '../../../shared/ui/primitives';
 import { LateTicketPanel } from '../../../shared/ui/task/LateTicketPanel';
+import { lateBlockReason } from '../../../shared/api/tickets';
 
 const RETEST_REASONS = [
   { value: 'sampling_error', label: 'The sample was wrong' },
@@ -211,6 +212,8 @@ function Checkpoint({
         activityId={item.activityId}
         taskOpen={['READY', 'IN_PROGRESS', 'RETURNED'].includes(item.state)}
       />
+
+      <LateBanner activityId={item.activityId} />
 
       {item.blockedReason && !open && item.state !== 'COMPLETED' && (
         <Panel tone="lock">{item.blockedReason}</Panel>
@@ -755,3 +758,10 @@ function SecondaryButton({ onClick, disabled, label }: { onClick: () => void; di
 }
 
 export default LabCheckpoint;
+
+/** 0100 · a late Lab check is blocked until Admin grants time on a late ticket. */
+function LateBanner({ activityId }: { activityId: string }) {
+  const q = useQuery({ queryKey: ['late-block', activityId], queryFn: () => lateBlockReason(activityId), refetchInterval: 60_000 });
+  if (!q.data) return null;
+  return <Panel tone="lock">{q.data}</Panel>;
+}
