@@ -4,6 +4,7 @@ import {
   captureEvidence,
   getActivityDetail,
   loadEvidenceState,
+  loadTimeGate,
   signedEvidenceUrl,
   startActivity,
   type BatchValueRow,
@@ -116,6 +117,7 @@ export function TaskDrawer({
     qc.invalidateQueries({ queryKey: ['activity', activityId] });
     qc.invalidateQueries({ queryKey: ['activity-detail', activityId] });
     qc.invalidateQueries({ queryKey: ['evidence-full', activityId] });
+    qc.invalidateQueries({ queryKey: ['time-gate', activityId] });
     onChanged();
   };
 
@@ -188,6 +190,19 @@ export function TaskDrawer({
     queryFn: () => loadEvidenceState(activityId),
   });
 
+  // The time gate (0096): the after photo and Finish wait for the SOP time. The server refuses them
+  // anyway; the screen says when they open instead of letting someone try.
+  const timeGate = useQuery({
+    queryKey: ['time-gate', activityId],
+    queryFn: () => loadTimeGate(activityId),
+    refetchInterval: 60_000,
+  });
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setClock(Date.now()), 15_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   const a = activity.data;
   const vals = detail.data?.values ?? [];
   const evs = detail.data?.evidence ?? [];
@@ -202,6 +217,47 @@ export function TaskDrawer({
     return (v.sop_min != null && n < v.sop_min) || (v.sop_max != null && n > v.sop_max);
   };
   const anyOutOfRange = vals.some(outOfRange);
+
+  const tg = timeGate.data;
+  const timed = Boolean(tg?.hasGate);
+  const started = Boolean(a?.actual_start) || Boolean(a?.is_hold);
+  // Time part: open once the server's ready time has passed (a hold with no known start is not held on time).
+  const timeOpen = !tg?.hasGate || (tg.readyAt ? clock >= Date.parse(tg.readyAt) : Boolean(a?.is_hold));
+  const triggerField = tg?.triggerLabel ? vals.find((v) => v.label === tg.triggerLabel) : undefined;
+  const typed = triggerField ? values[triggerField.field_key] : undefined;
+  const triggerOpen =
+    tg?.triggerMin != null && typed != null && /^-?\d+(\.\d+)?$/.test(typed) && Number(typed) >= tg.triggerMin;
+  const finishOpen = !tg?.hasGate
+    ? true
+    : !started
+      ? false
+      : !tg.triggerLabel
+        ? timeOpen
+        : tg.triggerJoin === 'or'
+          ? timeOpen || triggerOpen
+          : timeOpen && triggerOpen;
+  const remaining = (() => {
+    if (!tg?.readyAt) return '';
+    const secs = Math.max(0, Math.ceil((Date.parse(tg.readyAt) - clock) / 1000));
+    const h = Math.floor(secs / 3600);
+    const m = Math.ceil((secs % 3600) / 60);
+    return h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`;
+  })();
+  const readyWords = tg?.readyLabel ? `from ${tg.readyLabel}${remaining ? ` (${remaining} to go)` : ''}` : '';
+  const triggerWords = tg?.triggerLabel ? `${tg.triggerLabel} is at least ${tg.triggerMin}` : '';
+  const gateLine = !tg?.hasGate
+    ? null
+    : !started
+      ? `Tap Start first. It can be finished ${tg.hours} h after Start.`
+      : finishOpen
+        ? null
+        : !tg.triggerLabel
+          ? `Can be finished ${readyWords}.`
+          : tg.triggerJoin === 'or'
+            ? `Confirm when ${triggerWords}, or ${readyWords}.`
+            : !timeOpen
+              ? `Confirm ${readyWords}, once ${triggerWords}.`
+              : `Confirm once ${triggerWords} — record the reading.`;
   const remarkRequired = anyOutOfRange && remarks.trim().length === 0;
 
   // With two or more photo requirements the first (by the process's ordering) is taken before the work.
@@ -210,6 +266,8 @@ export function TaskDrawer({
 
   const renderEvidence = (e: (typeof evs)[number]) => {
     const met = e.satisfied_count >= e.min_count;
+    // 0096 · the after photo shows finished work, so it waits for the SOP time since Start.
+    const waitsForTime = e.capture_phase === 'after_duration' && timed && (!a?.actual_start || !timeOpen);
     // Photos already captured for this requirement
     const captured = fullEvItems.filter((f) => f.key === e.key && f.mediaId !== null && f.supersededById === null);
     return (
@@ -219,7 +277,12 @@ export function TaskDrawer({
             {met ? '✓ ' : '○ '}
             {e.label}
           </span>
-          {!met && editable && cameraIsGuaranteed() && (
+          {!met && editable && waitsForTime && (
+            <span className="shrink-0 text-right text-[11px] font-600 text-muted" style={{ maxWidth: 180 }}>
+              {a?.actual_start ? `Can be taken ${readyWords}` : 'After Start'}
+            </span>
+          )}
+          {!met && editable && !waitsForTime && cameraIsGuaranteed() && (
             <button
               type="button"
               disabled={evidence.isPending}
@@ -230,7 +293,7 @@ export function TaskDrawer({
               {evidence.isPending ? 'Uploading…' : 'Take photo'}
             </button>
           )}
-          {!met && editable && !cameraIsGuaranteed() && (
+          {!met && editable && !waitsForTime && !cameraIsGuaranteed() && (
             <label
               className="shrink-0 cursor-pointer rounded border px-3 py-2 font-head text-[11px] font-600"
               style={{
@@ -560,6 +623,15 @@ export function TaskDrawer({
           </p>
         )}
 
+        {gateLine && editable && (
+          <p
+            className="mb-3 rounded border px-3 py-2 text-[13px] font-600"
+            style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}
+          >
+            {gateLine}
+          </p>
+        )}
+
         {error && (
           <p
             className="mb-3 rounded border px-3 py-2 text-[12px]"
@@ -580,17 +652,19 @@ export function TaskDrawer({
         {editable && (
           <button
             onClick={() => submit.mutate()}
-            disabled={submit.isPending || remarkRequired}
+            disabled={submit.isPending || remarkRequired || !finishOpen}
             className="w-full rounded px-3 py-3.5 font-head text-sm font-700"
             style={{
-              background: outstanding.length > 0 ? 'var(--lock)' : 'var(--accent)',
+              background: outstanding.length > 0 || !finishOpen ? 'var(--lock)' : 'var(--accent)',
               color: '#fff',
-              opacity: submit.isPending || remarkRequired ? 0.55 : 1,
+              opacity: submit.isPending || remarkRequired || !finishOpen ? 0.55 : 1,
             }}
           >
             {submit.isPending
               ? 'Saving…'
-              : outstanding.length > 0
+              : !finishOpen
+                ? `${a?.is_hold ? 'Confirm' : 'Finish'} · ${started ? 'not yet' : 'start first'}`
+                : outstanding.length > 0
                 ? `${a?.is_hold ? 'Confirm' : 'Finish'} · ${outstanding.length} photo${outstanding.length === 1 ? '' : 's'} still needed`
                 : a?.is_hold
                   ? 'Confirm the condition is met'

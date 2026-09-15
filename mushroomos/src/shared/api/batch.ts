@@ -89,7 +89,39 @@ export type BatchEvidenceRow = {
   gates_submission: boolean;
   capture_hint: string | null;
   ordering: number;
+  /** 'after_duration' (0096): taken only once the SOP time has passed since Start. */
+  capture_phase: string;
 };
+
+/** The time gate on one task (0096 · time_gate_status). `hasGate` false means the task is not timed. */
+export type TimeGate = {
+  hasGate: boolean;
+  hours: number | null;
+  readyAt: string | null;
+  readyLabel: string | null;
+  triggerLabel: string | null;
+  triggerMin: number | null;
+  triggerJoin: 'and' | 'or' | null;
+  ok: boolean;
+  summary: string | null;
+};
+
+export async function loadTimeGate(activityId: string): Promise<TimeGate> {
+  const { data, error } = await supabase.rpc('time_gate_status', { p_activity: activityId });
+  if (error) throw error;
+  const r = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+  return {
+    hasGate: Boolean(r?.has_gate),
+    hours: (r?.hours as number | null) ?? null,
+    readyAt: (r?.ready_at as string | null) ?? null,
+    readyLabel: (r?.ready_label as string | null) ?? null,
+    triggerLabel: (r?.trigger_label as string | null) ?? null,
+    triggerMin: (r?.trigger_min as number | null) ?? null,
+    triggerJoin: (r?.trigger_join as 'and' | 'or' | null) ?? null,
+    ok: r ? Boolean(r.ok) : true,
+    summary: (r?.summary as string | null) ?? null,
+  };
+}
 
 // Kept as inline literals rather than shared constants: supabase-js infers the row type from the
 // select string, and a concatenated string degrades it to `GenericStringError[]`.
@@ -271,7 +303,7 @@ export async function getActivityDetail(activityId: string) {
     supabase
       .from('batch_activity_evidence_req')
       .select(
-        'id, batch_activity_id, key, label, media_kinds, min_count, satisfied_count, gates_submission, capture_hint, ordering'
+        'id, batch_activity_id, key, label, media_kinds, min_count, satisfied_count, gates_submission, capture_hint, ordering, capture_phase'
       )
       .eq('batch_activity_id', activityId)
       .order('ordering'),
