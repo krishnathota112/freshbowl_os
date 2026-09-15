@@ -8,7 +8,7 @@ import {
   loadResults,
   type LabApprovalRow,
 } from '../../../shared/api/lab';
-import { loadEvidenceState } from '../../../shared/api/batch';
+import { loadEvidenceState, signedEvidenceUrl, type EvidenceItem } from '../../../shared/api/batch';
 import { listBatchContexts } from '../../../shared/api/work';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
@@ -457,17 +457,30 @@ function DecisionSheet({
             {evidence.isLoading ? 'Loading…' : 'This checkpoint requires no evidence.'}
           </p>
         ) : (
-          <ul className="mt-1 space-y-0.5">
-            {(evidence.data ?? []).map((e) => (
-              <li key={e.requirementId} className="text-[13px] text-ink">
-                {e.label}{' '}
-                <strong
-                  className={`font-mono ${e.satisfiedCount < e.minCount ? 'text-warn' : 'text-ok'}`}
-                >
-                  {e.satisfiedCount}/{e.minCount}
-                </strong>
-              </li>
-            ))}
+          <ul className="mt-1 space-y-2">
+            {/* v_evidence_state has one row per photo (or one empty row per requirement): group by requirement. */}
+            {[...new Map((evidence.data ?? []).map((e) => [e.requirementId, e])).values()].map((e) => {
+              const photos = (evidence.data ?? []).filter(
+                (p) => p.requirementId === e.requirementId && p.mediaId && p.storagePath && !p.supersededById
+              );
+              return (
+                <li key={e.requirementId} className="text-[13px] text-ink">
+                  {e.label}{' '}
+                  <strong
+                    className={`font-mono ${e.satisfiedCount < e.minCount ? 'text-warn' : 'text-ok'}`}
+                  >
+                    {e.satisfiedCount}/{e.minCount}
+                  </strong>
+                  {photos.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {photos.map((p) => (
+                        <ApprovalPhoto key={p.mediaId!} p={p} />
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>
@@ -611,5 +624,29 @@ function OpenQuestion({ readings }: { readings: { statement: string; consequence
         </div>
       )}
     </section>
+  );
+}
+
+/** One photograph the lab took for this check, via a short-lived signed URL. Tap to open full size. */
+function ApprovalPhoto({ p }: { p: EvidenceItem }) {
+  const url = useQuery({
+    queryKey: ['evidence-url', p.storagePath],
+    queryFn: () => signedEvidenceUrl(p.storagePath!, 300),
+    staleTime: 240_000,
+  });
+  return (
+    <figure className="w-36">
+      {url.data ? (
+        <a href={url.data} target="_blank" rel="noopener noreferrer">
+          <img src={url.data} alt={p.label} className="h-28 w-36 rounded-md object-cover" loading="lazy" />
+        </a>
+      ) : (
+        <div className="h-28 w-36 rounded-md" style={{ background: 'var(--surface-2)' }} />
+      )}
+      <figcaption className="mt-0.5 text-[11px] leading-tight text-muted">
+        {p.uploadedByName ?? '—'}
+        {p.uploadedAt ? ` · ${new Date(p.uploadedAt).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+      </figcaption>
+    </figure>
   );
 }

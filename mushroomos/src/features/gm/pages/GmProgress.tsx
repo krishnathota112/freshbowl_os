@@ -63,6 +63,15 @@ function ProgressCard({ b }: { b: BatchMonitor }) {
         <Status label="Over stated time" value={b.overdue} warn />
         <Status label="Deviations" value={b.deviations} warn />
       </div>
+
+      {/* The batch page opens on its monitor: every step with who, when, readings and the photographs. */}
+      <Link
+        to={`/batch/${b.master_batch_id}`}
+        className="mt-4 flex items-center justify-center rounded-xl border font-head text-[15px] font-700 no-underline"
+        style={{ minHeight: 48, borderColor: 'var(--accent)', color: 'var(--accent-ink)' }}
+      >
+        Open batch · steps, readings and photos
+      </Link>
     </article>
   );
 }
