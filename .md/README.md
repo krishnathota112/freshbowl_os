@@ -13,6 +13,7 @@ Everything about the project in one place, written on 15 Sep 2026. Start with 01
 | [07-operations-runbook.md](07-operations-runbook.md) | How to run it: batches, failsafe, logins, web link, APK, rollback |
 | [08-security-and-monitoring.md](08-security-and-monitoring.md) | The anti-cheat rules, the role audit, and the monitoring views |
 | [09-open-items.md](09-open-items.md) | Decisions still open and work still to do |
+| [10-backend-repair-2026-09-16.md](10-backend-repair-2026-09-16.md) | The 16 Sep backend repair pass: matrices, contracts, runtime proofs |
 
 ## Current state (15 Sep 2026)
 
