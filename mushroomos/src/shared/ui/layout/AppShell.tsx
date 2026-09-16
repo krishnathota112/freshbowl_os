@@ -31,7 +31,9 @@ const NAV_MORE: Record<string, { to: string; label: string }[]> = {
 const NAV: Record<string, { to: string; label: string }[]> = {
   admin: [
     { to: '/admin', label: 'Home' },
+    { to: '/admin/now', label: 'Now' },
     { to: '/admin/batches', label: 'Batches' },
+    { to: '/admin/resources', label: 'Resources' },
     { to: '/admin/tickets', label: 'Tickets' },
     { to: '/gm/people', label: 'People' },
     { to: '/admin/logins', label: 'Logins' },
@@ -49,6 +51,7 @@ const NAV: Record<string, { to: string; label: string }[]> = {
   ],
   gm: [
     { to: '/gm/progress', label: 'Progress' },
+    { to: '/admin/now', label: 'Now' },
     { to: '/lab/approvals', label: 'Approvals' },
     { to: '/gm/people', label: 'People' },
     { to: '/admin/batches', label: 'Batches' },

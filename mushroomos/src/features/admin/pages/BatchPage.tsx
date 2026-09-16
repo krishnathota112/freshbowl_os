@@ -13,6 +13,9 @@ import { humanDuration } from '../../../shared/ui/domain/HumanDuration';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { BatchMonitor } from '../components/BatchMonitor';
+import { DeleteBatchButton } from '../components/DeleteBatchButton';
+import { useQuery as useMonitorQuery } from '@tanstack/react-query';
+import { getBatchMonitor } from '../../../shared/api/monitor';
 /*
   The activity list is LAZY, and stays lazy for the same reason `AppShell` is: the overview is the
   tab that opens, and `BatchDetail` drags `TaskDrawer` and the whole per-activity editing surface
@@ -82,6 +85,7 @@ export function BatchPage() {
           <TabButton current={tab} value="activities" onSelect={selectTab}>Activities</TabButton>
         </nav>
         <BatchMonitor batchId={id} />
+        <AdminBatchActions batchId={id} />
       </>
     );
   }
@@ -425,5 +429,21 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h2 className="mb-2 font-head text-[10px] font-700 uppercase tracking-wider text-muted">
       {children}
     </h2>
+  );
+}
+
+/** Admin-only actions on a batch record. Today: deleting a DEMO / TEST batch (0112). */
+function AdminBatchActions({ batchId }: { batchId: string }) {
+  const m = useMonitorQuery({ queryKey: ['batch-monitor', batchId], queryFn: () => getBatchMonitor(batchId) });
+  if (!m.data?.is_demo) return null;
+  return (
+    <div className="mt-8 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+      <DeleteBatchButton
+        batchId={batchId}
+        batchCode={m.data.batch_code}
+        isDemo={Boolean(m.data.is_demo)}
+        onDeleted={() => { window.location.href = '/admin/batches'; }}
+      />
+    </div>
   );
 }

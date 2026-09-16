@@ -55,7 +55,7 @@ const ReferenceData = lazy(() =>
   import('../features/admin/pages/ReferenceData').then((m) => ({ default: m.ReferenceData }))
 );
 // Retired screens (Control Tower, Control Room, Plant, Resources, the old New Batch, Schedule Builder,
-// the dev Gallery) live in src/legacy/ and are not routed.
+// the dev Gallery) live in NOT_NEEDED/frontend_legacy/ and are not routed.
 
 // The field surface.
 const MyWork = lazy(() => import('../features/supervisor/pages/MyWork').then((m) => ({ default: m.MyWork })));
@@ -69,6 +69,8 @@ const LabApprovals = lazy(() =>
 const AdminTickets = lazy(() =>
   import('../features/admin/pages/AdminTickets').then((m) => ({ default: m.AdminTickets }))
 );
+const AdminNow = lazy(() => import('../features/admin/pages/AdminNow').then((m) => ({ default: m.AdminNow })));
+const AdminResources = lazy(() => import('../features/admin/pages/AdminResources').then((m) => ({ default: m.AdminResources })));
 const AdminLogins = lazy(() => import('../features/admin/pages/AdminLogins').then((m) => ({ default: m.AdminLogins })));
 const GmPeople = lazy(() => import('../features/gm/pages/GmPeople').then((m) => ({ default: m.GmPeople })));
 const GmProgress = lazy(() =>
@@ -212,6 +214,8 @@ export default function App() {
           hardcoding one.
         */}
         <Route path="/lab/approvals" element={<RoleGuard allow={['gm']}><LabApprovals /></RoleGuard>} />
+        <Route path="/admin/now" element={<RoleGuard allow={MGMT}><AdminNow /></RoleGuard>} />
+        <Route path="/admin/resources" element={<RoleGuard allow={['admin', 'manager']}><AdminResources /></RoleGuard>} />
         <Route path="/admin/logins" element={<RoleGuard allow={['admin']}><AdminLogins /></RoleGuard>} />
         <Route path="/gm/people" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmPeople /></RoleGuard>} />
         <Route path="/gm/progress" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmProgress /></RoleGuard>} />
