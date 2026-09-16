@@ -111,6 +111,14 @@ export type TimelineRow = {
   skipped_at: string | null;
   duration_target_min_hr: number | null;
   duration_target_max_hr: number | null;
+  /** The published plan's own hours from H0 (0113): H0 … H476. */
+  baseline_start_hour: number | null;
+  baseline_end_hour: number | null;
+  planned_start_at: string | null;
+  planned_end_at: string | null;
+  h0: string | null;
+  /** The earliest this task may be started (0106). Null once it has started or has no plan. */
+  due_from: string | null;
   actual_start: string | null;
   started_by_name: string | null;
   actual_end: string | null;

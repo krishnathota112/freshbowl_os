@@ -189,6 +189,20 @@ function Progress({ m }: { m: Monitor }) {
   );
 }
 
+/** H-hours of the published plan, e.g. "H0–H3" or "H70". */
+function hourSpan(r: TimelineRow): string {
+  if (r.baseline_start_hour == null) return 'no planned hour';
+  const s = `H${r.baseline_start_hour}`;
+  return r.baseline_end_hour != null && r.baseline_end_hour !== r.baseline_start_hour ? `${s}–H${r.baseline_end_hour}` : s;
+}
+
+/** READY on screen but the server will refuse a start until its planned time (0106). */
+function notDueYet(r: TimelineRow): boolean {
+  return r.due_from !== null && r.due_from !== undefined && Date.parse(r.due_from) > Date.now();
+}
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
 function ActivityCard({ r }: { r: TimelineRow }) {
   const live = r.photos.filter((p) => !p.superseded);
   const tone = r.state === 'COMPLETED' ? 'ok' : r.state === 'DEVIATION' || r.overdue ? 'crit' : r.state === 'IN_PROGRESS' ? 'accent' : 'muted';
@@ -199,10 +213,22 @@ function ActivityCard({ r }: { r: TimelineRow }) {
         {r.overdue && <Chip tone="crit">over stated duration</Chip>}
         {r.is_lab && <Chip tone="accent">Lab{r.lab_checkpoint ? ` · ${r.lab_checkpoint}` : ''}</Chip>}
         {r.is_hold && <Chip tone="muted">hold</Chip>}
+        {notDueYet(r) && <Chip tone="warn">not due yet</Chip>}
+        {r.lab_is_gate && <Chip tone="crit">needs GM approval</Chip>}
         {r.onboarded_position && <Chip tone="accent">onboarding position</Chip>}
       </div>
       <h4 className="mt-1 font-head text-[16px] font-800">{r.title}{r.scope_label ? <span className="font-normal text-muted"> · {r.scope_label}</span> : null}</h4>
+      {/* The process hour first (H0 … H476) — the stage wording is the SOP's own and comes second. */}
+      <p className="text-[13px] text-ink2">
+        <strong className="mono">{hourSpan(r)}</strong>
+        {r.planned_start_at && <> · planned {when(r.planned_start_at)}{r.planned_end_at ? ` → ${clock(r.planned_end_at)}` : ''}</>}
+      </p>
       <p className="text-[12px] text-muted">{r.stage ?? '—'} · <span className="mono">{r.code}</span></p>
+      {notDueYet(r) && (
+        <p className="mt-1 text-[13px] font-600" style={{ color: 'var(--warn)' }}>
+          Not due yet — it can be started from {when(r.due_from!)}
+        </p>
+      )}
 
       <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-[13px] sm:grid-cols-2">
         <Line label="Actual start" value={r.actual_start ? `${when(r.actual_start)}${r.started_by_name ? ` · ${r.started_by_name}` : ''}` : '—'} />
