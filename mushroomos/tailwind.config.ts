@@ -99,6 +99,7 @@ export default {
         body: 'var(--font-body)',
         sans: 'var(--font-body)',
         mono: 'var(--font-mono)',
+        display: 'var(--font-display)',
       },
     },
   },

@@ -17,6 +17,7 @@ export type SopActivity = {
   code: string;
   title: string;
   stream: string;
+  scope: string;
   stage: string | null;
   start: number | null;
   end: number | null;
@@ -82,6 +83,7 @@ type ActivityRow = {
   code: string;
   label_template: string;
   stream: string;
+  scope: string;
   stage: string | null;
   standard_start_hour: number | string | null;
   standard_end_hour: number | string | null;
@@ -96,7 +98,7 @@ export async function loadSopActivities(definitionId: string): Promise<SopActivi
   const { data, error } = await supabase
     .from('process_activity')
     .select(
-      'id, code, label_template, stream, stage, standard_start_hour, standard_end_hour, is_hold, is_pre_h0, lab_parameters, ' +
+      'id, code, label_template, stream, scope, stage, standard_start_hour, standard_end_hour, is_hold, is_pre_h0, lab_parameters, ' +
         'gate_rule(kind, phase, is_enabled, config), lab_checkpoint_activity(checkpoint_code, gates_activity_code)'
     )
     .eq('process_definition_id', definitionId);
@@ -107,6 +109,7 @@ export async function loadSopActivities(definitionId: string): Promise<SopActivi
       code: r.code,
       title: r.label_template,
       stream: r.stream,
+      scope: r.scope,
       stage: r.stage,
       start: num(r.standard_start_hour),
       end: num(r.standard_end_hour),
