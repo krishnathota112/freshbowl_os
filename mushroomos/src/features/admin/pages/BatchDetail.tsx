@@ -309,6 +309,7 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
  * the people using this screen should read what the task is doing, not what the database column says.
  */
 const STATE_LABEL: Record<string, string> = {
+  NOT_DUE_YET: 'Not due yet',
   COMPLETED: 'Done',
   READY: 'Ready',
   IN_PROGRESS: 'In progress',

@@ -7,6 +7,7 @@ export type VesselReadiness = {
   kind: string;
   label: string;
   status: string;
+  occupied_by_batch_id: string | null;
   occupied_by_batch: string | null;
   occupied_since: string | null;
   last_released_at: string | null;

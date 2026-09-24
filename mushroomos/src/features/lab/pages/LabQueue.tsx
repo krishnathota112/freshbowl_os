@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { loadLabWork, type LabWorkItem } from '../../../shared/api/lab';
+import { WAITING_STATES } from '../../../shared/api/work';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
@@ -39,7 +40,7 @@ export function LabQueue() {
   const items = q.data ?? [];
   const running = items.filter((i) => i.state === 'IN_PROGRESS' || i.state === 'RETURNED').sort(byPlan);
   // The day plan (15 Sep 2026): checks planned for today or earlier are today's work; later days wait below.
-  const open = items.filter((i) => i.state === 'READY' || i.state === 'LOCKED' || i.state === 'BLOCKED').sort(byPlan);
+  const open = items.filter((i) => i.state === 'READY' || (WAITING_STATES as readonly string[]).includes(i.state)).sort(byPlan);
   const next = open.filter((i) => isDueByToday(i.plannedStartAt));
   const later = open.filter((i) => !isDueByToday(i.plannedStartAt));
   const done = items.filter((i) => i.state === 'COMPLETED');
@@ -188,6 +189,7 @@ function WorkCard({ i }: { i: LabWorkItem }) {
             <p className="font-head text-base font-extrabold text-ink leading-snug">{i.activityTitle}</p>
             <p className="mt-0.5 text-xs text-muted font-medium">
               {i.scopeLabel} · <span className="mono font-bold text-ink-2">{i.batchCode}</span>
+              {i.baselineStartHour !== null && <span className="mono"> · Planned H{i.baselineStartHour}</span>}
             </p>
           </div>
         </div>
@@ -200,7 +202,7 @@ function WorkCard({ i }: { i: LabWorkItem }) {
       <div className="mt-3 pt-2.5 border-t border-line flex items-center justify-between gap-2 text-xs text-ink-2">
         <p className="font-medium text-muted">{line}</p>
         <span className="font-head text-xs font-bold text-accent flex items-center gap-0.5 shrink-0">
-          {inProgress ? 'Continue' : i.state === 'COMPLETED' ? 'View' : 'Record'}
+          {inProgress ? 'Continue' : i.state === 'READY' ? 'Record' : 'View'}
           <span className="material-symbols-outlined text-sm">chevron_right</span>
         </span>
       </div>

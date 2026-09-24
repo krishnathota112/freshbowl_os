@@ -1,0 +1,13 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 0127 · A THIRD FIBRE ROLE FOR BATCH CREATION (owner, 17 Sep 2026)
+--
+-- "The 3rd fibre is just for mixing with the 1st and 2nd fibre when the material is low."
+-- It is a MATERIAL BINDING on the batch, like SECONDARY_FIBRE today: no process activity names it, so
+-- generate_activity_plan / validate_batch never require or plan anything for it, and no published
+-- process version changes. Only the enum value is added here, because Postgres cannot use a new enum
+-- value in the transaction that adds it; 0128 makes materials eligible for it.
+--
+-- Rollback: an enum value cannot be dropped in place. 0128's rollback removes the eligibility, which
+-- takes the choice off the screen; the unused value is harmless. See db-rollback/pre_0128__third_fibre.sql.
+-- ─────────────────────────────────────────────────────────────────────────────
+alter type public.material_role_code add value if not exists 'TERTIARY_FIBRE' after 'SECONDARY_FIBRE';

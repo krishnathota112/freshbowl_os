@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { signedEvidenceUrl } from '../../../shared/api/batch';
+import { loadBatchHour } from '../../../shared/api/projection';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import {
   getBatchMonitor,
@@ -23,6 +24,7 @@ import {
 type View = 'timeline' | 'now' | 'blocked' | 'lab' | 'before';
 
 const STATE_WORDS: Record<string, string> = {
+  NOT_DUE_YET: 'Not due yet',
   COMPLETED: 'Completed', READY: 'Ready', IN_PROGRESS: 'In progress', LOCKED: 'Locked', BLOCKED: 'Blocked',
   DEVIATION: 'Deviation', RETURNED: 'Returned', SKIPPED: 'Skipped', WAITING_TIME: 'Resting',
   WAITING_CONDITION: 'Waiting', AWAITING_LAB: 'Waiting on lab', AWAITING_SUPERVISOR: 'Waiting on supervisor',
@@ -30,7 +32,8 @@ const STATE_WORDS: Record<string, string> = {
 };
 
 export function BatchMonitor({ batchId }: { batchId: string }) {
-  const [view, setView] = useState<View>('timeline');
+  const [view, setView] = useState<View>('now');
+  const clock = useQuery({ queryKey: ['batch-hour', batchId], queryFn: () => loadBatchHour(batchId), refetchInterval: 30_000 });
   const monitor = useQuery({ queryKey: ['batch-monitor', batchId], queryFn: () => getBatchMonitor(batchId), refetchInterval: 30_000 });
   const timeline = useQuery({ queryKey: ['batch-timeline', batchId], queryFn: () => listBatchTimeline(batchId), refetchInterval: 30_000 });
   const material = useQuery({ queryKey: ['initial-material', batchId], queryFn: () => listInitialMaterial(batchId) });
@@ -58,6 +61,7 @@ export function BatchMonitor({ batchId }: { batchId: string }) {
   return (
     <div className="space-y-5">
       <BatchHeader m={m} currentActivities={now.filter((r) => !r.is_lab).map((r) => `${r.title}${r.scope_label ? ` · ${r.scope_label}` : ''}`)} />
+      <p className="text-[14px] text-ink2">Current batch hour: <strong className="mono">{clock.isError ? 'Unavailable' : clock.isLoading ? 'Loading…' : clock.data == null ? 'H0 not recorded' : `H${clock.data}`}</strong></p>
       <Progress m={m} />
 
       <section className="rounded-xl border bg-surface p-4" style={{ borderColor: 'var(--line)' }}>
@@ -196,9 +200,19 @@ function hourSpan(r: TimelineRow): string {
   return r.baseline_end_hour != null && r.baseline_end_hour !== r.baseline_start_hour ? `${s}–H${r.baseline_end_hour}` : s;
 }
 
-/** READY on screen but the server will refuse a start until its planned time (0106). */
+/**
+ * 0117 · THE SERVER SAYS WHETHER A TASK IS DUE. THIS NO LONGER DECIDES.
+ *
+ * This used to be `r.due_from != null && Date.parse(r.due_from) > Date.now()` — the browser
+ * re-deriving eligibility from a timestamp, and then rendering a "not due yet" chip beside a
+ * "Ready" chip that disagreed with it. Two answers to one question, one of them computed here.
+ *
+ * `NOT_DUE_YET` is now a real state produced by `advance_batch` from `planned_time_status`, the
+ * same function `start_block_reason` uses. This reads the answer instead of forming one, and
+ * `due_from` is used only to SAY when — never to decide whether.
+ */
 function notDueYet(r: TimelineRow): boolean {
-  return r.due_from !== null && r.due_from !== undefined && Date.parse(r.due_from) > Date.now();
+  return r.state === 'NOT_DUE_YET';
 }
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -213,7 +227,9 @@ function ActivityCard({ r }: { r: TimelineRow }) {
         {r.overdue && <Chip tone="crit">over stated duration</Chip>}
         {r.is_lab && <Chip tone="accent">Lab{r.lab_checkpoint ? ` · ${r.lab_checkpoint}` : ''}</Chip>}
         {r.is_hold && <Chip tone="muted">hold</Chip>}
-        {notDueYet(r) && <Chip tone="warn">not due yet</Chip>}
+        {/* 0117 · no separate "not due yet" chip: the STATE chip above now says it, because the
+            state itself is NOT_DUE_YET. Two chips saying the same thing was the visible symptom of
+            the browser holding a second opinion. */}
         {r.lab_is_gate && <Chip tone="crit">needs GM approval</Chip>}
         {r.onboarded_position && <Chip tone="accent">onboarding position</Chip>}
       </div>
@@ -226,7 +242,7 @@ function ActivityCard({ r }: { r: TimelineRow }) {
       <p className="text-[12px] text-muted">{r.stage ?? '—'} · <span className="mono">{r.code}</span></p>
       {notDueYet(r) && (
         <p className="mt-1 text-[13px] font-600" style={{ color: 'var(--warn)' }}>
-          Not due yet — it can be started from {when(r.due_from!)}
+          {r.blocked_reason ?? (r.due_from ? `Not due yet — it can be started from ${when(r.due_from)}` : 'Not due yet.')}
         </p>
       )}
 

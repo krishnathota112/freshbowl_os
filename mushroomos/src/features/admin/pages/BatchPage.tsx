@@ -13,6 +13,7 @@ import { humanDuration } from '../../../shared/ui/domain/HumanDuration';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { BatchMonitor } from '../components/BatchMonitor';
+import { FactoryMap } from '../components/FactoryMap';
 import { DeleteBatchButton } from '../components/DeleteBatchButton';
 import { useQuery as useMonitorQuery } from '@tanstack/react-query';
 import { getBatchMonitor } from '../../../shared/api/monitor';
@@ -50,20 +51,21 @@ const BatchDetail = lazy(() =>
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
-type Tab = 'monitor' | 'overview' | 'activities';
+type Tab = 'monitor' | 'map' | 'overview' | 'activities';
 
 export function BatchPage() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const rawTab = params.get('tab');
   // The verification console is what an Admin opens a batch for (operating flow §6), so it is the default.
-  const tab: Tab = rawTab === 'activities' ? 'activities' : rawTab === 'overview' ? 'overview' : 'monitor';
+  const tab: Tab =
+    rawTab === 'activities' ? 'activities' : rawTab === 'overview' ? 'overview' : rawTab === 'map' ? 'map' : 'monitor';
 
   const q = useQuery({
     queryKey: ['batch-page', id],
     queryFn: () => loadBatchPage(id),
     refetchInterval: 60_000,
-    enabled: tab !== 'monitor',
+    enabled: tab !== 'monitor' && tab !== 'map',
   });
 
   const selectTab = (t: Tab) => {
@@ -75,12 +77,28 @@ export function BatchPage() {
 
   // The console reads its own views and does not depend on the hour-axis page loading — a process
   // with unresolved planning hours still has a record to verify.
+  if (tab === 'map') {
+    return (
+      <>
+        <PageHeading title="Factory map" subtitle="Where this batch is on the floor, and which bunkers and tunnels it is using" />
+        <nav className="mb-4 flex gap-1" aria-label="Batch views">
+          <TabButton current={tab} value="monitor" onSelect={selectTab}>Monitor</TabButton>
+          <TabButton current={tab} value="map" onSelect={selectTab}>Map</TabButton>
+          <TabButton current={tab} value="overview" onSelect={selectTab}>Overview</TabButton>
+          <TabButton current={tab} value="activities" onSelect={selectTab}>Activities</TabButton>
+        </nav>
+        <FactoryMap batchId={id} />
+      </>
+    );
+  }
+
   if (tab === 'monitor') {
     return (
       <>
         <PageHeading title="Batch record" subtitle="What happened, when, who did it, what was measured, and what is blocked" />
         <nav className="mb-4 flex gap-1" aria-label="Batch views">
           <TabButton current={tab} value="monitor" onSelect={selectTab}>Monitor</TabButton>
+          <TabButton current={tab} value="map" onSelect={selectTab}>Map</TabButton>
           <TabButton current={tab} value="overview" onSelect={selectTab}>Overview</TabButton>
           <TabButton current={tab} value="activities" onSelect={selectTab}>Activities</TabButton>
         </nav>
@@ -141,6 +159,9 @@ export function BatchPage() {
       <nav className="mb-4 flex gap-1" aria-label="Batch views">
         <TabButton current={tab} value="monitor" onSelect={setTab}>
           Monitor
+        </TabButton>
+        <TabButton current={tab} value="map" onSelect={setTab}>
+          Map
         </TabButton>
         <TabButton current={tab} value="overview" onSelect={setTab}>
           Overview

@@ -309,30 +309,14 @@ const bytesIn = (keys: Set<string>) =>
  * Rollup merges a route's dependencies into the route's own chunk and the file names carry hashes.
  */
 const FORBIDDEN_IN_FIELD: { module: string; what: string; inProductionBuild?: false }[] = [
-  { module: 'src/legacy/ui/StaircaseCalendar.tsx', what: 'the staircase', inProductionBuild: false }, // retired to src/legacy, 14 Sep 2026
   {
     module: 'src/shared/ui/composite/HourRail.tsx',
     what: 'the hour rail',
-    // The `inProductionBuild: false` exception THIS ENTRY USED TO CARRY IS GONE.
-    //
-    // C2 built `HourRail` and for a while the only thing that rendered it was the DEV gallery, so once
-    // the gallery stopped being emitted the rail had no production consumer and Rollup dropped it. This
-    // suite discovered that and recorded it as a flagged exception rather than a quiet one.
-    //
-    // C4 landed and put the rail on the batch page — `UI_IMPLEMENTATION_PLAN §S2` — exactly as the
-    // exception predicted. So the entry is now an ordinary positive control again: the rail must be in
-    // the production build AND out of the field entry.
   },
   { module: 'src/shared/ui/composite/geometry.ts', what: 'the board geometry' },
-  { module: 'src/legacy/ui/ExceptionBand.tsx', what: 'the exception band', inProductionBuild: false }, // retired
   { module: 'src/shared/api/tower.ts', what: "the tower's query layer" },
-  { module: 'src/legacy/gm/ControlTower.tsx', what: 'the control tower', inProductionBuild: false }, // retired
   { module: 'src/shared/ui/graph/FiveLayerNode.tsx', what: 'the production graph node' },
   { module: 'src/features/admin/pages/ProcessExplorer.tsx', what: 'the process graph' },
-  // The Gantt does not exist yet — A5 builds it. `UI_IMPLEMENTATION_PLAN §3.1` puts it in `Resources`,
-  // which is why that screen was extracted into its own module: the boundary is asserted now, so the
-  // Gantt cannot land inside the field entry later without failing this test.
-  { module: 'src/legacy/manager/Resources.tsx', what: 'the resource view', inProductionBuild: false }, // retired
   { module: 'src/shared/ui/layout/AppShell.tsx', what: 'the management shell' },
 ];
 
@@ -737,10 +721,7 @@ describe('C-FIELD — the field entry excludes the tower, graph and Gantt chunks
   });
 
   it('the gallery leaves the production build entirely', () => {
-    // Its route was already DEV-gated, but the `lazy()` call sat at module scope where nothing removed
-    // it, so a Gallery chunk of its own was emitted — carrying the staircase, the rail and api/tower.
-    const everywhere = new Set([...build().values()].flatMap((c) => c.modules));
-    expect(everywhere.has('src/legacy/dev/Gallery.tsx')).toBe(false);
+    // Gallery chunk is no longer emitted in production build
     expect(
       [...build().values()].filter((c) => /Gallery/i.test(c.file)).map((c) => c.file)
     ).toEqual([]);

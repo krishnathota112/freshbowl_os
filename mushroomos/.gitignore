@@ -15,6 +15,9 @@ supabase/.branches
 *.log
 coverage
 .vite
+*.tsbuildinfo
+*-run.txt
+.start.txt
 
 # ── Capacitor / Android ───────────────────────────────────────────────────────
 # The `android/` project itself IS committed — it carries the app id, the label and the manifest,

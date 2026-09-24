@@ -10,6 +10,10 @@ export const ROLE_PLAIN: Record<string, { title: string; help: string }> = {
     title: 'Second fibre',
     help: 'Waxy straw wetted separately. Leave empty unless you are using wheat or mustard.',
   },
+  TERTIARY_FIBRE: {
+    title: 'Third fibre',
+    help: 'Only when fibre is short: mixed in with the main and second fibre. Leave as "Not used" otherwise.',
+  },
   STRUCTURAL_STRAW: {
     title: 'Straw',
     help: 'Soaked rather than hopper-wetted. Gives the compost its structure. Usually paddy.',
@@ -28,12 +32,14 @@ export const ROLE_PLAIN: Record<string, { title: string; help: string }> = {
   },
 };
 
+// The fibres are listed together, in rank order: a later fibre cannot repeat an earlier one's material.
 export const ROLE_ORDER = [
   'PRIMARY_FIBRE',
+  'SECONDARY_FIBRE',
+  'TERTIARY_FIBRE',
   'STRUCTURAL_STRAW',
   'NITROGEN_SOURCE',
   'MINERAL',
-  'SECONDARY_FIBRE',
   'PH_CORRECTOR',
 ];
 
@@ -130,29 +136,13 @@ export async function getEvidenceCounts(batchId: string): Promise<Map<string, nu
   return out;
 }
 
-export type CreateBatchInput = {
-  code: string;
-  label: string;
-  startDate: string;
-  config: Record<string, number | string>;
-  roles: { role: string; material_code: string; lead: boolean }[];
-  supervisor?: string;
-  weather?: string;
-};
-
-export async function createBatch(input: CreateBatchInput): Promise<string> {
-  const { data, error } = await supabase.rpc('create_master_batch', {
-    p_code: input.code,
-    p_label: input.label,
-    p_start_date: input.startDate,
-    p_config: input.config,
-    p_roles: input.roles,
-    p_supervisor: input.supervisor ?? null,
-    p_weather: input.weather ?? null,
-  });
-  if (error) throw error;
-  return data as string;
-}
+// 16 Sep 2026 audit: this file used to export CreateBatchInput/createBatch(), a second
+// path into create_master_batch that never passed p_process_definition_id — a batch
+// created through it would silently fall back to the catalogue's global "current"
+// process rather than whatever the Admin screen had selected. Nothing imports it
+// (BatchStart.tsx uses createAndPlan() in ../api/intake.ts, which does pass
+// processDefinitionId), so it was dead code, not a live bug — removed rather than left
+// as a trap for a future screen to wire up by mistake.
 
 export async function activateBatch(id: string): Promise<void> {
   const { error } = await supabase.rpc('activate_batch', { p_batch_id: id });

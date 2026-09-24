@@ -51,6 +51,9 @@ const BatchPage = lazy(() => import('../features/admin/pages/BatchPage').then((m
 const ProcessExplorer = lazy(() =>
   import('../features/admin/pages/ProcessExplorer').then((m) => ({ default: m.ProcessExplorer }))
 );
+const SopHome = lazy(() => import('../features/admin/pages/SopHome').then((m) => ({ default: m.SopHome })));
+const SopBatchEditor = lazy(() => import('../features/admin/pages/SopBatchEditor').then((m) => ({ default: m.SopBatchEditor })));
+const SopVersionEditor = lazy(() => import('../features/admin/pages/SopVersionEditor').then((m) => ({ default: m.SopVersionEditor })));
 const ReferenceData = lazy(() =>
   import('../features/admin/pages/ReferenceData').then((m) => ({ default: m.ReferenceData }))
 );
@@ -215,6 +218,9 @@ export default function App() {
         */}
         <Route path="/lab/approvals" element={<RoleGuard allow={['gm']}><LabApprovals /></RoleGuard>} />
         <Route path="/admin/now" element={<RoleGuard allow={MGMT}><AdminNow /></RoleGuard>} />
+        <Route path="/admin/sop" element={<RoleGuard allow={['admin', 'gm']}><SopHome /></RoleGuard>} />
+        <Route path="/admin/sop/batch/:id" element={<RoleGuard allow={['admin', 'gm']}><SopBatchEditor /></RoleGuard>} />
+        <Route path="/admin/sop/version/:id" element={<RoleGuard allow={['admin', 'gm']}><SopVersionEditor /></RoleGuard>} />
         <Route path="/admin/resources" element={<RoleGuard allow={['admin', 'manager']}><AdminResources /></RoleGuard>} />
         <Route path="/admin/logins" element={<RoleGuard allow={['admin']}><AdminLogins /></RoleGuard>} />
         <Route path="/gm/people" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmPeople /></RoleGuard>} />

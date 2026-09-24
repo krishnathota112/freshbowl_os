@@ -27,7 +27,7 @@ import type { AppRole } from '../../domain/types';
 const WEB_HOME: Record<AppRole, string> = {
   operator: '/operator/my-work',
   lab_tech: '/lab/queue',
-  // The Control Room, Resources and Control Tower homes were retired to src/legacy/ (14 Sep 2026).
+  // The Control Room, Resources and Control Tower homes were retired to NOT_NEEDED/frontend_legacy/ (14 Sep 2026).
   supervisor: '/operator/my-work',
   admin: '/admin',
   manager: '/admin/batches',

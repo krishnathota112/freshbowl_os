@@ -138,6 +138,10 @@ export async function completeActivity(
 export const ACTIONABLE_STATES = ['READY', 'RETURNED', 'DEVIATION'] as const;
 export const RUNNING_STATES = ['IN_PROGRESS'] as const;
 export const WAITING_STATES = [
+  // 0117 · its planned hour has not arrived. It sits under a waiting heading and carries no Start
+  // button. `workGroupOf` already folded any unknown state to 'waiting', so this is the explicit
+  // form of what the UI was doing anyway — not a new opinion about eligibility.
+  'NOT_DUE_YET',
   'LOCKED',
   'BLOCKED',
   'WAITING_TIME',
@@ -162,6 +166,7 @@ export function workGroupOf(state: string): 'running' | 'ready' | 'waiting' | 'd
  * as itself rather than being quietly folded into "Waiting".
  */
 export const STATE_LABEL: Record<string, string> = {
+  NOT_DUE_YET: 'Not due yet',
   LOCKED: 'Locked',
   READY: 'Ready now',
   IN_PROGRESS: 'In progress',

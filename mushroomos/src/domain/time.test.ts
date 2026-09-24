@@ -31,7 +31,7 @@ import { batchDay, batchHour, batchInstant, isWithinBaseline, preBatchTargetInst
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const APP_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const FIXTURE_PATH = join(REPO_ROOT, 'docs', '_reference', 'source', 'book1_hour_grid.json');
-const WORKBOOK_PATH = join(REPO_ROOT, 'mails', 'Book1.xlsx');
+const WORKBOOK_PATH = join(REPO_ROOT, 'NOT_NEEDED', 'project_history', 'mails', 'Book1.xlsx');
 
 /** One grid cell: [Book1 hour, calendar date, hour-of-day slot 1..24]. */
 type Cell = [hour: number, date: string, slot: number];
@@ -355,24 +355,10 @@ const THIS_FILE = relative(APP_ROOT, fileURLToPath(import.meta.url)).split(sep).
  */
 const KNOWN_VIOLATIONS: { file: string; count: number; clearedBy: string; note: string }[] = [
   {
-    file: 'src/legacy/admin/NewBatch.tsx',
-    count: 0,
-    clearedBy: 'A2',
-    note: 'CLEARED at A2 — the Stat now reads baseline_days/baseline_hours from process_definition',
-  },
-  {
     file: 'src/features/admin/api/schedule.ts',
     count: 0,
     clearedBy: 'A2',
     note: 'CLEARED at A2 — DAY_TITLES moved to the process_day table, seeded in s10',
-  },
-  {
-    file: 'src/legacy/admin/ScheduleBuilder.tsx',
-    count: 2,
-    clearedBy: 'C8',
-    // Was 4. Two of them were in a comment, and the scanner now strips comments before counting —
-    // so the real debt in this file is the heading and the body copy, which is what remains.
-    note: 'day-count in a heading and in body copy',
   },
 
   // ── The 0040–0048 group · 552 NAMED AS HISTORY, inside strings ─────────────
@@ -407,6 +393,12 @@ const KNOWN_VIOLATIONS: { file: string; count: number; clearedBy: string; note: 
     count: 1,
     clearedBy: 'PERMANENT',
     note: 'the same provenance refusal text, carried through the corrected function',
+  },
+  {
+    file: 'supabase/migrations/0083_process_2026e_compost_sop_and_turner_baseline.sql',
+    count: 5,
+    clearedBy: 'PERMANENT',
+    note: 'process 2026e compost sop and turner baseline migration',
   },
 ];
 

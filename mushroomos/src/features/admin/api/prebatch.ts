@@ -19,6 +19,44 @@ export const PREBATCH_PARAMETERS = [
   { code: 'dry_weight', label: 'Dry weight', unit: '' },
 ] as const;
 
+/**
+ * Pre-H0 material WEIGHTS (Batch Creation only, 17 Sep 2026): dry and fresh weight in kg per material.
+ * Each is a numeric reading on the same pre-H0 sample, under a parameter registered by 0129
+ * (`wt_<material>_<dry|fresh>_kg`), so it carries its label and unit like every other reading.
+ */
+export const PREBATCH_WEIGHT_MATERIALS = [
+  { key: 'urea', label: 'Urea' },
+  { key: 'ash', label: 'Ash' },
+  { key: 'nitrogen', label: 'Nitrogen' },
+  { key: 'gypsum', label: 'Gypsum' },
+  { key: 'bagasse', label: 'Bagasse' },
+  { key: 'paddy', label: 'Paddy' },
+  { key: 'chicken_manure', label: 'Chicken Manure' },
+  { key: 'wheat', label: 'Wheat' },
+  { key: 'mustard', label: 'Mustard' },
+  { key: 'ammonium_sulphate', label: 'Ammonium Sulphate' },
+] as const;
+
+export const weightCode = (material: string, kind: 'dry' | 'fresh') => `wt_${material}_${kind}_kg`;
+
+/** The weights typed in, as readings. Blank fields are left out; a weight must be a number ≥ 0. */
+export function weightReadingsFromInputs(values: Record<string, string>): PrebatchReading[] {
+  const readings: PrebatchReading[] = [];
+  for (const m of PREBATCH_WEIGHT_MATERIALS) {
+    for (const kind of ['dry', 'fresh'] as const) {
+      const code = weightCode(m.key, kind);
+      const raw = (values[code] ?? '').replace(',', '.').trim();
+      if (raw === '') continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0) {
+        throw new Error(`${m.label} ${kind} weight must be a number of kilograms (0 or more).`);
+      }
+      readings.push({ parameter: code, value: n });
+    }
+  }
+  return readings;
+}
+
 export type PrebatchCheckpoint = { id: string; code: string; name: string };
 
 /** The checkpoints the process marks as pre-batch. Read, never named in code — rule 4. */
@@ -40,6 +78,12 @@ export type PrebatchReading = { parameter: string; value: number };
  * was entered at all.
  */
 export function readingsFromInputs(values: Record<string, string>): PrebatchReading[] {
+  const readings = parseParameterInputs(values);
+  if (readings.length === 0) throw new Error('Enter at least one initial material value.');
+  return readings;
+}
+
+function parseParameterInputs(values: Record<string, string>): PrebatchReading[] {
   const readings: PrebatchReading[] = [];
   for (const p of PREBATCH_PARAMETERS) {
     const raw = (values[p.code] ?? '').replace(',', '.').trim();
@@ -48,7 +92,6 @@ export function readingsFromInputs(values: Record<string, string>): PrebatchRead
     if (!Number.isFinite(n)) throw new Error(`${p.label} must be a number.`);
     readings.push({ parameter: p.code, value: n });
   }
-  if (readings.length === 0) throw new Error('Enter at least one initial material value.');
   return readings;
 }
 
@@ -92,8 +135,15 @@ export async function recordInitialMaterial(input: {
 }
 
 /** Record initial material data on the process's pre-batch checkpoint. */
-export async function recordInitialMaterialForBatch(batchId: string, label: string, values: Record<string, string>) {
-  const readings = readingsFromInputs(values);
+export async function recordInitialMaterialForBatch(
+  batchId: string,
+  label: string,
+  values: Record<string, string>,
+  /** Batch Creation's Weights section; the same save, the same sample. Omitted elsewhere. */
+  weights: Record<string, string> = {},
+) {
+  const extra = weightReadingsFromInputs(weights);
+  const readings = extra.length === 0 ? readingsFromInputs(values) : [...parseParameterInputs(values), ...extra];
   const cps = await listPrebatchCheckpoints();
   if (cps.length === 0) throw new Error('No pre-H0 material checkpoint is defined.');
   return recordInitialMaterial({ batchId, checkpointId: cps[0].id, label, readings });

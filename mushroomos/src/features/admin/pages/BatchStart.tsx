@@ -47,7 +47,9 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
 
   const list = versions.data ?? [];
   // The current standard is pre-selected; the admin can still choose another published version.
-  const processId = pickedProcessId ?? list.find((v) => v.isCurrent)?.id ?? null;
+  // `?process=` (from the SOP editor's "Create a batch on this version") preselects a published version.
+  const linked = list.find((v) => v.id === params.get('process'))?.id ?? null;
+  const processId = pickedProcessId ?? linked ?? list.find((v) => v.isCurrent)?.id ?? null;
   const chosen: ProcessVersion | null = list.find((v) => v.id === processId) ?? null;
 
   const roles = useQuery({ queryKey: ['material-roles'], queryFn: loadMaterialRoles });
@@ -60,21 +62,40 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
   const roleList = [...(roles.data ?? [])].sort(
     (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role)
   );
-  const materialFor = (role: string) =>
-    role in picked ? picked[role] : (roleList.find((r) => r.role === role)?.leadId ?? '');
+  const valueIn = (p: Record<string, string>, role: string) =>
+    role in p ? p[role] : (roleList.find((r) => r.role === role)?.leadId ?? '');
+  const materialFor = (role: string) => valueIn(picked, role);
   const requiredRoles = required.data ?? [];
   const missingRequired = requiredRoles.filter((r) => !materialFor(r));
+
+  // FIBRE SELECTORS (16 Sep 2026): Main, Second (and any later fibre role) share ONE list — every material
+  // eligible for any fibre role, from the same source — and a later fibre cannot repeat an earlier one.
+  const fibreRoles = ROLE_ORDER.filter((r) => r.endsWith('_FIBRE') && roleList.some((x) => x.role === r));
+  const fibreMaterials = roleList
+    .filter((r) => fibreRoles.includes(r.role))
+    .flatMap((r) => r.materials)
+    .filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const optionsFor = (r: { role: string; materials: typeof fibreMaterials }) =>
+    fibreRoles.includes(r.role)
+      ? fibreMaterials.filter((m) => !fibreTakenBefore(fibreRoles, (x) => valueIn(picked, x), r.role).includes(m.id))
+      : r.materials;
+  const choose = (role: string, id: string) =>
+    setPicked((p) => clearRepeatedFibres(fibreRoles, { ...p, [role]: id }, (q, x) => valueIn(q, x)));
+  const fibreChosen = fibreRoles.map(materialFor).filter(Boolean);
+  const fibreRepeated = fibreChosen.length !== new Set(fibreChosen).size;
 
   const start = useMutation({
     mutationFn: async () => {
       if (!chosen) throw new Error('Choose the process this batch follows.');
       if (code.trim() === '') throw new Error('Give the batch a name — the numbers the factory calls it by.');
+      if (fibreRepeated) throw new Error('The same material is chosen for two fibres. Each fibre must be a different material.');
       // A running batch starts tracking from its current position; its original start is asked for,
       // optionally, on the onboarding screen — never assumed here.
       const startAt = ongoing ? null : await resolveH0(date, time);
       const bindings = roleList.flatMap((r) => {
         const id = materialFor(r.role);
-        const material = r.materials.find((m) => m.id === id);
+        const material = (fibreRoles.includes(r.role) ? fibreMaterials : r.materials).find((m) => m.id === id);
         return material ? [{ role: r.role, material_code: material.code, lead: true }] : [];
       });
       const batchId = await createAndPlan({
@@ -182,14 +203,14 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
                     {plain && <span className="block text-[13px] text-muted">{plain.help}</span>}
                     <select
                       value={materialFor(r.role)}
-                      onChange={(e) => setPicked((p) => ({ ...p, [r.role]: e.target.value }))}
+                      onChange={(e) => choose(r.role, e.target.value)}
                       className="mt-1 w-full rounded-md border bg-surface px-3 text-[16px]"
                       style={{ minHeight: 52, borderColor: isRequired && !materialFor(r.role) ? 'var(--crit)' : 'var(--line-2)' }}
                     >
                       <option value="" disabled={isRequired}>
                         {isRequired ? 'Choose a material' : 'Not used'}
                       </option>
-                      {r.materials.map((m) => (
+                      {optionsFor(r).map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
                         </option>
@@ -198,6 +219,11 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
                   </label>
                 );
               })}
+              {fibreRepeated && (
+                <p className="text-[13px]" style={{ color: 'var(--crit)' }}>
+                  The same material is chosen for two fibres. Each fibre must be a different material.
+                </p>
+              )}
               {missingRequired.length > 0 && (
                 <p className="text-[13px]" style={{ color: 'var(--crit)' }}>
                   Choose a material for {missingRequired.map((r) => ROLE_PLAIN[r]?.title ?? r).join(', ')}.
@@ -290,7 +316,8 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
           code.trim() === '' ||
           required.isLoading ||
           roles.isLoading ||
-          missingRequired.length > 0
+          missingRequired.length > 0 ||
+          fibreRepeated
         }
         onClick={() => start.mutate()}
         className="w-full rounded-lg font-head text-[17px] font-800 disabled:opacity-50"
@@ -308,6 +335,25 @@ export function BatchStart({ mode }: { mode: 'new' | 'ongoing' }) {
       </p>
     </>
   );
+}
+
+/** Materials already chosen by the fibre roles ranked before `role`. "Not used" ('') is not a material. */
+export function fibreTakenBefore(fibreRoles: string[], value: (role: string) => string, role: string): string[] {
+  return fibreRoles.slice(0, Math.max(fibreRoles.indexOf(role), 0)).map(value).filter(Boolean);
+}
+
+/** After a change, clear any fibre that now repeats an earlier fibre's material (in rank order). */
+export function clearRepeatedFibres(
+  fibreRoles: string[],
+  next: Record<string, string>,
+  valueIn: (p: Record<string, string>, role: string) => string,
+): Record<string, string> {
+  const out = { ...next };
+  for (const role of fibreRoles) {
+    const v = valueIn(out, role);
+    if (v && fibreTakenBefore(fibreRoles, (r) => valueIn(out, r), role).includes(v)) out[role] = '';
+  }
+  return out;
 }
 
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {

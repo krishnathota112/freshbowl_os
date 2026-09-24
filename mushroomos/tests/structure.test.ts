@@ -29,9 +29,13 @@ const importsOf = (file: string) =>
   [...readFileSync(file, 'utf8').matchAll(/(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g)].map((m) => m[1]);
 
 describe('source tree structure', () => {
-  it('live code never imports from src/legacy/', () => {
+  it('src/legacy is absent from src/ and quarantined in NOT_NEEDED/frontend_legacy', () => {
+    expect(existsSync(join(SRC, 'legacy'))).toBe(false);
+    expect(existsSync(join(APP_ROOT, '..', 'NOT_NEEDED', 'frontend_legacy'))).toBe(true);
+  });
+
+  it('live code never imports from legacy/', () => {
     const offenders = code
-      .filter((f) => !rel(f).startsWith('src/legacy/'))
       .flatMap((f) => importsOf(f).filter((s) => /(^|\/)legacy\//.test(s)).map((s) => `${rel(f)} -> ${s}`));
     expect(offenders).toEqual([]);
   });

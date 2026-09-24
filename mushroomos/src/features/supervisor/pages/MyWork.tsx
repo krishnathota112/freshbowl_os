@@ -430,6 +430,7 @@ function TaskCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-2">
+        {row.baseline_start_hour !== null && <strong className="font-mono">Planned H{row.baseline_start_hour}</strong>}
         <span>
           Planned <strong className="font-mono">{formatWindow(row.planned_start_at, row.planned_end_at)}</strong>
         </span>

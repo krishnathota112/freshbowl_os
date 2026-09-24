@@ -16,7 +16,11 @@ export function labStatus(state: string, verdict: string | null, holdsGate: bool
   if (state === 'IN_PROGRESS') return { label: 'In progress', tone: 'accent' };
   if (state === 'RETURNED') return { label: 'Returned to you', tone: 'warn' };
   if (state === 'READY') return { label: 'Ready', tone: 'accent' };
-  if (state === 'LOCKED' || state === 'BLOCKED') return { label: 'Locked', tone: 'lock' };
+  if (state === 'LOCKED') return { label: 'Locked', tone: 'lock' };
+  if (state === 'BLOCKED') return { label: 'Blocked', tone: 'lock' };
+  if (state === 'NOT_DUE_YET' || state === 'WAITING_CONDITION' || state === 'WAITING_TIME') {
+    return { label: STATE_LABEL[state] ?? state, tone: 'muted' };
+  }
   if (verdict === 'approved') return { label: 'Approved', tone: 'ok' };
   if (verdict === 'rejected') return { label: 'Rejected', tone: 'crit' };
   if (state === 'COMPLETED' && holdsGate) return { label: 'Waiting approval', tone: 'warn' };
@@ -60,4 +64,31 @@ export function approverWords(roles: string[]): string {
   const words = [...roles].sort((a) => (a === 'gm' ? 1 : -1)).map((r) => ROLE_WORDS[r] ?? r);
   if (words.length === 0) return 'the approver';
   return words.join(' or ');
+}
+
+/** The fields of a `v_lab_approval_queue` row that say where a Lab gate stands. */
+export type GateDecisionShape = {
+  awaiting_decision: boolean;
+  latest_verdict: string | null;
+  latest_reason: string | null;
+  decided_by_name: string | null;
+  decided_role: string | null;
+};
+
+/** One Lab gate in words, for any screen (0126). Words only — the state and verdict are the server's. */
+export function gateStatusWords(r: GateDecisionShape): { tone: 'ok' | 'warn' | 'crit' | 'muted'; head: string; remark: string | null } {
+  const role = r.decided_role ? r.decided_role.toUpperCase() : 'the approver';
+  const who = r.decided_by_name ? `${r.decided_by_name} (${role})` : role;
+  if (r.awaiting_decision) {
+    return {
+      tone: 'warn',
+      head: r.latest_verdict === 'rejected'
+        ? 'Re-submitted by the Lab — waiting for the GM’s decision'
+        : 'Submitted by the Lab — waiting for the GM’s decision',
+      remark: null,
+    };
+  }
+  if (r.latest_verdict === 'approved') return { tone: 'ok', head: `Approved by ${who}`, remark: r.latest_reason };
+  if (r.latest_verdict === 'rejected') return { tone: 'crit', head: `Rejected by ${who} — back with the Lab to re-test`, remark: r.latest_reason };
+  return { tone: 'muted', head: 'Waiting for the Lab to test and submit', remark: null };
 }

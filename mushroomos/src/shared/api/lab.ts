@@ -375,11 +375,12 @@ export async function findOpenSample(
  * ───────────────────────────────────────────────────────────────────────────── */
 
 const WORK_COLS =
-  'activity_id, code, planned_start_at, actual_start, actual_end, blocked_reason, ' +
+  'activity_id, code, baseline_start_hour, planned_start_at, actual_start, actual_end, blocked_reason, ' +
   'required_count, satisfied_total, outstanding_labels';
 
 export type LabWorkItem = LabQueueRow & {
   code: string | null;
+  baselineStartHour: number | null;
   plannedStartAt: string | null;
   actualStart: string | null;
   actualEnd: string | null;
@@ -399,6 +400,7 @@ function mergeWork(q: LabQueueRow, w: Record<string, unknown> | null): LabWorkIt
   return {
     ...q,
     code: (w?.code as string | null) ?? null,
+    baselineStartHour: w?.baseline_start_hour == null ? null : Number(w.baseline_start_hour),
     plannedStartAt: (w?.planned_start_at as string | null) ?? null,
     actualStart: (w?.actual_start as string | null) ?? null,
     actualEnd: (w?.actual_end as string | null) ?? null,
@@ -751,6 +753,22 @@ export async function loadLabApprovals(): Promise<LabApprovalRow[]> {
     .eq('batch_status', 'active')
     .order('batch_code', { ascending: true })
     .order('activity_code', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as LabApprovalRow[];
+}
+
+/**
+ * The Lab gates that hold ONE production step, with the latest decision and its remark (0126).
+ * Read from `v_lab_approval_queue`, which Supervisor, Admin, Manager and GM may read.
+ */
+export async function loadGatesFor(batchId: string, activityCode: string): Promise<LabApprovalRow[]> {
+  const { data, error } = await supabase
+    .from('v_lab_approval_queue')
+    .select('*')
+    .eq('master_batch_id', batchId)
+    .eq('gates_activity_code', activityCode)
+    .eq('is_gate', true)
+    .order('activity_code');
   if (error) throw error;
   return (data ?? []) as LabApprovalRow[];
 }

@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { loadAdminHome } from '../api/intake';
 import { listBatchMonitors, type BatchMonitor } from '../../../shared/api/monitor';
 import { listTickets } from '../../../shared/api/tickets';
+import { loadLabApprovals } from '../../../shared/api/lab';
+import { LabGateBoard } from '../../../shared/ui/domain/AdminLive';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
 import { Chip, Skeleton } from '../../../shared/ui/primitives';
 
@@ -18,6 +20,7 @@ export function AdminHome() {
   const home = useQuery({ queryKey: ['admin-home'], queryFn: loadAdminHome, refetchInterval: 60_000 });
   const running = useQuery({ queryKey: ['batch-monitor', 'active'], queryFn: () => listBatchMonitors(['active']), refetchInterval: 60_000 });
   const tickets = useQuery({ queryKey: ['admin-tickets', 'open'], queryFn: () => listTickets('open'), refetchInterval: 30_000 });
+  const approvals = useQuery({ queryKey: ['lab-approvals'], queryFn: loadLabApprovals, refetchInterval: 30_000 });
 
   const ticketCount = tickets.data?.length ?? 0;
   const drafts = home.data?.draft ?? [];
@@ -70,6 +73,14 @@ export function AdminHome() {
           ))}
         </section>
       )}
+
+      {/* Lab gates: what the GM decided, with the remark (0126) */}
+      <section className="space-y-2">
+        <h2 className="font-head text-[13px] font-800 uppercase tracking-wider text-muted">Lab gates — GM decisions</h2>
+        {approvals.error
+          ? <ErrorPanel error={approvals.error} prefix="Lab gates could not be loaded." onRetry={() => approvals.refetch()} />
+          : <LabGateBoard approvals={approvals.data} loading={approvals.isLoading} />}
+      </section>
 
       {/* 3 · running batches */}
       <section className="space-y-2">

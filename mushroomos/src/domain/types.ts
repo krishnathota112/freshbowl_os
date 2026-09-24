@@ -37,6 +37,7 @@ export const NON_ACTIONABLE_STATES: ReadonlySet<ActivityState> = new Set([
 export const MATERIAL_ROLES = [
   'PRIMARY_FIBRE',
   'SECONDARY_FIBRE',
+  'TERTIARY_FIBRE',
   'STRUCTURAL_STRAW',
   'NITROGEN_SOURCE',
   'MINERAL',

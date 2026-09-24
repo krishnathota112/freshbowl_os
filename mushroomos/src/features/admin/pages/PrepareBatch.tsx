@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { activateBatch, getPreBatchMaterialCheck } from '../../../shared/api/batch';
 import { loadPrepare } from '../api/intake';
-import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
+import { PREBATCH_PARAMETERS, PREBATCH_WEIGHT_MATERIALS, recordInitialMaterialForBatch, weightCode } from '../api/prebatch';
 import { getBatchContext } from '../../../shared/api/work';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
 import { fmtWhen } from '../../../shared/utils/labWords';
@@ -213,7 +213,7 @@ export function PrepareBatch() {
  * Pre-H0 Material Entry: Record physical starting measurements (moisture, pH, dry weight).
  * Post-H0 checkpoints are recorded by the Lab team during active production.
  */
-function MaterialCheck({
+export function MaterialCheck({
   batchId,
   row,
   loading,
@@ -225,9 +225,10 @@ function MaterialCheck({
   onDone: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [weights, setWeights] = useState<Record<string, string>>({});
 
   const take = useMutation({
-    mutationFn: () => recordInitialMaterialForBatch(batchId, 'Initial material data', values),
+    mutationFn: () => recordInitialMaterialForBatch(batchId, 'Initial material data', values, weights),
     onSettled: onDone,
   });
 
@@ -270,6 +271,45 @@ function MaterialCheck({
             />
           </div>
         ))}
+      </div>
+      <h3 className="mb-1 mt-5 font-head text-[13px] font-800 uppercase tracking-wider text-ink">Weights</h3>
+      <p className="mb-2 max-w-[60ch] text-[13px] text-muted">
+        Dry and fresh weight of each material, in kilograms. Leave blank what is not used or not known.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[320px] border-collapse text-[14px]">
+          <thead>
+            <tr className="text-left text-[12px] uppercase tracking-wide text-muted">
+              <th className="py-1 pr-2 font-700">Material</th>
+              <th className="py-1 pr-2 font-700">Dry weight (kg)</th>
+              <th className="py-1 font-700">Fresh weight (kg)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PREBATCH_WEIGHT_MATERIALS.map((m) => (
+              <tr key={m.key} className="border-t" style={{ borderColor: 'var(--line)' }}>
+                <th scope="row" className="py-1.5 pr-2 text-left font-head font-700">{m.label}</th>
+                {(['dry', 'fresh'] as const).map((kind) => {
+                  const code = weightCode(m.key, kind);
+                  return (
+                    <td key={kind} className={kind === 'dry' ? 'py-1.5 pr-2' : 'py-1.5'}>
+                      <input
+                        id={`pb-${code}`}
+                        aria-label={`${m.label} ${kind} weight (kg)`}
+                        inputMode="decimal"
+                        value={weights[code] ?? ''}
+                        onChange={(e) => setWeights((w) => ({ ...w, [code]: e.target.value }))}
+                        placeholder="kg"
+                        className="mono w-full min-w-0 rounded-md border bg-surface px-2 text-[16px]"
+                        style={{ minHeight: 44, borderColor: 'var(--line-2)' }}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <button
         type="button"
