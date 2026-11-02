@@ -1,0 +1,53 @@
+{
+  "releasedAt": "2026-11-02T21:52:41.547Z",
+  "version": "2.8",
+  "versionCode": 19,
+  "repository": "https://github.com/krishnathota112/freshbowl_os",
+  "branch": "codex/tasks-release-2026-11-03",
+  "sourceCommit": "da79c73cbe1e50427309a7098f3be75cddda9204",
+  "productionUrl": "https://freshbowl-factory-tasks.pages.dev/",
+  "cloudflare": {
+    "project": "freshbowl-factory-tasks",
+    "subdomain": "freshbowl-factory-tasks.pages.dev",
+    "deploymentId": "2244961e-f78e-4ce6-9e82-9099084dac0a",
+    "deploymentUrl": "https://2244961e.freshbowl-factory-tasks.pages.dev",
+    "status": "success"
+  },
+  "backendUrl": "https://szwosmyqwvpaqugjtzcp.supabase.co",
+  "apk": {
+    "version": "2.8",
+    "versionCode": 19,
+    "packageId": "in.freshbowl.tasks.gk",
+    "apk": "MushroomOS-Tasks-GK-v2.8.apk",
+    "bytes": 6645775,
+    "sha256": "21b948ded4425722b89f1f25ff01138289881c9cb85506c017bc80ecd01d8d04",
+    "publishedAt": "2026-11-02T21:41:50.473Z",
+    "notes": "Daily and monthly planning, spreadsheet ranges, copy/paste, fill-down, undo/redo and management planning views. Installs separately as MushroomOS Tasks GK; sign in with your existing factory account.",
+    "url": "https://freshbowl-factory-tasks.pages.dev/downloads/MushroomOS-Tasks-GK-v2.8.apk",
+    "signing": "Local Android debug key; separate package from prior release",
+    "signingCertificateSha256": "43fea69fde894fc20deba921afab83370c643dbc46a36e19a64b6fdf143eb37d"
+  },
+  "verification": {
+    "tasksTestsPassed": 162,
+    "sourceJavaScriptFilesChecked": 37,
+    "deployedFrontendDownloadFilesMatched": 75,
+    "apkBytesAndSha256Matched": true,
+    "androidBuild": "assembleDebug succeeded with JDK 17",
+    "browserFixtureChecks": [
+      "daily planner",
+      "monthly chart",
+      "locked rows",
+      "fill down",
+      "undo",
+      "guarded batch save"
+    ],
+    "reactEngineBuild": "passed",
+    "reactEngineTestLimits": "11 passing files; 35 failing files: remote-target guards, missing hour-grid fixture, and two stale structure assertions"
+  },
+  "limitations": [
+    "Factory login and physical Android camera/install walkthrough still require an owner account/device.",
+    "Capacity planning remains advisory with inferred reference capacities.",
+    "No production database migrations or resets were performed.",
+    "The new Android package does not inherit sessions or unsynced local work from the old app. Keep the older app installed."
+  ]
+}
