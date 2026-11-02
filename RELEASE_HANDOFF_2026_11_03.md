@@ -2,7 +2,7 @@
 
 Start with `mushroomos-tasks/README.md` for the deployed Tasks app. `mushroomos/` is the separate React process engine. The source snapshot preserves all currently present required code and migrations, and records the checkout's existing removal of legacy/decompiled archives. Private credentials, dependencies, build caches, database/storage backups and signing keys are excluded.
 
-## Tasks 2.8
+## Tasks 2.8.1
 
 - Production: https://freshbowl-factory-tasks.pages.dev/
 - Android: https://freshbowl-factory-tasks.pages.dev/downloads/
@@ -10,6 +10,7 @@ Start with `mushroomos-tasks/README.md` for the deployed Tasks app. `mushroomos/
 - APK built successfully with JDK 17. New package `in.freshbowl.tasks.gk` installs alongside the older app because the original signing key is unavailable. Sign in using the existing factory account. Keep the older installation and sync its pending work.
 - Factory Flow capacity planning is advisory. See `mushroomos-tasks/docs/DATA_VISUALIZATION_PLAN.md` for metric definitions, source mappings, phases and acceptance criteria.
 - No production database migration or reset was performed. Existing guarded RPCs implement plan saving.
+- Capacitor Android/Core/CLI are patched to 6.2.3. The shipped runtime dependency audit reports zero vulnerabilities. Five development-toolchain alerts remain in the legacy CLI dependency chain; a future toolchain migration needs separate validation. The other native source projects need their own dependency review before APK distribution. See the detailed Tasks release notes.
 
 ## React engine validation limits
 

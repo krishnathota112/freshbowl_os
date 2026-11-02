@@ -61,7 +61,7 @@ On Windows use `gradlew.bat assembleDebug`. Open `app/android` in Android Studio
 
 Update `app/www/build-info.js`, `app/package.json`, its lockfile and `app/android/app/build.gradle` together. Re-sync after the final frontend edit. Use the same signing key as an installed release for an in-place update; compare certificates before claiming compatibility. `npm run release:prepare` creates a versioned installer and manifest after building.
 
-Version 2.8 installs alongside the older app as **MushroomOS Tasks GK**, package `in.freshbowl.tasks.gk`, because the original signing key is unavailable. Keep the old app installed and sync pending work there. Use the same factory login in the GK app. The current build uses this computer's debug signing key; preserve that key privately for future GK updates, or plan a separately signed production package. Never commit signing keys.
+Version 2.8.1 installs alongside the older app as **MushroomOS Tasks GK**, package `in.freshbowl.tasks.gk`, because the original signing key is unavailable. Keep the old app installed and sync pending work there. Use the same factory login in the GK app. The current build uses this computer's debug signing key; preserve that key privately for future GK updates, or plan a separately signed production package. Never commit signing keys.
 
 ## Database work
 

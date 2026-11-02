@@ -1,4 +1,4 @@
-# Release 2.8 / Android code 19
+# Release 2.8.1 / Android code 20
 
 Prepared 3 November 2026 for the owner's new Cloudflare account. The release keeps the original Tasks backend at `szwosmyqwvpaqugjtzcp.supabase.co`.
 
@@ -14,7 +14,9 @@ Prepared 3 November 2026 for the owner's new Cloudflare account. The release kee
 
 ## Release evidence
 
-Record the final test count, deployment URL, Git commit and APK hash in `DEPLOYMENT.json` after validation. Source and Android metadata identify v2.8/code 19. New Gradle/JDK caches, local SDK paths, credentials, private record snapshots, node_modules and generated assets are excluded from Git and the portable archive.
+Record the final test count, deployment URL, Git commit and APK hash in `DEPLOYMENT.json` after validation. Source and Android metadata identify v2.8.1/code 20. New Gradle/JDK caches, local SDK paths, credentials, private record snapshots, node_modules and generated assets are excluded from Git and the portable archive.
+
+The final laptop setup check surfaced [GHSA-rvm3-566m-v7fv](https://github.com/ionic-team/capacitor/security/advisories/GHSA-rvm3-566m-v7fv). Capacitor Android, Core and CLI are pinned to 6.2.3 in this release. The production dependency audit now reports zero vulnerabilities. Five development-toolchain audit alerts remain in the older CLI's tar/glob/rimraf chain; removing those requires a separately validated toolchain upgrade. No forced major upgrade was applied. The separate React and Weighbridge Android source projects retain their existing dependency versions and require their own native dependency review before distributing new APKs.
 
 ## Acceptance limits
 

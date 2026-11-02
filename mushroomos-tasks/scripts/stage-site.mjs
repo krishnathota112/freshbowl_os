@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const output=path.join(root,'.work','pages');
+const folder=process.argv[2]||'pages';
+if(!/^[A-Za-z0-9._-]+$/.test(folder)||folder==='.'||folder==='..')throw Error('Pass a simple staging folder name.');
+const output=path.join(root,'.work',folder);
 fs.mkdirSync(output,{recursive:true});
 if(fs.readdirSync(output).length)throw Error('Staging directory must be empty. Use a fresh directory before building a release.');
 for(const [source,dest] of [['app/www',''],['weighbridge-app/www','weighbridge'],['release-site','downloads']]) {
