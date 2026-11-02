@@ -1,0 +1,11 @@
+{
+  "appId": "in.freshbowl.weighbridge",
+  "appName": "MushroomOS Weighbridge",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "version": "1.2",
+  "versionCode": 3,
+  "packageId": "in.freshbowl.mushroomos",
+  "apk": "MushroomOS-v1.2.apk",
+  "bytes": 6378232,
+  "sha256": "a80c1cd861bc6ba781c1f2ac1a8feffd8f7f9976f716bcff729986d78c017e19",
+  "publishedAt": "2026-09-30T09:19:18.025Z",
+  "notes": "Weighbridge tab for supervisors: record weighment slips against the required fresh weight Admin set for each batch — same sheet and rules as the Weighbridge app (balance, reduce the weight, over/short alerts to Admin). Account → Update checks for new versions."
+}

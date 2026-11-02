@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Factory flow · MushroomOS</title>
+  <link rel="icon" type="image/png" href="logo-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#f6f3ec">
+  <link href="app.css?v=2.3" rel="stylesheet">
+  <link href="theme.css?v=2.5" rel="stylesheet">
+  <link href="director.css?v=1" rel="stylesheet">
+  <link href="flow.css?v=1" rel="stylesheet">
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="tk-api.js?v=1.4"></script>
+</head>
+<body class="director-page flow-page">
+  <header class="dir-header">
+    <div class="dir-brand"><img src="logo.webp" alt="" width="40" height="36"><div><strong>Factory flow</strong><span>MushroomOS · read-only</span></div></div>
+    <nav class="dir-actions" aria-label="Actions">
+      <span id="identity" class="dir-identity"></span>
+      <a class="btn sm" href="director.html">Director brief</a>
+      <a class="btn sm" href="operations.html">Operations detail</a>
+      <button class="btn sm" id="print" type="button">Print</button>
+      <button class="btn sm" id="refresh" type="button">Refresh</button>
+      <button class="btn sm" id="signout" type="button">Sign out</button>
+    </nav>
+  </header>
+  <main class="dir-main">
+    <section class="dir-hero">
+      <div>
+        <p class="dir-eyebrow"><span>きのこ</span>Factory flow</p>
+        <h1>Which group is on which platform, and when?</h1>
+        <p class="dir-sub">The owner’s hour-by-hour plan, alive: each batch group’s platform windows placed from its real start, moved later by its current slip. Read-only; a planning reference, not a sensor.</p>
+      </div>
+      <div class="flow-controls">
+        <label class="dir-period">Look ahead<select id="horizon"><option value="14">14 days</option><option value="21" selected>21 days</option><option value="30">30 days</option></select></label>
+        <label class="flow-check"><input type="checkbox" id="forecast" checked> Move windows by each group’s slip</label>
+      </div>
+    </section>
+    <div id="dirStatus" role="status" aria-live="polite" class="muted">Loading batch groups…</div>
+    <div id="dirContent" hidden>
+      <section id="kpis" class="dir-kpis" aria-label="Key figures"></section>
+      <section class="dir-block" aria-labelledby="tlTitle">
+        <div class="dir-head"><div><h2 id="tlTitle">Platform timeline</h2><p class="muted">One lane per platform. Groups on the same platform at the same time are stacked; red marks a platform over its capacity.</p></div></div>
+        <div class="flow-scroll"><div id="timeline"></div></div>
+        <div id="legend" class="flow-legend"></div>
+      </section>
+      <section class="dir-block" aria-labelledby="cfTitle"><div class="dir-head"><div><h2 id="cfTitle">Conflicts ahead</h2><p id="cfSub" class="muted"></p></div></div><div id="conflicts"></div></section>
+      <section class="dir-panel dir-block" aria-labelledby="grTitle"><h2 id="grTitle">Batch groups</h2><div id="groups"></div></section>
+      <div class="dir-two">
+        <section class="dir-panel" aria-labelledby="planTitle"><h2 id="planTitle">Plan the next group</h2><div id="plan"></div></section>
+        <section class="dir-panel" aria-labelledby="capTitle"><h2 id="capTitle">Platform capacity</h2><div id="capacity"></div></section>
+      </div>
+      <section class="dir-panel dir-method" aria-labelledby="howTitle"><h2 id="howTitle">How to read this</h2><div id="method"></div></section>
+    </div>
+  </main>
+  <script src="flow-model.js?v=1"></script>
+  <script src="flow.js?v=1"></script>
+</body>
+</html>

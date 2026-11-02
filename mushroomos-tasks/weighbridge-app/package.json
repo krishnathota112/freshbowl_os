@@ -1,0 +1,19 @@
+{
+  "name": "mushroomos-weighbridge",
+  "private": true,
+  "version": "1.2.0",
+  "description": "MushroomOS Weighbridge \u2014 raw-material weighment slips against batch requirements (tables wb_*, migration 0151).",
+  "scripts": {
+    "sync": "cap sync android",
+    "apk": "cap sync android && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.1",
+    "@capacitor/camera": "6.1.3",
+    "@capacitor/core": "6.2.1",
+    "@capacitor/local-notifications": "6.1.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "6.2.1"
+  }
+}

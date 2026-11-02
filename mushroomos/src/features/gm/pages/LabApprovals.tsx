@@ -14,6 +14,7 @@ import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
 import { humanError } from '../../../shared/utils/humanError';
 import { approverWords } from '../../../shared/utils/labWords';
+import { showQty } from '../../../shared/utils/units';
 import { useAuth } from '../../../shared/auth/auth';
 
 /**
@@ -434,8 +435,7 @@ function DecisionSheet({
                 <li key={x.resultId} className="text-[13px] text-ink flex flex-wrap gap-x-3">
                   <span className="font-mono">{x.parameterCode}</span>
                   <strong className="font-mono">
-                    {x.valueNumeric ?? x.valueText ?? '—'}
-                    {x.unit ? ` ${x.unit}` : ''}
+                    {x.valueNumeric != null ? showQty(x.valueNumeric, x.unit) : `${x.valueText ?? '—'}${x.unit ? ` ${x.unit}` : ''}`}
                   </strong>
                   <span className="text-muted">
                     {x.specFound

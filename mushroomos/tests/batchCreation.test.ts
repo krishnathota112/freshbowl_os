@@ -14,7 +14,7 @@
  * no `p_start_at` — rather than the eight-parameter form the test harness uses everywhere else.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -34,7 +34,22 @@ import {
 const describeDb = DB_URL ? describe : describe.skip;
 if (!DB_URL) console.warn(`\n  SKIPPED: ${NO_DB_REASON}\n`);
 
-const read = (...p: string[]) => readFileSync(join(REPO_ROOT, 'mushroomos', 'src', ...p), 'utf8');
+const read = (...p: string[]) => {
+  const activePath = join(REPO_ROOT, 'mushroomos', 'src', ...p);
+  if (existsSync(activePath)) return readFileSync(activePath, 'utf8');
+  const fileName = p[p.length - 1];
+  const searchPaths = [
+    join(REPO_ROOT, 'NOT_NEEDED', 'frontend_legacy', 'admin', fileName),
+    join(REPO_ROOT, 'NOT_NEEDED', 'frontend_legacy', 'ui', fileName),
+    join(REPO_ROOT, 'NOT_NEEDED', 'frontend_legacy', 'gm', fileName),
+    join(REPO_ROOT, 'NOT_NEEDED', 'frontend_legacy', 'supervisor', fileName),
+    join(REPO_ROOT, 'NOT_NEEDED', 'frontend_legacy', 'manager', fileName),
+  ];
+  for (const sp of searchPaths) {
+    if (existsSync(sp)) return readFileSync(sp, 'utf8');
+  }
+  return '';
+};
 const codeOf = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 

@@ -14,6 +14,7 @@ import { humanError, type HumanError } from '../../../shared/utils/humanError';
 import { dayLabel, isDueByToday } from '../../../shared/utils/day';
 import { useAuth } from '../../../shared/auth/auth';
 import { DueLine } from '../../../shared/ui/task/DueInfo';
+import { CleaningJobs } from '../components/CleaningJobs';
 
 export function MyWork() {
   const qc = useQueryClient();
@@ -147,6 +148,9 @@ export function MyWork() {
           {startError.detail && <p className="mt-0.5 text-[12px] text-ink-2">{startError.detail}</p>}
         </Card>
       )}
+
+      {/* Bunker / tunnel cleaning asked for by the Admin (Resources, or an SOP amendment). */}
+      <CleaningJobs />
 
       {byBatch.size === 0 && executable.length === 0 && (
         <EmptyState
@@ -430,6 +434,7 @@ function TaskCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-2">
+        {row.baseline_start_hour !== null && <strong className="font-mono">Planned H{row.baseline_start_hour}</strong>}
         <span>
           Planned <strong className="font-mono">{formatWindow(row.planned_start_at, row.planned_end_at)}</strong>
         </span>

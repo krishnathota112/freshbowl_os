@@ -1,0 +1,57 @@
+/* Weighbridge additions on top of the Tasks look (app.css). */
+.remain { font-size: 40px; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.remain.over { color: var(--bad); }
+.remain.done { color: var(--pri); }
+.bar { height: 10px; border-radius: 6px; background: var(--soft2); overflow: hidden; margin-top: 10px; }
+.bar i { display: block; height: 100%; background: var(--pri); }
+.bar i.over { background: var(--bad); }
+.figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.figs div { background: var(--soft); border-radius: 12px; padding: 8px 10px; }
+.figs b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.unit { display: inline-flex; border: 1px solid var(--line2); border-radius: 12px; overflow: hidden; }
+.unit button { min-height: 40px; min-width: 56px; border: 0; background: var(--card); font: inherit; font-weight: 800; cursor: pointer; }
+.unit button.on { background: var(--pri); color: #fff; }
+.slip { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.slip:first-child { border-top: 0; }
+.slip img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); cursor: zoom-in; flex: none; }
+.slip.void { opacity: .5; }
+.slip.void b { text-decoration: line-through; }
+.result { border-radius: 14px; padding: 14px 16px; margin: 12px 0; font-weight: 700; }
+.result.ok { background: var(--pri-soft); color: #0b4d2e; }
+.result.over { background: var(--bad-soft); color: var(--bad); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* 0153 · the Excel sheet per material */
+.lg-wrap { overflow-x: auto; border: 1px solid var(--line2); border-radius: 12px; background: var(--card); margin-top: 10px; }
+table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+table.ledger th { background: var(--soft); text-align: left; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px; border-bottom: 1px solid var(--line2); white-space: nowrap; }
+table.ledger td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.ledger tr:last-child td { border-bottom: 0; }
+table.ledger .n { text-align: right; white-space: nowrap; border-left: 1px solid var(--line); }
+table.ledger td:first-child { min-width: 150px; }
+table.ledger td.neg, .lg-bad { color: var(--bad); font-weight: 800; }
+.lg-ok { color: var(--pri); font-weight: 700; }
+.lg-req td { background: var(--pri-soft); }
+.lg-void td { color: var(--muted); }
+.lg-info { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.lg-ph { float: left; margin: 0 8px 0 0; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line2); background: var(--soft); color: var(--pri); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.lg-ph .ms { font-size: 20px; }
+.lg-x { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0 2px; }
+.lg-rm2 { display: none; }
+@media (max-width: 560px) {
+  table.ledger .lg-rm { display: none; }
+  .lg-rm2 { display: block; white-space: normal; font-size: 12px; margin-top: 2px; }
+  table.ledger td:first-child { min-width: 0; }
+  table.ledger td, table.ledger th { padding: 7px 6px; }
+  .lg-ph { width: 28px; height: 28px; margin-right: 6px; }
+}
+.lg-voidbox { display: flex; gap: 6px; margin-top: 6px; clear: both; }
+.lg-voidbox input { min-height: 36px; flex: 1; min-width: 0; }
+/* Admin's requirement sheet (batch numbers + materials) */
+table.wbsheet { width: 100%; border-collapse: collapse; }
+table.wbsheet th { text-align: left; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 4px; border-bottom: 1px solid var(--line2); white-space: nowrap; }
+table.wbsheet td { padding: 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.wbsheet input, table.wbsheet select { min-height: 40px; width: 100%; min-width: 90px; }
+table.wbsheet td.n, table.wbsheet th.n { text-align: right; }
+table.wbsheet td.n input { text-align: right; font-variant-numeric: tabular-nums; }
+table.wbsheet tr.sum td { font-weight: 800; border-bottom: 0; }
+@media (max-width: 380px) { .figs { grid-template-columns: 1fr 1fr; } }

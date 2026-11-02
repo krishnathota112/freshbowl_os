@@ -1,0 +1,40 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const context = { window: { TK: {} } };
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname, '../www/turner-plan.js'), 'utf8'), context);
+const plan = context.window.TK.turnerPlan;
+test('each Turner pile has four separately photographed passes and only two T1 Lab checks', () => {
+  const rows = plan.resize([], 6);
+  assert.equal(rows.length, 42);
+  assert.equal(rows.filter(r => r.kind === 'work' && r.photos === 'both').length, 24);
+  assert.equal(rows.filter(r => r.kind === 'lab').length, 12);
+  assert.equal(rows.filter(r => r.kind === 'rest').length, 6);
+  assert.equal(new Set(rows.map(r => r.line)).size, 6);
+  assert(rows.every(r => r.pile && r.description && r.suggested_offset_minutes === null));
+});
+test('changing pile count preserves retained pile edits and leaves non-Turner rows intact', () => {
+  const main = { title: 'Bagasse wetting', line: 'Main' };
+  let rows = plan.resize([main], 6);
+  const p2 = rows.find(r => r.pile === 'P2' && r.turner_pass === 'T1');
+  p2.description = 'Use machine M2'; p2.suggested_offset_minutes = 11000;
+  rows = plan.resize(rows, 3);
+  assert.equal(rows.length, 22);
+  assert.strictEqual(rows[0], main);
+  assert.strictEqual(rows.find(r => r.pile === 'P2' && r.turner_pass === 'T1'), p2);
+  rows = plan.resize(rows, 4);
+  assert.equal(rows.filter(r => r.pile === 'P4').length, 7);
+  assert.throws(() => plan.resize(rows, 0));
+  assert.throws(() => plan.resize(rows, 2.5));
+});
+test('the ready preview becomes 104 master rows, with 40 actual Lab tasks', () => {
+  const rows = Array.from({ length: 43 }, (_, i) => ({ ord:i+1, line:'Main', title:'Process '+(i+1), kind:[6,16,35].includes(i+1)?'lab_gate':'work', control:'Source context', suggested_offset_minutes:(i+1)*60 }));
+  const ready = plan.completeTemplate(rows);
+  assert.equal(ready.length,104);
+  assert.equal(ready.filter(r => r.kind === 'lab' || r.kind === 'lab_gate').length,40);
+  assert.equal(ready.filter(r => r.pile).length,42);
+  assert(ready.find(r => r.title === 'Lab after Hopper Pass 1'));
+  assert.equal(ready[0].description,'Source context');
+  assert.equal(ready.filter(r => r.pile && r.kind === 'lab' && !r.turner_pass.includes('T1')).length,0);
+});

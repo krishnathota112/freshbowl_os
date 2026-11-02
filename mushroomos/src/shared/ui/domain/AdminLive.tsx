@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { Card, Chip, EmptyState, Skeleton } from '../primitives';
+import { fmtWhen, gateStatusWords } from '../../utils/labWords';
 
 /*
  * THE PROPS ARE DECLARED HERE, NOT IMPORTED FROM `api/`.
@@ -41,6 +42,12 @@ type LabApprovalRow = {
   is_approved: boolean;
   awaiting_decision: boolean;
   result_count: number;
+  gates_activity_state: string | null;
+  latest_verdict: string | null;
+  latest_reason: string | null;
+  decided_at: string | null;
+  decided_role: string | null;
+  decided_by_name: string | null;
 };
 
 /**
@@ -169,13 +176,16 @@ export function LabGateBoard({
 
   const rows = approvals ?? [];
   const holding = rows.filter((r) => r.awaiting_decision && r.is_gate);
-  const released = rows.filter((r) => r.is_approved && r.is_gate);
+  // 0126 · every gate the GM has ruled on and that is not waiting again: verdict, remark, who, when
+  const decided = rows
+    .filter((r) => r.is_gate && r.latest_verdict && !r.awaiting_decision)
+    .sort((x, y) => (y.decided_at ?? '').localeCompare(x.decided_at ?? ''));
 
   if (rows.length === 0) {
     return (
       <EmptyState
         title="No lab checkpoint is bound on a live batch."
-        detail="PROCESS-2026C binds four gating checkpoints. They appear once a batch generated from it reaches them."
+        detail="Gating checkpoints appear here once a live batch generated from the process reaches them."
       />
     );
   }
@@ -184,9 +194,7 @@ export function LabGateBoard({
     <div className="space-y-2">
       {holding.length === 0 ? (
         <Card className="p-3" rail="var(--ok)">
-          <p className="text-[13px] text-ink">
-            No submission is holding a gate. {released.length} released.
-          </p>
+          <p className="text-[13px] text-ink">No Lab submission is waiting for the GM.</p>
         </Card>
       ) : (
         holding.map((r) => (
@@ -195,21 +203,42 @@ export function LabGateBoard({
               <span className="font-mono text-[11px] text-muted">
                 {r.batch_code} · {r.checkpoint_code}
               </span>
-              <Link to="/gm/progress" className="text-[11px] font-bold text-accent">
-                View progress →
-              </Link>
+              <Chip tone="warn">WAITING FOR GM</Chip>
             </div>
             <p className="text-[13px] text-ink mt-0.5">
               Holds <strong>{r.gates_activity_title ?? r.gates_activity_code}</strong>
             </p>
             <p className="text-[11px] text-muted">
-              {r.activity_title} finished with {r.result_count}{' '}
-              {r.result_count === 1 ? 'reading' : 'readings'} and no decision. Submission is not
-              approval.
+              {gateStatusWords(r).head} · {r.result_count} {r.result_count === 1 ? 'reading' : 'readings'}.
+              Submission is not approval.
             </p>
           </Card>
         ))
       )}
+
+      {decided.map((r) => {
+        const w = gateStatusWords(r);
+        const opened = r.latest_verdict === 'approved';
+        return (
+          <Card key={r.activity_id} className="p-3" rail={opened ? 'var(--ok)' : 'var(--crit)'}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-mono text-[11px] text-muted">
+                {r.batch_code} · {r.checkpoint_code}
+              </span>
+              <Chip tone={opened ? 'ok' : 'crit'}>{opened ? 'APPROVED' : 'REJECTED'}</Chip>
+            </div>
+            <p className="text-[13px] text-ink mt-0.5">
+              {w.head}{r.decided_at ? ` · ${fmtWhen(r.decided_at)}` : ''}
+            </p>
+            {w.remark && <p className="text-[13px] text-ink">“{w.remark}”</p>}
+            <p className="text-[11px] text-muted">
+              {opened
+                ? `${r.gates_activity_title ?? r.gates_activity_code} is open for the Supervisor${r.gates_activity_state ? ` (${r.gates_activity_state.toLowerCase().replace(/_/g, ' ')})` : ''}.`
+                : `${r.gates_activity_title ?? r.gates_activity_code} stays shut until the Lab re-tests and the GM approves.`}
+            </p>
+          </Card>
+        );
+      })}
     </div>
   );
 }

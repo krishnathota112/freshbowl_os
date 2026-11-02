@@ -53,6 +53,19 @@ export async function loadBatchesNow(): Promise<BatchNow[]> {
   return (data ?? []) as BatchNow[];
 }
 
+export async function loadBatchNow(batchId: string): Promise<BatchNow | null> {
+  const { data, error } = await supabase.from('v_batch_projection').select('*').eq('master_batch_id', batchId).maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as BatchNow | null;
+}
+
+export async function loadBatchHour(batchId: string): Promise<number | null> {
+  const { data, error } = await supabase.from('v_batch_projection')
+    .select('current_hour').eq('master_batch_id', batchId).maybeSingle();
+  if (error) throw error;
+  return data?.current_hour == null ? null : Number(data.current_hour);
+}
+
 export async function loadBatchActivitiesNow(batchId: string): Promise<ActivityNow[]> {
   const { data, error } = await supabase.rpc('project_batch', { p_batch: batchId });
   if (error) throw error;

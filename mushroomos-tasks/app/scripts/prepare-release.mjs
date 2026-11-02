@@ -1,0 +1,20 @@
+// Generates release artifacts; does NOT deploy. Run after building and checking the APK signature.
+import {readFileSync,writeFileSync,copyFileSync,existsSync,mkdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import vm from 'node:vm';
+const root=new URL('../../',import.meta.url),ctx={window:{TK:{}}};
+vm.runInNewContext(readFileSync(new URL('app/www/build-info.js',root),'utf8'),ctx);
+const build=ctx.window.TK.build,gradle=readFileSync(new URL('app/android/app/build.gradle',root),'utf8');
+if(!gradle.includes('versionCode '+build.versionCode)||!gradle.includes('versionName "'+build.version+'"'))throw new Error('Build information and Android version do not match');
+const binary=new URL('app/android/app/build/outputs/apk/debug/app-debug.apk',root);
+const bytes=readFileSync(binary),hash=createHash('sha256').update(bytes).digest('hex');
+if(bytes.length>25*1024*1024)throw new Error('APK exceeds Pages per-file size limit');
+mkdirSync(new URL('apk/',root),{recursive:true});
+mkdirSync(new URL('release-site/',root),{recursive:true});
+const apk='MushroomOS-Tasks-GK-v'+build.version+'.apk',dest=new URL('release-site/'+apk,root);
+if(existsSync(dest)&&createHash('sha256').update(readFileSync(dest)).digest('hex')!==hash&&!process.argv.includes('--replace-unpublished'))throw new Error('This version already has different bytes. Bump the version for a published release.');
+copyFileSync(binary,dest);
+const manifest={...build,apk,bytes:bytes.length,sha256:hash,publishedAt:new Date().toISOString(),notes:process.env.RELEASE_NOTES||'Daily and monthly planning, spreadsheet ranges, copy/paste, fill-down, undo/redo and management planning views. Installs separately as MushroomOS Tasks GK; sign in with your existing factory account.'};
+writeFileSync(new URL('release-site/latest.json',root),JSON.stringify(manifest,null,2)+'\n');
+copyFileSync(binary,new URL('apk/MushroomOS-Tasks-GK-'+new Date().toISOString().slice(0,10)+'-v'+build.version+'.apk',root));
+console.log(JSON.stringify({version:build.version,versionCode:build.versionCode,bytes:bytes.length,sha256:hash,site:'release-site'},null,2));

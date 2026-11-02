@@ -41,7 +41,7 @@ import {
   fixtureSegments,
   fixtureStaircase,
   type FixtureGeometry,
-} from '../src/legacy/dev/fixtures';
+} from './fixtures/fixtures';
 import type { ActivityRef, BatchBar, Exception, TowerCounters } from '../src/domain/contracts';
 import { ACTIVITY_STATES } from '../src/domain/types';
 import { REPO_ROOT } from './db';

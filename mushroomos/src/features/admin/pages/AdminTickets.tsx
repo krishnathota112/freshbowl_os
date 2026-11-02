@@ -84,7 +84,7 @@ function TicketCard({ t }: { t: Ticket }) {
       </h3>
       <p className="text-[12px] text-muted">
         {t.stage ?? '—'}
-        {t.duration_target_max_hr != null ? ` · stated max ${t.duration_target_max_hr} h` : ''}
+        {t.duration_target_max_hr != null ? ` · SOP time ${t.duration_target_max_hr} h` : ''}
         {t.actual_start ? ` · started ${new Date(t.actual_start).toLocaleString()}` : ''}
       </p>
       <p className="mt-2 text-[14px]">

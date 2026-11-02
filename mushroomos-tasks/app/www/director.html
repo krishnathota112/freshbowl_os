@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Director brief · MushroomOS</title>
+  <link rel="icon" type="image/png" href="logo-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#f6f3ec">
+  <link href="app.css?v=2.3" rel="stylesheet">
+  <link href="theme.css?v=2.5" rel="stylesheet">
+  <link href="director.css?v=1" rel="stylesheet">
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="tk-api.js?v=1.4"></script>
+</head>
+<body class="director-page">
+  <header class="dir-header">
+    <div class="dir-brand"><img src="logo.webp" alt="" width="40" height="36"><div><strong>Director brief</strong><span>MushroomOS · read-only</span></div></div>
+    <nav class="dir-actions" aria-label="Actions">
+      <span id="identity" class="dir-identity"></span>
+      <a class="btn sm" href="flow.html">Factory flow</a>
+      <a class="btn sm" href="operations.html">Operations detail</a>
+      <button class="btn sm" id="print" type="button">Print / PDF</button>
+      <button class="btn sm" id="refresh" type="button">Refresh</button>
+      <button class="btn sm" id="signout" type="button">Sign out</button>
+    </nav>
+  </header>
+  <main class="dir-main">
+    <section class="dir-hero">
+      <div>
+        <p class="dir-eyebrow"><span>きのこ</span>Director brief</p>
+        <h1 id="greeting">Good day</h1>
+        <p class="dir-sub">Where the factory stands, what is at risk, and what is waiting on someone. Read-only; nothing here changes any record.</p>
+      </div>
+      <label class="dir-period">Period for trends<select id="period"><option value="7" selected>Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>
+    </section>
+    <div id="dirStatus" role="status" aria-live="polite" class="muted">Loading the factory picture…</div>
+    <div id="dirContent" hidden>
+      <section id="kpis" class="dir-kpis" aria-label="Key figures"></section>
+      <section aria-labelledby="attTitle" class="dir-block">
+        <div class="dir-head"><div><h2 id="attTitle">Needs attention</h2><p id="attSub" class="muted"></p></div><button class="btn sm" id="exportAttention" type="button">Download list (CSV)</button></div>
+        <div id="attention"></div>
+      </section>
+      <section aria-labelledby="healthTitle" class="dir-block">
+        <div class="dir-head"><div><h2 id="healthTitle">Batch health</h2><p class="muted">Completed work against the share the plan expected by now.</p></div><button class="btn sm" id="exportHealth" type="button">Download (CSV)</button></div>
+        <div id="health" class="dir-batches"></div>
+      </section>
+      <div class="dir-two">
+        <section class="dir-panel" aria-labelledby="tpTitle"><h2 id="tpTitle">Throughput</h2><div id="throughput"></div></section>
+        <section class="dir-panel" aria-labelledby="adTitle"><h2 id="adTitle">Schedule adherence</h2><div id="adherence"></div></section>
+      </div>
+      <section class="dir-panel dir-block" aria-labelledby="matTitle"><h2 id="matTitle">Materials</h2><div id="materials"></div></section>
+      <section class="dir-panel dir-method" aria-labelledby="howTitle"><h2 id="howTitle">How to read this</h2><div id="method"></div></section>
+    </div>
+  </main>
+  <script src="director-model.js?v=1"></script>
+  <script src="paddy-convergence.js?v=2.3"></script>
+  <script src="director.js?v=1"></script>
+</body>
+</html>

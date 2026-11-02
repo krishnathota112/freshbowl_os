@@ -309,6 +309,7 @@ export function BatchDetail({ embedded = false }: { embedded?: boolean } = {}) {
  * the people using this screen should read what the task is doing, not what the database column says.
  */
 const STATE_LABEL: Record<string, string> = {
+  NOT_DUE_YET: 'Not due yet',
   COMPLETED: 'Done',
   READY: 'Ready',
   IN_PROGRESS: 'In progress',
@@ -346,7 +347,7 @@ function TaskCard({ a, onOpen }: { a: BatchActivityRow; onOpen: () => void }) {
   const tone = STATE_TONE[a.state] ?? 'lock';
   const actionable = a.state === 'READY' || a.state === 'IN_PROGRESS' || a.state === 'RETURNED';
   const startHr = (a as unknown as { baseline_start_hour?: number }).baseline_start_hour ?? (a.rel_day * 24);
-  const durHr = a.day0_duration_hr ?? (a.duration_target_min_hr ?? 1);
+  const durHr = a.day0_duration_hr ?? (a.duration_target_max_hr ?? 1);   // SOP time = the upper number
   const endHr = (a as unknown as { baseline_end_hour?: number }).baseline_end_hour ?? (startHr + durHr);
   const dur = durHr >= 1 ? `${durHr} h` : `${Math.round(durHr * 60)} min`;
 

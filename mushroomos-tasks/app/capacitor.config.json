@@ -1,0 +1,11 @@
+{
+  "appId": "in.freshbowl.tasks.gk",
+  "appName": "MushroomOS Tasks GK",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

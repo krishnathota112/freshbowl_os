@@ -1,29 +1,11 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { APP_ROLES, ROLE_HOME, ROLE_LABEL, isNativeApp, roleAllowedHere, signIn, signOut, useAuth } from './auth';
+import { ROLE_HOME, ROLE_LABEL, roleAllowedHere, signIn, signOut, useAuth } from './auth';
 import type { AppRole } from '../../domain/types';
 import { humanError } from '../utils/humanError';
-import { Chip } from '../ui/primitives';
 
-const ALL_DEMO_ACCOUNTS = [
-  { email: 'admin@freshbowl.demo', role: 'admin' as const },
-  { email: 'operator@freshbowl.demo', role: 'operator' as const },
-  { email: 'lab@freshbowl.demo', role: 'lab_tech' as const },
-  { email: 'supervisor@freshbowl.demo', role: 'supervisor' as const },
-  { email: 'manager@freshbowl.demo', role: 'manager' as const },
-  { email: 'gm@freshbowl.demo', role: 'gm' as const },
-];
-
-// The Android app offers only its three logins; the web keeps every account.
-const DEMO_ACCOUNTS = isNativeApp()
-  ? ALL_DEMO_ACCOUNTS.filter((a) => APP_ROLES.includes(a.role))
-  : ALL_DEMO_ACCOUNTS;
-
-// The quick-fill list and its password are for the phone app and local development only. A page
-// served on a public link (tunnel / hosting) shows a plain sign-in form.
-// 15 Sep 2026 · a shipped build never shows accounts or a password: the APK printed every login, Admin and GM
-// included, on its sign-in page. Only a local development server (npm run dev) keeps the quick-fill list.
-const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+// 25 Sep 2026 (owner): the sign-in page is one email + password form everywhere — the app, the web and a local
+// dev server. No account list and no password are shipped in the code.
 
 /** Shown when an account the Android app does not serve is signed in on the phone. */
 export function RoleNotInApp({ role }: { role: AppRole }) {
@@ -56,8 +38,6 @@ export function RoleNotInApp({ role }: { role: AppRole }) {
   );
 }
 
-const DEMO_PASSWORD = 'mushroom2026';
-
 /**
  * The mark from the Mushroom OS build the factory already has, inline rather than linked.
  * Inline because it is the first thing drawn: an icon font that has not arrived yet renders its
@@ -78,8 +58,8 @@ function MushroomMark() {
 
 export function SignIn() {
   const { session, role, loading } = useAuth();
-  const [email, setEmail] = useState(SHOW_DEMO_ACCOUNTS ? (DEMO_ACCOUNTS[0]?.email ?? '') : '');
-  const [password, setPassword] = useState(SHOW_DEMO_ACCOUNTS ? DEMO_PASSWORD : '');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
@@ -195,43 +175,6 @@ export function SignIn() {
           </button>
         </form>
 
-        {/* Demo Account Quick-Fill */}
-        {SHOW_DEMO_ACCOUNTS && (
-        <div className="mos-card p-5 border border-line space-y-3 shadow-card">
-          <div className="flex items-center justify-between">
-            <span className="label-caps text-muted">Demo Accounts</span>
-            <span className="font-mono text-[11px] text-muted">Password: <strong className="text-ink">{DEMO_PASSWORD}</strong></span>
-          </div>
-          <div className="grid gap-2">
-            {DEMO_ACCOUNTS.map((a) => (
-              <button
-                key={a.email}
-                type="button"
-                onClick={() => {
-                  setEmail(a.email);
-                  setPassword(DEMO_PASSWORD);
-                }}
-                className="flex items-center justify-between border px-3.5 py-2.5 rounded-xl text-left transition-all hover:border-accent/40 hover:bg-surface-2 tappable"
-                style={{
-                  borderColor: 'var(--line)',
-                  background: 'var(--surface)',
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="mos-icon-tile w-7 h-7 bg-surface-2 text-accent">
-                    <span className="material-symbols-outlined text-sm">person</span>
-                  </div>
-                  <span className="font-mono text-[12px] font-semibold text-ink">{a.email}</span>
-                </div>
-                <Chip tone="accent">{ROLE_LABEL[a.role]}</Chip>
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted text-center pt-1">
-            Select an account above to test role-specific workflows.
-          </p>
-        </div>
-        )}
       </div>
     </div>
 

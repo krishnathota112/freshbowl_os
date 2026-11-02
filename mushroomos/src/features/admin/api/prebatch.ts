@@ -11,13 +11,54 @@
  * `lab_checkpoint.is_prebatch` — never named in code.
  */
 import { supabase } from '../../../shared/api/client';
+import { KG_PER_TON } from '../../../shared/utils/units';
 
 /** The initial material values the operating flow names. Each is optional; a blank is not recorded. */
+/** `perUnit`: stored value per unit typed. Dry weight is typed in tons and stored in kg (the parameter's unit). */
 export const PREBATCH_PARAMETERS = [
-  { code: 'moisture_pct', label: 'Moisture', unit: '%' },
-  { code: 'ph', label: 'pH', unit: '' },
-  { code: 'dry_weight', label: 'Dry weight', unit: '' },
+  { code: 'moisture_pct', label: 'Moisture', unit: '%', perUnit: 1 },
+  { code: 'ph', label: 'pH', unit: '', perUnit: 1 },
+  { code: 'dry_weight', label: 'Dry weight', unit: 't', perUnit: KG_PER_TON },
 ] as const;
+
+/**
+ * Pre-H0 material WEIGHTS (Batch Creation only, 17 Sep 2026): dry and fresh weight per material, TYPED IN TONS
+ * (owner, 25 Sep 2026) and stored in kg.
+ * Each is a numeric reading on the same pre-H0 sample, under a parameter registered by 0129
+ * (`wt_<material>_<dry|fresh>_kg`), so it carries its label and unit like every other reading.
+ */
+export const PREBATCH_WEIGHT_MATERIALS = [
+  { key: 'urea', label: 'Urea' },
+  { key: 'ash', label: 'Ash' },
+  { key: 'nitrogen', label: 'Nitrogen' },
+  { key: 'gypsum', label: 'Gypsum' },
+  { key: 'bagasse', label: 'Bagasse' },
+  { key: 'paddy', label: 'Paddy' },
+  { key: 'chicken_manure', label: 'Chicken Manure' },
+  { key: 'wheat', label: 'Wheat' },
+  { key: 'mustard', label: 'Mustard' },
+  { key: 'ammonium_sulphate', label: 'Ammonium Sulphate' },
+] as const;
+
+export const weightCode = (material: string, kind: 'dry' | 'fresh') => `wt_${material}_${kind}_kg`;
+
+/** The weights typed in (tons), as readings in kg. Blank fields are left out; a weight must be a number ≥ 0. */
+export function weightReadingsFromInputs(values: Record<string, string>): PrebatchReading[] {
+  const readings: PrebatchReading[] = [];
+  for (const m of PREBATCH_WEIGHT_MATERIALS) {
+    for (const kind of ['dry', 'fresh'] as const) {
+      const code = weightCode(m.key, kind);
+      const raw = (values[code] ?? '').replace(',', '.').trim();
+      if (raw === '') continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0) {
+        throw new Error(`${m.label} ${kind} weight must be a number of tons (0 or more).`);
+      }
+      readings.push({ parameter: code, value: Math.round(n * KG_PER_TON * 1000) / 1000 });
+    }
+  }
+  return readings;
+}
 
 export type PrebatchCheckpoint = { id: string; code: string; name: string };
 
@@ -40,15 +81,20 @@ export type PrebatchReading = { parameter: string; value: number };
  * was entered at all.
  */
 export function readingsFromInputs(values: Record<string, string>): PrebatchReading[] {
+  const readings = parseParameterInputs(values);
+  if (readings.length === 0) throw new Error('Enter at least one initial material value.');
+  return readings;
+}
+
+function parseParameterInputs(values: Record<string, string>): PrebatchReading[] {
   const readings: PrebatchReading[] = [];
   for (const p of PREBATCH_PARAMETERS) {
     const raw = (values[p.code] ?? '').replace(',', '.').trim();
     if (raw === '') continue;
     const n = Number(raw);
     if (!Number.isFinite(n)) throw new Error(`${p.label} must be a number.`);
-    readings.push({ parameter: p.code, value: n });
+    readings.push({ parameter: p.code, value: Math.round(n * p.perUnit * 1000) / 1000 });
   }
-  if (readings.length === 0) throw new Error('Enter at least one initial material value.');
   return readings;
 }
 
@@ -92,8 +138,15 @@ export async function recordInitialMaterial(input: {
 }
 
 /** Record initial material data on the process's pre-batch checkpoint. */
-export async function recordInitialMaterialForBatch(batchId: string, label: string, values: Record<string, string>) {
-  const readings = readingsFromInputs(values);
+export async function recordInitialMaterialForBatch(
+  batchId: string,
+  label: string,
+  values: Record<string, string>,
+  /** Batch Creation's Weights section; the same save, the same sample. Omitted elsewhere. */
+  weights: Record<string, string> = {},
+) {
+  const extra = weightReadingsFromInputs(weights);
+  const readings = extra.length === 0 ? readingsFromInputs(values) : [...parseParameterInputs(values), ...extra];
   const cps = await listPrebatchCheckpoints();
   if (cps.length === 0) throw new Error('No pre-H0 material checkpoint is defined.');
   return recordInitialMaterial({ batchId, checkpointId: cps[0].id, label, readings });

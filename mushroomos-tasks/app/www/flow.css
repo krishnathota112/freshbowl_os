@@ -1,0 +1,37 @@
+/* Factory flow — builds on director.css (header, figures, panels). */
+.flow-controls { display: grid; gap: 12px; min-width: 240px; }
+.flow-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2); cursor: pointer; }
+.flow-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); }
+#timeline { min-width: 980px; }
+#timeline svg { display: block; width: 100%; height: auto; }
+#timeline text { font-family: inherit; fill: var(--ink2); }
+#timeline .lane-name { font-size: 15px; font-weight: 700; fill: var(--ink); }
+#timeline .lane-cap { font-size: 10px; fill: var(--muted); letter-spacing: .04em; }
+#timeline .day { font-size: 10px; fill: var(--muted); }
+#timeline .block text { font-size: 10.5px; fill: #fff; font-weight: 600; pointer-events: none; }
+#timeline .ghost { fill-opacity: .12; stroke-dasharray: 4 3; }
+#timeline .conf { fill: var(--bad); fill-opacity: .13; stroke: var(--bad); stroke-opacity: .5; stroke-dasharray: 3 3; }
+.flow-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 12.5px; color: var(--ink2); }
+.flow-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.flow-legend .dash { background: none; border: 1.5px dashed var(--ink2); }
+.flow-legend .red { background: rgba(156, 59, 46, .15); border: 1px dashed var(--bad); }
+.flow-cf { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.flow-cf li { position: relative; padding: 14px 18px 14px 20px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); }
+.flow-cf li::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--bad); }
+.flow-cf strong { display: block; } .flow-cf p { margin: 3px 0 0; color: var(--ink2); font-size: 14px; }
+.flow-cf small { color: var(--muted); font-size: 12px; }
+.flow-slip { width: 86px; min-height: 36px; padding: 4px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+.flow-tag { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); letter-spacing: .02em; }
+.flow-groups td, .flow-groups th { white-space: nowrap; padding-right: 22px; } .flow-groups td.n, .flow-groups th.n { padding-right: 26px; } .flow-groups td.wrap { white-space: normal; min-width: 180px; }
+.flow-groups .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; }
+.flow-plan { display: grid; gap: 14px; }
+.flow-plan label { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--ink2); }
+.flow-plan input { margin-top: 6px; }
+.flow-result { padding: 14px 16px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+.flow-result.ok { background: var(--ok-soft); color: var(--ok-ink); } .flow-result.bad { background: var(--bad-soft); color: var(--bad); } .flow-result.warn { background: var(--run-soft); color: var(--run); }
+.flow-cap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+.flow-cap label { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--ink2); }
+.flow-cap input { margin-top: 6px; min-height: 40px; }
+.flow-cap small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; font-weight: 400; letter-spacing: 0; }
+@media (max-width: 899px) { .flow-cap { grid-template-columns: repeat(2, 1fr); } }
+@media print { .flow-controls { display: none !important; } .flow-scroll { overflow: visible; } #timeline { min-width: 0; } }

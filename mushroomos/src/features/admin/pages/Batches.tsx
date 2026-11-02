@@ -5,6 +5,7 @@ import { listBatches } from '../../../shared/api/batch';
 import { supabase } from '../../../shared/api/client';
 import { PageHeading } from '../../../shared/ui/layout/PageHeading';
 import { Card, Chip, EmptyState } from '../../../shared/ui/primitives';
+import { ClearBatchesPanel } from '../components/ClearBatchesPanel';
 
 /** Every batch, newest first, with what each is waiting on. */
 export function Batches() {
@@ -46,7 +47,8 @@ export function Batches() {
         title="Batches"
         subtitle={`${rows.length} shown${cancelledCount > 0 && !showCancelled ? ` · ${cancelledCount} cancelled hidden` : ''}`}
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <ClearBatchesPanel batches={all} />
             {cancelledCount > 0 && (
               <button
                 type="button"
@@ -102,6 +104,7 @@ export function Batches() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-head text-[15px] font-800">{b.label}</p>
+                  {b.is_demo && <Chip tone="warn">DEMO</Chip>}
                   <Chip
                     tone={b.status === 'active' ? 'ok' : b.status === 'draft' ? 'inherit' : 'lock'}
                   >

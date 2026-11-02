@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { activateBatch, getPreBatchMaterialCheck } from '../../../shared/api/batch';
 import { loadPrepare } from '../api/intake';
 import { PREBATCH_PARAMETERS, recordInitialMaterialForBatch } from '../api/prebatch';
+import { WeightsTable } from '../components/WeightsTable';
 import { getBatchContext } from '../../../shared/api/work';
 import { ErrorPanel } from '../../../shared/ui/feedback/ErrorPanel';
 import { fmtWhen } from '../../../shared/utils/labWords';
@@ -213,7 +214,7 @@ export function PrepareBatch() {
  * Pre-H0 Material Entry: Record physical starting measurements (moisture, pH, dry weight).
  * Post-H0 checkpoints are recorded by the Lab team during active production.
  */
-function MaterialCheck({
+export function MaterialCheck({
   batchId,
   row,
   loading,
@@ -225,9 +226,10 @@ function MaterialCheck({
   onDone: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [weights, setWeights] = useState<Record<string, string>>({});
 
   const take = useMutation({
-    mutationFn: () => recordInitialMaterialForBatch(batchId, 'Initial material data', values),
+    mutationFn: () => recordInitialMaterialForBatch(batchId, 'Initial material data', values, weights),
     onSettled: onDone,
   });
 
@@ -271,6 +273,7 @@ function MaterialCheck({
           </div>
         ))}
       </div>
+      <WeightsTable weights={weights} onChange={setWeights} />
       <button
         type="button"
         disabled={take.isPending}

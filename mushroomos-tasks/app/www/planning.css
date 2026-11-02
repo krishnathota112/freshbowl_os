@@ -1,0 +1,147 @@
+/* Assign daily tasks + Monthly task chart.
+ * Layouts follow the owner's spreadsheets: the monthly schedule (date rows × batch columns, stage per cell) and the
+ * "Status" grid (date + hour rows × batch columns, one block per task).
+ * Colour rule (owner): ORANGE = a task, WHITE = rest, RED = missed (planned time passed, not started). */
+:root { --dp-task: #f6ad55; --dp-task-line: #d9822b; --dp-task-ink: #3b2100;
+        --dp-rest: #ffffff; --dp-rest-line: var(--line2); --dp-rest-ink: var(--ink2);
+        --dp-missed: #e5484d; --dp-missed-line: #b3262b; --dp-missed-ink: #ffffff; }
+.dp { display: block; --dp-row: 28px; }
+.dp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
+.dp-toolbar input[type=date], .dp-toolbar select { width: auto; flex: 0 0 auto; min-height: 38px; border: 1px solid var(--line2); border-radius: 6px; background: var(--card); color: var(--ink); font: inherit; padding: 0 10px; }
+.dp-toolbar select[data-dp-batch] { max-width: 220px; margin-left: auto; }
+.dp-toolbar [data-dp-full] { margin-left: 4px; }
+.dp-toolbar select[data-dp-batch] + [data-dp-full] { margin-left: 0; }
+.dp-monthname { font-family: var(--font-display, inherit); font-weight: 600; font-size: 20px; min-width: 160px; text-align: center; }
+.dp-head { margin-bottom: 8px; }
+.dp-sub { margin: -4px 0 10px; }
+.dp-dragshift { display: flex; align-items: center; gap: 6px; margin: -6px 0 10px; font-size: 13px; color: var(--ink2); }
+#dpNote:empty { display: none; }
+#dpNote .note, #dpNote .error { margin: 0 0 10px; }
+.dp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 12px; font-size: 12px; color: var(--muted); align-items: center; }
+.dp-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dp-legend i { width: 16px; height: 16px; border-radius: 4px; border: 1px solid; display: inline-block; }
+.dp-marks { color: var(--ink2); }
+
+/* the three tones */
+.t-task   { background: var(--dp-task);   color: var(--dp-task-ink);   border-color: var(--dp-task-line); }
+.t-rest   { background: var(--dp-rest);   color: var(--dp-rest-ink);   border-color: var(--dp-rest-line); }
+.t-missed { background: var(--dp-missed); color: var(--dp-missed-ink); border-color: var(--dp-missed-line); }
+
+.dp-group { margin: 18px 0 6px; }
+.dp-grouphead { margin: 0 0 4px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.dp-itemrow { display: flex; gap: 8px; align-items: center; }
+.dp-itemrow .task { flex: 1; min-width: 0; border-left-width: 5px; }
+.dp-itemrow .task.tn-task { border-left-color: var(--dp-task-line); }
+.dp-itemrow .task.tn-rest { border-left-color: var(--line2); }
+.dp-itemrow .task.tn-missed { border-left-color: var(--dp-missed); }
+.dp-itemrow > .btn { flex: none; }
+.dp-move, .dp-assign { margin: 4px 0 12px; }
+.dp-item > .dp-move { padding: 10px 12px; border: 1px solid var(--line2); border-radius: 8px; background: var(--soft); }
+.dp-fields { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.dp-fields label.lbl { flex: 1 1 120px; }
+.dp-move > label.lbl input { width: 100%; }
+.dp-move input:not([type=checkbox]), .dp-move select, .dp-fields input:not([type=checkbox]), .dp-assign select, .dp-assign input:not([type=checkbox]), .dp-batchform input:not([type=checkbox]) { width: 100%; min-height: 40px; border: 1px solid var(--line2); border-radius: 6px; background: var(--card); color: var(--ink); font: inherit; padding: 0 10px; }
+.dp-move input[type=checkbox], .dp-assign input[type=checkbox], .dp-dragshift input, .dp-type input { width: 18px; min-height: 18px; margin: 0; }
+.dp-assign select { max-width: 100%; }
+.dp-shift { margin: 10px 0; font-size: 13px; color: var(--ink2); align-items: flex-start; }
+.dp-assigngrid { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: flex-end; }
+.dp-assigngrid .lbl { margin-bottom: 0; }
+.dp-a-batch { flex: 1 1 150px; } .dp-a-task { flex: 3 1 260px; } .dp-a-time { flex: 0 1 130px; } .dp-a-date { flex: 0 1 160px; } .dp-a-type { flex: 1 1 130px; } .dp-a-stream { flex: 1 1 140px; } .dp-a-dur { flex: 0 1 90px; }
+.dp-a-go { flex: 0 0 auto; margin-top: 12px; }
+
+/* type filter, batch strip, Paddy pill, batch panel */
+.dp-types { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: -4px 0 10px; }
+.dp-type { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 8px; border-radius: 999px; border: 1px solid; font-size: 12px; font-weight: 700; cursor: pointer; }
+.dp-batchstrip { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.dp-batchchip { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.dp-pill { border: 1px solid var(--line2); border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 11px; font-weight: 700; line-height: 1.5; cursor: pointer; background: var(--soft); color: var(--ink2); }
+.dp-pill.bad { background: var(--dp-missed); color: #fff; border-color: var(--dp-missed-line); }
+.dp-pill.warn { background: var(--soft2); }
+.dp-pill.ok { background: var(--pri-soft); color: var(--pri); border-color: var(--pri2, var(--pri)); }
+.dp-bcol .dp-pill { margin-top: 4px; }
+.dp-bhead { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.dp-hedit { min-height: 28px; padding: 0 6px; flex: none; }
+.dp-modes { display: flex; margin: 8px 0 4px; }
+.dp-modes button { flex: 1; min-height: 38px; border: 1px solid var(--line2); background: var(--card); font: inherit; font-weight: 700; color: var(--ink2); cursor: pointer; }
+.dp-modes button:first-child { border-radius: 6px 0 0 6px; } .dp-modes button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.dp-modes button.on { background: var(--pri); color: var(--on-pri); border-color: var(--pri); }
+.dp-panel { margin: 0 0 12px; }
+.dp-panel + .convergence-card, .dp-panel + .dp-assign { margin-top: 12px; }
+.dp-batchform .dp-fields label.lbl { flex: 1 1 200px; }
+.dp-batchform { margin-top: 8px; }
+
+/* ── hour-by-hour board: date + hour down, a column per batch (like the Status sheet) ───────────────────────── */
+.dp-boardscroll { overflow: auto; max-height: 72vh; margin-top: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+.dp-boardgrid { display: grid; position: relative; min-width: max-content; }
+.dp-bh { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; justify-content: center; padding: 0 8px; background: var(--soft); border-bottom: 1px solid var(--line2); border-left: 1px solid var(--line2); font-size: 13px; font-weight: 800; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dp-corner { left: 0; z-index: 6; border-left: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.dp-bt { position: sticky; left: 78px; z-index: 3; display: flex; align-items: center; justify-content: center; background: var(--card); border-bottom: 1px solid var(--line); border-right: 1px solid var(--line2); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dp-bt.day { border-top: 2px solid var(--line2); }
+.dp-bd { position: sticky; left: 0; z-index: 3; background: var(--card); border-right: 1px solid var(--line); border-top: 2px solid var(--line2); }
+.dp-bd span { position: sticky; top: 34px; display: flex; flex-direction: column; align-items: center; padding-top: 6px; font-size: 11px; color: var(--muted); line-height: 1.25; }
+.dp-bd b { color: var(--ink); font-size: 13px; }
+.dp-bbg { z-index: 0; border-left: 1px solid var(--line2); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--dp-row) - 1px), var(--line) calc(var(--dp-row) - 1px), var(--line) var(--dp-row)); }
+.dp-block { z-index: 1; margin: 1px 3px; padding: 2px 7px; border-width: 1px; border-style: solid; border-radius: 5px; font: inherit; font-size: 12px; line-height: 1.25; text-align: left; display: flex; flex-direction: column; justify-content: flex-start; gap: 0; overflow: hidden; cursor: pointer; min-height: 0; }
+.dp-block[draggable=true] { cursor: grab; }
+.dp-block.dragging, .dp-line.dragging { opacity: .45; }
+.dp-block b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dp-block span { font-size: 10.5px; opacity: .85; white-space: nowrap; }
+.dp-block.plan { border-style: dashed; border-width: 2px; }
+.dp-block.plan.t-task { background-image: repeating-linear-gradient(135deg, transparent 0, transparent 6px, rgba(255, 255, 255, .35) 6px, rgba(255, 255, 255, .35) 12px); }
+.dp-block.plan.t-missed { background-image: repeating-linear-gradient(135deg, transparent 0, transparent 6px, rgba(255, 255, 255, .22) 6px, rgba(255, 255, 255, .22) 12px); }
+.dp-block.cut-b { border-top-left-radius: 0; border-top-right-radius: 0; margin-top: 0; }
+.dp-block.cut-a { border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: 0; }
+.dp-block:hover { filter: brightness(.96); }
+.dp-now { z-index: 2; height: 0; border-top: 2px solid var(--ink); pointer-events: none; }
+
+/* ── monthly chart: dates down, batches across (like the June schedule) ─────────────────────────────────────── */
+.dp-chart { padding: 0; }
+.dp-monthscroll { overflow: auto; max-height: 76vh; }
+.dp-month { border-collapse: separate; border-spacing: 0; min-width: max-content; font-size: 12px; }
+.dp-month th, .dp-month td { padding: 0; border-bottom: 1px solid var(--line); }
+.dp-month thead th { position: sticky; top: 0; z-index: 3; background: var(--soft); border-bottom: 1px solid var(--line2); }
+.dp-bcol { min-width: 190px; max-width: 240px; padding: 8px 10px !important; text-align: left; font-weight: 400; border-left: 1px solid var(--line2); vertical-align: top; }
+.dp-bcol b { display: block; font-size: 14px; }
+/* Date and day share ONE sticky column, so there is no second offset that can leave a gap for the batches to show through. */
+.dp-month .dp-date { position: sticky; left: 0; z-index: 2; box-sizing: border-box; width: 88px; min-width: 88px; max-width: 88px; background: var(--card); text-align: center; font-weight: 600; border-right: 1px solid var(--line2); }
+.dp-month thead .dp-date { z-index: 5; background: var(--soft); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 8px 0 !important; }
+.dp-date button { display: block; width: 100%; padding: 6px 0 0; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.dp-date button:hover { text-decoration: underline; }
+.dp-dow { display: block; padding-bottom: 6px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.dp-dayrow.we .dp-date, .dp-dayrow.we .dp-cellwrap { background: var(--soft); }
+.dp-dayrow.today .dp-date { box-shadow: inset 4px 0 0 var(--pri); }
+.dp-dayrow.today .dp-date button { color: var(--pri); }
+.dp-dayrow.today td, .dp-dayrow.today th { border-bottom: 2px solid var(--pri); border-top: 2px solid var(--pri); }
+.dp-cellwrap { vertical-align: top; border-left: 1px solid var(--line); padding: 0 !important; }
+.dp-cell { box-sizing: border-box; width: 100%; height: 100%; min-height: 44px; padding: 3px; display: flex; flex-direction: column; gap: 2px; cursor: pointer; border: 2px solid transparent; border-radius: 4px; color: var(--ink); font-size: 12px; }
+.dp-cell:focus-visible { outline: 2px solid var(--pri); outline-offset: -2px; }
+.dp-cell.sel { border-color: var(--pri); }
+.dp-cell.drop { background: var(--pri-soft); border-color: var(--pri); border-style: dashed; }
+.dp-line { display: block; padding: 2px 6px; border-width: 1px; border-style: solid; border-radius: 4px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dp-line[draggable=true] { cursor: grab; }
+.dp-line.cont { opacity: .78; font-style: italic; }
+.dp-line.t-rest { font-style: italic; }
+.dp-line.lab { font-size: 11px; }
+.dp-more { padding: 0 6px; font-size: 11px; color: var(--muted); }
+.dp-cell.empty { align-items: center; justify-content: center; color: var(--line2); }
+.dp-cell.empty .ms { font-size: 16px; opacity: 0; }
+.dp-month tr:hover .dp-cell.empty .ms, .dp-cell.empty:focus-visible .ms, .dp-cell.empty.sel .ms { opacity: 1; }
+.dp-drawer { margin-top: 14px; }
+.dp-drawer .dp-assign { margin-top: 14px; padding: 12px; background: var(--soft); box-shadow: none; }
+
+/* ── full screen: the whole pane (native Fullscreen API when allowed, otherwise the whole window) ───────────── */
+html.dp-fs-open, html.dp-fs-open body { overflow: hidden; }
+.dp-full { position: fixed; inset: 0; z-index: 1000; overflow: auto; padding: 14px 20px 20px; background: var(--bg); }
+.dp-full::backdrop { background: var(--bg); }
+.dp-full .dp-monthscroll { max-height: calc(100vh - 210px); }
+.dp-full .dp-boardscroll { max-height: calc(100vh - 230px); }
+.dp-full .dp-chart, .dp-full .dp-board { box-shadow: none; }
+
+@media (max-width: 719px) {
+  .dp-toolbar select[data-dp-batch] { margin-left: 0; max-width: none; flex: 1 1 100%; }
+  .dp-monthname { min-width: 0; flex: 1; }
+  .dp-month .dp-date { width: 68px; min-width: 68px; max-width: 68px; }
+  .dp-bcol { min-width: 160px; }
+  .dp-boardscroll { max-height: 64vh; }
+  .dp-full { padding: 10px 10px 16px; }
+}

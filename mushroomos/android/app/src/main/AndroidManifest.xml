@@ -41,4 +41,7 @@
     <!-- Evidence is photographed at the point of capture (DEC-026). The camera plugin asks for this
          at runtime the first time a photo is taken; nothing is written to the phone's gallery. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Task alarms (5 min before / after a task's time) ring at the exact minute, even with the screen off.
+         Notification permission and boot rescheduling come from @capacitor/local-notifications. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 </manifest>

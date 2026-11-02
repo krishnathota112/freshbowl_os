@@ -42,14 +42,19 @@ Do not claim a feature works from a migration/build/typecheck alone.
 ## Where things are
 
 - App: `mushroomos/` (React + Vite + Capacitor Android; Supabase Postgres).
-- Database changes: `mushroomos/supabase/migrations/` (next number 0114). Rollback bodies: `db-rollback/`.
+- Database changes: `mushroomos/supabase/migrations/` (next number 0118). Rollback bodies: `db-rollback/`.
+- **Implementation state and handoff: `docs/IMPLEMENTATION_STATE.md` and `docs/CLAUDE_HANDOFF.md`.**
+  Read the handoff first. Those files — not chat history — are the record of what has been done,
+  what was proved, what failed on the way, and where to continue.
 - Raw factory source files (SOP workbook, Lab document, baseline table): `docs/SOURCE/`.
 - Superseded documentation and earlier interpretations were moved out of the project to
   `C:\Users\prath\MushroomOS_ARCHIVE\2026-09-16\` on 16 Sep 2026. Do not reintroduce them as authority.
 
 ## Runtime facts to re-verify, never assume
 
-- Which process version is current (`process_catalogue.current_definition_id`) — it was PROCESS-2026J on 16 Sep 2026.
+- Which process version is current (`process_catalogue.current_definition_id`) — it was PROCESS-2026K
+  on 16 Sep 2026 (ceiling H476, stated and FACTORY_CONFIRMED). It was PROCESS-2026J earlier the same
+  day; the four batches active at that moment are still pinned to 2026J and always will be.
 - Which batches are live, and which are DEMO (`master_batch.is_demo`).
 - The target database is shared and live: it holds real batches, real staff logins, evidence and the audit trail.
   Never reset, reseed or bulk-delete it. Cancel instead of deleting production batches.

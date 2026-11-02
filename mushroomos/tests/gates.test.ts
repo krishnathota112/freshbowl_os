@@ -301,6 +301,10 @@ describeDb('the rel_day barrier is gone', () => {
       return_activity:
         'an actor transition: a supervisor RETURNS to the operator queue with what to redo. ' +
         '§3.1. Added at B2 (0017)',
+      decide_lab_submission:
+        'an actor transition: a REJECTION is a verdict that returns the Lab work (RETURNED, with the ' +
+        'remark) so it can be re-tested and resubmitted. Approval still opens gates only through ' +
+        'advance_batch. Added 16 Sep 2026 (0126)',
     };
 
     await withRollback(async (db) => {

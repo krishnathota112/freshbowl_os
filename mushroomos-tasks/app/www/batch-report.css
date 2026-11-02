@@ -1,0 +1,29 @@
+.report-toolbar { margin-top: 0; }
+.report-scroll { overflow: auto; max-height: calc(100vh - 180px); border: 1px solid #b4c2cb; background: white; }
+.progress-report { width: 100%; min-width: 1260px; border-collapse: separate; border-spacing: 0; color: #172a32; font-size: 14px; }
+.progress-report th,.progress-report td { padding: 10px; border-right: 1px solid #bbc8d0; border-bottom: 1px solid #bbc8d0; vertical-align: top; }
+.progress-report thead th { background: #90acd8; position: sticky; top: 0; z-index: 2; text-align: center; }
+.progress-report thead tr:first-child th { height: 48px; }
+.progress-report thead tr:nth-child(2) th { top: 48px; }
+.progress-report td:first-child { width: 52px; position: sticky; left: 0; background: #f3f6f8; z-index: 1; }
+.progress-report td:nth-child(2) { min-width: 260px; max-width: 400px; }
+.progress-report td:nth-child(3),.progress-report td:nth-child(7) { min-width: 90px; }
+.progress-report td:nth-child(4) { min-width: 112px; }
+.progress-report td:nth-child(9) { min-width: 135px; }
+.progress-report .report-remark { white-space: pre-wrap; min-width: 310px; max-width: 520px; overflow-wrap: anywhere; }
+.report-section th { background: #d6dee8; text-align: left; }
+.report-actual td:nth-child(n+4) { background: #dcefc3; }
+.report-planned td:nth-child(n+4) { background: #ffebab; }
+.report-partial td:nth-child(n+4) { background: #ddeef8; }
+.report-unknown td:nth-child(n+4) { background: #f2f3f4; }
+@media print {
+  @page { size: A3 landscape; margin: 10mm; }
+  body:has(.progress-report) .top, .report-toolbar button, .report-toolbar a { display: none !important; }
+  body:has(.progress-report) .wrap { max-width: none; margin: 0; padding: 0; }
+  .report-scroll { overflow: visible; max-height: none; border: 0; }
+  .progress-report { min-width: 0; font-size: 9pt; }
+  .progress-report th,.progress-report td { padding: 5px; min-width: 0 !important; position: static !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .progress-report thead { display: table-header-group; }
+  .progress-report tr { break-inside: avoid; }
+  .progress-report a { color: inherit; text-decoration: none; }
+}

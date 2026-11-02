@@ -1,0 +1,7 @@
+{
+  "name": "mushroomos-tasks-db",
+  "private": true,
+  "type": "module",
+  "scripts": { "proof": "node proof/tasks-app-proof.mjs", "proof:live": "node proof/tasks-app-proof.mjs --live", "proof:suggested": "node proof/tasks-suggested-time-proof.mjs", "proof:suggested:live": "node proof/tasks-suggested-time-proof.mjs --live", "apply:0145": "node apply-0145.mjs" },
+  "dependencies": { "pg": "8.13.1", "dotenv": "16.4.7" }
+}

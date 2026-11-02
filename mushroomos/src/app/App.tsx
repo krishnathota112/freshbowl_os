@@ -33,6 +33,8 @@ const FieldShell = lazy(() =>
  * `SignIn` is lazy too. It is the only screen a signed-out visitor sees, so keeping it eager would put
  * it in the chunk every signed-in user downloads and never renders.
  */
+// Task alarms (5 min before / after a task's time) for the Supervisor and the Lab, in either shell.
+const TaskAlarms = lazy(() => import('../shared/alarms/TaskAlarms').then((m) => ({ default: m.TaskAlarms })));
 const SignIn = lazy(() => import('../shared/auth/SignIn').then((m) => ({ default: m.SignIn })));
 // Android app: an account the app does not serve (admin, manager, operator) gets this, not a screen.
 const RoleNotInApp = lazy(() => import('../shared/auth/SignIn').then((m) => ({ default: m.RoleNotInApp })));
@@ -51,6 +53,9 @@ const BatchPage = lazy(() => import('../features/admin/pages/BatchPage').then((m
 const ProcessExplorer = lazy(() =>
   import('../features/admin/pages/ProcessExplorer').then((m) => ({ default: m.ProcessExplorer }))
 );
+const SopHome = lazy(() => import('../features/admin/pages/SopHome').then((m) => ({ default: m.SopHome })));
+const SopBatchEditor = lazy(() => import('../features/admin/pages/SopBatchEditor').then((m) => ({ default: m.SopBatchEditor })));
+const SopVersionEditor = lazy(() => import('../features/admin/pages/SopVersionEditor').then((m) => ({ default: m.SopVersionEditor })));
 const ReferenceData = lazy(() =>
   import('../features/admin/pages/ReferenceData').then((m) => ({ default: m.ReferenceData }))
 );
@@ -116,6 +121,7 @@ function RoleGuard({ allow, children }: { allow: AppRole[]; children: ReactNode 
   return (
     <Suspense fallback={<p className="p-6 text-sm text-muted">Loading…</p>}>
       <Shell>
+        <Suspense fallback={null}><TaskAlarms /></Suspense>
         <Suspense fallback={<Skeleton label="Opening" lines={4} />}>{children}</Suspense>
       </Shell>
     </Suspense>
@@ -215,6 +221,9 @@ export default function App() {
         */}
         <Route path="/lab/approvals" element={<RoleGuard allow={['gm']}><LabApprovals /></RoleGuard>} />
         <Route path="/admin/now" element={<RoleGuard allow={MGMT}><AdminNow /></RoleGuard>} />
+        <Route path="/admin/sop" element={<RoleGuard allow={['admin', 'gm']}><SopHome /></RoleGuard>} />
+        <Route path="/admin/sop/batch/:id" element={<RoleGuard allow={['admin', 'gm']}><SopBatchEditor /></RoleGuard>} />
+        <Route path="/admin/sop/version/:id" element={<RoleGuard allow={['admin', 'gm']}><SopVersionEditor /></RoleGuard>} />
         <Route path="/admin/resources" element={<RoleGuard allow={['admin', 'manager']}><AdminResources /></RoleGuard>} />
         <Route path="/admin/logins" element={<RoleGuard allow={['admin']}><AdminLogins /></RoleGuard>} />
         <Route path="/gm/people" element={<RoleGuard allow={['gm', 'admin', 'manager']}><GmPeople /></RoleGuard>} />

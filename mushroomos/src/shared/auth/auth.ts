@@ -27,7 +27,7 @@ import type { AppRole } from '../../domain/types';
 const WEB_HOME: Record<AppRole, string> = {
   operator: '/operator/my-work',
   lab_tech: '/lab/queue',
-  // The Control Room, Resources and Control Tower homes were retired to src/legacy/ (14 Sep 2026).
+  // The Control Room, Resources and Control Tower homes were retired to NOT_NEEDED/frontend_legacy/ (14 Sep 2026).
   supervisor: '/operator/my-work',
   admin: '/admin',
   manager: '/admin/batches',
@@ -178,6 +178,10 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
+  // A shared phone must not keep ringing for the previous person's tasks.
+  if (isNativeApp()) {
+    await import('../alarms/nativeAlarms').then((m) => m.cancelAllNativeAlarms()).catch(() => undefined);
+  }
   try {
     await supabase.auth.signOut({ scope: 'local' });
   } catch {

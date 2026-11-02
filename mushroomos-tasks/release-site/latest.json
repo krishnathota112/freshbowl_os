@@ -1,0 +1,10 @@
+{
+  "version": "2.8",
+  "versionCode": 19,
+  "packageId": "in.freshbowl.tasks.gk",
+  "apk": "MushroomOS-Tasks-GK-v2.8.apk",
+  "bytes": 6645775,
+  "sha256": "21b948ded4425722b89f1f25ff01138289881c9cb85506c017bc80ecd01d8d04",
+  "publishedAt": "2026-11-02T21:41:50.473Z",
+  "notes": "Daily and monthly planning, spreadsheet ranges, copy/paste, fill-down, undo/redo and management planning views. Installs separately as MushroomOS Tasks GK; sign in with your existing factory account."
+}

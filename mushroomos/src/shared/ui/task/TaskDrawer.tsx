@@ -12,6 +12,8 @@ import {
 } from '../../api/batch';
 import { supabase } from '../../api/client';
 import { completeActivity } from '../../api/work';
+import { loadGatesFor } from '../../api/lab';
+import { fmtWhen, gateStatusWords } from '../../utils/labWords';
 import { CaptureCancelled, assertIsImage, cameraIsGuaranteed, takeNativePhoto } from '../../camera/camera';
 import { Chip, Countdown } from '../primitives';
 import { LateTicketPanel } from './LateTicketPanel';
@@ -24,6 +26,7 @@ import { useAuth } from '../../auth/auth';
  * The internal names are engine vocabulary; a person using this screen reads what the task is doing.
  */
 const STATE_LABEL: Record<string, string> = {
+  NOT_DUE_YET: 'Not due yet',
   COMPLETED: 'Done', READY: 'Ready', IN_PROGRESS: 'In progress', SUBMITTED: 'Submitted',
   WAITING_TIME: 'Resting', WAITING_CONDITION: 'Waiting', DEVIATION: 'Needs decision',
   BLOCKED: 'Blocked', RETURNED: 'Returned', LOCKED: 'Not yet', SKIPPED: 'Skipped',
@@ -225,6 +228,13 @@ export function TaskDrawer({
     refetchInterval: 60_000,
   });
   const startReason = startBlock.data ?? null;
+  // 0126 · the Lab gates that hold this step, and what the GM decided (with the remark)
+  const gates = useQuery({
+    queryKey: ['task-lab-gates', activityId],
+    enabled: Boolean(activity.data?.master_batch_id && activity.data?.code),
+    queryFn: () => loadGatesFor(String(activity.data?.master_batch_id), String(activity.data?.code)),
+    refetchInterval: 30_000,
+  });
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setClock(Date.now()), 15_000);
@@ -421,6 +431,27 @@ export function TaskDrawer({
           >
             {a.blocked_reason}
           </p>
+        )}
+
+        {(gates.data ?? []).length > 0 && (
+          <div className="mb-4 grid gap-2">
+            {(gates.data ?? []).map((g) => {
+              const w = gateStatusWords(g);
+              return (
+                <div key={g.activity_id} className="rounded border px-3 py-2 text-[13px]"
+                     style={{ borderColor: `var(--${w.tone === 'muted' ? 'line-2' : w.tone})`, background: w.tone === 'muted' ? 'var(--surface-2)' : `var(--${w.tone}-soft)` }}>
+                  <p className="font-head text-[11px] font-700 uppercase tracking-wider text-ink2">
+                    Lab gate · {g.checkpoint_name ?? g.checkpoint_code}
+                  </p>
+                  <p className="font-700" style={{ color: w.tone === 'muted' ? 'var(--ink-2)' : `var(--${w.tone})` }}>
+                    {w.head}{g.decided_at && !g.awaiting_decision ? ` · ${fmtWhen(g.decided_at)}` : ''}
+                  </p>
+                  {w.remark && <p className="mt-0.5 text-ink">“{w.remark}”</p>}
+                  {!g.is_approved && <p className="mt-0.5 text-[12px] text-muted">This task can start only after the GM approves.</p>}
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {/* Resting reads its countdown from a server-issued timestamp. */}

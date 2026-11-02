@@ -1,4 +1,9 @@
 key.txt
+.wrangler/
+.mcp.json
+*.tsbuildinfo
+*.keystore
+*.jks
 .env
 .env.local
 node_modules

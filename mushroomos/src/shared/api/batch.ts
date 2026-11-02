@@ -19,6 +19,8 @@ export type BatchRow = {
   status: 'draft' | 'validated' | 'active' | 'closed' | 'cancelled';
   supervisor_name: string | null;
   activated_at: string | null;
+  /** DEMO / TEST batch (0089). Only these can be deleted (0112); a real batch is cancelled. */
+  is_demo: boolean | null;
 };
 
 export type BatchActivityRow = {
@@ -132,7 +134,7 @@ export async function loadTimeGate(activityId: string): Promise<TimeGate> {
 export async function listBatches(): Promise<BatchRow[]> {
   const { data, error } = await supabase
     .from('master_batch')
-    .select('id, code, label, start_date, start_at, status, supervisor_name, activated_at')
+    .select('id, code, label, start_date, start_at, status, supervisor_name, activated_at, is_demo')
     .order('start_date', { ascending: false });
   if (error) throw error;
   return (data ?? []) as BatchRow[];
@@ -141,7 +143,7 @@ export async function listBatches(): Promise<BatchRow[]> {
 export async function getBatch(id: string): Promise<BatchRow> {
   const { data, error } = await supabase
     .from('master_batch')
-    .select('id, code, label, start_date, start_at, status, supervisor_name, activated_at')
+    .select('id, code, label, start_date, start_at, status, supervisor_name, activated_at, is_demo')
     .eq('id', id)
     .single();
   if (error) throw error;

@@ -134,7 +134,8 @@ export async function listProcessVersions(): Promise<ProcessVersion[]> {
     .order('published_at', { ascending: false, nullsFirst: false })
     .order('code');
   if (error) throw error;
-  return ((data ?? []) as unknown as Row[]).map(toVersion);
+  // 0130 · AMEND-<batch> rows hold one batch's amendments; they are not SOP versions.
+  return ((data ?? []) as unknown as Row[]).filter((r) => !String(r.code).startsWith('AMEND-')).map(toVersion);
 }
 
 /**

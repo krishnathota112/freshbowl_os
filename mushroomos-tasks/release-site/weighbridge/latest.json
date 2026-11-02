@@ -1,0 +1,10 @@
+{
+  "version": "1.2",
+  "versionCode": 3,
+  "packageId": "in.freshbowl.weighbridge",
+  "apk": "MushroomOS-Weighbridge-v1.2.apk",
+  "bytes": 6261494,
+  "sha256": "84301dab1ea4073671df17cb593973f7138a3f01b5ada7176e7e50654b141a40",
+  "publishedAt": "2026-09-30T05:59:26.559Z",
+  "notes": "Each material now opens in the unit saved by Admin: ammonium sulphate in kg, other materials in tons by default. The slip entry still allows switching units."
+}

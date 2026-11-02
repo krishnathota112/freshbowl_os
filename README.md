@@ -1,5 +1,9 @@
 # MushroomOS
 
+The current **MushroomOS Tasks** website, Android source, spreadsheet planner, tests and laptop setup are in [`mushroomos-tasks/`](mushroomos-tasks/README.md). Start there for the Tasks application discussed in the November 2026 release. Its [visualization roadmap](mushroomos-tasks/docs/DATA_VISUALIZATION_PLAN.md) distinguishes implemented views from proposed resource-capacity work.
+
+The `mushroomos/` directory and the older documentation below describe the separate React-based production engine. Both codebases are preserved in this repository; their process rules are different.
+
 Production management and traceability for button-mushroom compost — Fresh Bowl Horticulture.
 
 A batch on the current standard, PROCESS-2026C, runs **470 hours** from H0 to grow-room loading. Every activity records who did it, with

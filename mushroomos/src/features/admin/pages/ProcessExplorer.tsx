@@ -396,12 +396,8 @@ function StreamColumn({
           const variants = variantsFor(a.id);
           const evCount = evidenceCount(a.id);
 
-          const duration =
-            a.duration_target_min_hr && a.duration_target_max_hr
-              ? a.duration_target_min_hr === a.duration_target_max_hr
-                ? `${a.duration_target_min_hr} h`
-                : `${a.duration_target_min_hr}–${a.duration_target_max_hr} h`
-              : null;
+          // SOP time = the upper number (owner, 15 Sep 2026); longer is late and needs a ticket.
+          const duration = a.duration_target_max_hr ? `${a.duration_target_max_hr} h` : null;
 
           const scopedGate = gates.find((g) => g.predecessor_binding === 'SAME_SCOPE_INSTANCE');
 

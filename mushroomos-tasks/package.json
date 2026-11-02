@@ -1,0 +1,14 @@
+{
+  "name": "freshbowl-tasks-project",
+  "version": "2.8.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "npm --prefix app ci",
+    "dev": "node scripts/serve.mjs",
+    "test": "npm --prefix app test",
+    "check": "node scripts/check-source.mjs",
+    "release:prepare": "npm --prefix app run release:prepare",
+    "release:verify": "node scripts/verify-deployment.mjs"
+  }
+}

@@ -2,7 +2,9 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { signedEvidenceUrl } from '../../../shared/api/batch';
+import { loadBatchHour } from '../../../shared/api/projection';
 import { Chip, EmptyState, Skeleton } from '../../../shared/ui/primitives';
+import { showQty } from '../../../shared/utils/units';
 import {
   getBatchMonitor,
   listBatchTimeline,
@@ -23,6 +25,7 @@ import {
 type View = 'timeline' | 'now' | 'blocked' | 'lab' | 'before';
 
 const STATE_WORDS: Record<string, string> = {
+  NOT_DUE_YET: 'Not due yet',
   COMPLETED: 'Completed', READY: 'Ready', IN_PROGRESS: 'In progress', LOCKED: 'Locked', BLOCKED: 'Blocked',
   DEVIATION: 'Deviation', RETURNED: 'Returned', SKIPPED: 'Skipped', WAITING_TIME: 'Resting',
   WAITING_CONDITION: 'Waiting', AWAITING_LAB: 'Waiting on lab', AWAITING_SUPERVISOR: 'Waiting on supervisor',
@@ -30,7 +33,8 @@ const STATE_WORDS: Record<string, string> = {
 };
 
 export function BatchMonitor({ batchId }: { batchId: string }) {
-  const [view, setView] = useState<View>('timeline');
+  const [view, setView] = useState<View>('now');
+  const clock = useQuery({ queryKey: ['batch-hour', batchId], queryFn: () => loadBatchHour(batchId), refetchInterval: 30_000 });
   const monitor = useQuery({ queryKey: ['batch-monitor', batchId], queryFn: () => getBatchMonitor(batchId), refetchInterval: 30_000 });
   const timeline = useQuery({ queryKey: ['batch-timeline', batchId], queryFn: () => listBatchTimeline(batchId), refetchInterval: 30_000 });
   const material = useQuery({ queryKey: ['initial-material', batchId], queryFn: () => listInitialMaterial(batchId) });
@@ -58,6 +62,7 @@ export function BatchMonitor({ batchId }: { batchId: string }) {
   return (
     <div className="space-y-5">
       <BatchHeader m={m} currentActivities={now.filter((r) => !r.is_lab).map((r) => `${r.title}${r.scope_label ? ` · ${r.scope_label}` : ''}`)} />
+      <p className="text-[14px] text-ink2">Current batch hour: <strong className="mono">{clock.isError ? 'Unavailable' : clock.isLoading ? 'Loading…' : clock.data == null ? 'H0 not recorded' : `H${clock.data}`}</strong></p>
       <Progress m={m} />
 
       <section className="rounded-xl border bg-surface p-4" style={{ borderColor: 'var(--line)' }}>
@@ -71,7 +76,7 @@ export function BatchMonitor({ batchId }: { batchId: string }) {
             {(material.data ?? []).map((v, i) => (
               <div key={`${v.parameter}-${i}`} className="rounded-lg border px-3 py-2" style={{ borderColor: v.verdict === 'fail' ? 'var(--crit)' : 'var(--line)' }}>
                 <p className="mono text-[11px] text-muted">{v.parameter}</p>
-                <p className="mono text-[16px] font-700">{v.value ?? '—'} {v.unit ?? ''}</p>
+                <p className="mono text-[16px] font-700">{showQty(v.value, v.unit)}</p>
                 {v.verdict === 'fail' && <Chip tone="crit">outside spec</Chip>}
                 <p className="text-[11px] text-muted">{v.by ?? '—'} · {v.measuredAt ? when(v.measuredAt) : '—'}</p>
               </div>
@@ -196,9 +201,19 @@ function hourSpan(r: TimelineRow): string {
   return r.baseline_end_hour != null && r.baseline_end_hour !== r.baseline_start_hour ? `${s}–H${r.baseline_end_hour}` : s;
 }
 
-/** READY on screen but the server will refuse a start until its planned time (0106). */
+/**
+ * 0117 · THE SERVER SAYS WHETHER A TASK IS DUE. THIS NO LONGER DECIDES.
+ *
+ * This used to be `r.due_from != null && Date.parse(r.due_from) > Date.now()` — the browser
+ * re-deriving eligibility from a timestamp, and then rendering a "not due yet" chip beside a
+ * "Ready" chip that disagreed with it. Two answers to one question, one of them computed here.
+ *
+ * `NOT_DUE_YET` is now a real state produced by `advance_batch` from `planned_time_status`, the
+ * same function `start_block_reason` uses. This reads the answer instead of forming one, and
+ * `due_from` is used only to SAY when — never to decide whether.
+ */
 function notDueYet(r: TimelineRow): boolean {
-  return r.due_from !== null && r.due_from !== undefined && Date.parse(r.due_from) > Date.now();
+  return r.state === 'NOT_DUE_YET';
 }
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -210,10 +225,12 @@ function ActivityCard({ r }: { r: TimelineRow }) {
     <article className="rounded-xl border bg-surface p-4" style={{ borderColor: r.overdue ? 'var(--crit)' : 'var(--line)' }}>
       <div className="flex flex-wrap items-center gap-2">
         <Chip tone={tone as 'ok' | 'crit' | 'accent' | 'muted'}>{STATE_WORDS[r.state] ?? r.state}</Chip>
-        {r.overdue && <Chip tone="crit">over stated duration</Chip>}
+        {r.overdue && <Chip tone="crit">{r.is_hold ? 'past SOP time' : 'past SOP time — late ticket needed'}</Chip>}
         {r.is_lab && <Chip tone="accent">Lab{r.lab_checkpoint ? ` · ${r.lab_checkpoint}` : ''}</Chip>}
         {r.is_hold && <Chip tone="muted">hold</Chip>}
-        {notDueYet(r) && <Chip tone="warn">not due yet</Chip>}
+        {/* 0117 · no separate "not due yet" chip: the STATE chip above now says it, because the
+            state itself is NOT_DUE_YET. Two chips saying the same thing was the visible symptom of
+            the browser holding a second opinion. */}
         {r.lab_is_gate && <Chip tone="crit">needs GM approval</Chip>}
         {r.onboarded_position && <Chip tone="accent">onboarding position</Chip>}
       </div>
@@ -226,15 +243,17 @@ function ActivityCard({ r }: { r: TimelineRow }) {
       <p className="text-[12px] text-muted">{r.stage ?? '—'} · <span className="mono">{r.code}</span></p>
       {notDueYet(r) && (
         <p className="mt-1 text-[13px] font-600" style={{ color: 'var(--warn)' }}>
-          Not due yet — it can be started from {when(r.due_from!)}
+          {r.blocked_reason ?? (r.due_from ? `Not due yet — it can be started from ${when(r.due_from)}` : 'Not due yet.')}
         </p>
       )}
 
       <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-[13px] sm:grid-cols-2">
         <Line label="Actual start" value={r.actual_start ? `${when(r.actual_start)}${r.started_by_name ? ` · ${r.started_by_name}` : ''}` : '—'} />
         <Line label="Actual finish" value={r.actual_end ? `${when(r.actual_end)}${r.finished_by_name ? ` · ${r.finished_by_name}` : ''}` : '—'} />
-        {(r.duration_target_min_hr != null || r.duration_target_max_hr != null) && (
-          <Line label="Stated duration" value={r.duration_target_min_hr === r.duration_target_max_hr ? `${r.duration_target_max_hr} h` : `${r.duration_target_min_hr}–${r.duration_target_max_hr} h`} />
+        {/* The SOP time is the UPPER number (owner, 15 Sep 2026 — every MIN_DURATION gate and the due time use it).
+            Past it the step is late and needs a ticket; the lower number is not an allowance, so it is not shown. */}
+        {r.duration_target_max_hr != null && (
+          <Line label="SOP time" value={`${r.duration_target_max_hr} h — longer needs a late ticket`} />
         )}
         {r.skip_reason && !r.before_tracking && <Line label="Skipped" value={r.skip_reason} />}
       </dl>
@@ -249,7 +268,7 @@ function ActivityCard({ r }: { r: TimelineRow }) {
                   ? (v.value === 'true' ? '✓ done' : v.skip_reason ? `skipped — ${v.skip_reason}` : '—')
                   : v.skip_reason
                     ? <span style={{ color: 'var(--warn)' }}>skipped — {v.skip_reason}</span>
-                    : <strong className="mono">{v.value ?? '—'}{v.value && v.unit ? ` ${v.unit}` : ''}</strong>}
+                    : <strong className="mono">{showQty(v.value, v.unit)}</strong>}
                 {v.target && v.datatype !== 'check' && <span className="text-muted"> (target {v.target})</span>}
                 {v.flag === 'out_of_range' && <Chip tone="crit">outside SOP</Chip>}
                 {v.remarks && <span className="text-muted"> · “{v.remarks}”</span>}
@@ -274,7 +293,7 @@ function ActivityCard({ r }: { r: TimelineRow }) {
           <ul className="grid gap-1 text-[13px]">
             {r.lab_results.filter((l) => l.parameter).map((l, i) => (
               <li key={i}>
-                <span className="text-ink2">{l.parameter}:</span> <strong className="mono">{l.value ?? '—'} {l.unit ?? ''}</strong>
+                <span className="text-ink2">{l.parameter}:</span> <strong className="mono">{showQty(l.value, l.unit)}</strong>
                 {l.verdict && <span className={l.verdict === 'fail' ? 'text-crit' : 'text-muted'}> · {l.verdict}</span>}
                 <span className="text-muted"> · {l.technician ?? l.collected_by ?? '—'} · {l.measured_at ? when(l.measured_at) : '—'}</span>
                 {l.retest_reason && <span className="text-muted"> · retest: {l.retest_reason}</span>}

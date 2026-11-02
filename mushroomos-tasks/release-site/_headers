@@ -1,0 +1,21 @@
+/latest.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-store
+  X-Content-Type-Options: nosniff
+/weighbridge/latest.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-store
+  X-Content-Type-Options: nosniff
+/mushroomos/latest.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-store
+  X-Content-Type-Options: nosniff
+/*.apk
+  Content-Type: application/vnd.android.package-archive
+  Content-Disposition: attachment
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+/*
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff

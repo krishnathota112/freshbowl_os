@@ -33,6 +33,7 @@ const NAV: Record<string, { to: string; label: string }[]> = {
     { to: '/admin', label: 'Home' },
     { to: '/admin/now', label: 'Now' },
     { to: '/admin/batches', label: 'Batches' },
+    { to: '/admin/sop', label: 'SOP' },
     { to: '/admin/resources', label: 'Resources' },
     { to: '/admin/tickets', label: 'Tickets' },
     { to: '/gm/people', label: 'People' },

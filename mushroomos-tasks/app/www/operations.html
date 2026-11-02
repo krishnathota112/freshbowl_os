@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Factory Operations · MushroomOS</title>
+  <link rel="icon" type="image/png" href="logo-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#f6f3ec">
+  <link href="app.css?v=2.3" rel="stylesheet">
+  <link href="theme.css?v=2.5" rel="stylesheet">
+  <link href="operations.css?v=2.5" rel="stylesheet">
+  <script src="config.js"></script>
+  <script src="auth.js?v=2.5"></script>
+  <script src="tk-api.js?v=1.4"></script>
+</head>
+<body class="operations-page">
+  <header class="operations-header">
+    <div class="operations-brand"><img src="logo.webp" alt="" width="48" height="44"><div><strong>Factory Operations</strong><span>MushroomOS · Manager view</span></div></div>
+    <div class="operations-header-actions"><span id="identity"></span><button class="btn sm" id="refresh" type="button">Refresh data</button><button class="btn sm" id="signout" type="button">Sign out</button></div>
+  </header>
+  <main class="operations-main">
+    <nav class="row" aria-label="Management views"><a class="btn sm" href="director.html">Director brief</a><a class="btn sm" href="flow.html">Factory Flow · planning advisory</a></nav>
+    <div class="operations-intro"><div><div class="caps">Factory snapshot</div><h1>What is happening across batches?</h1><p>Recorded field work, timing, labour, machines and refuelling in one read-only place.</p></div><div class="operations-controls"><label for="period">Analysis period</label><select id="period"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 365 days</option></select></div></div>
+    <div id="operationsStatus" role="status" aria-live="polite">Loading recorded data…</div>
+    <div id="operationsContent" hidden>
+      <section aria-labelledby="summaryTitle"><div class="section-head"><div><h2 id="summaryTitle">At a glance</h2><p id="snapshotStamp" class="muted"></p></div></div><div id="summaryCards" class="summary-grid"></div></section>
+      <section aria-labelledby="fieldTitle"><div class="section-head"><div><h2 id="fieldTitle">On the field now</h2><p>All running tasks are shown; parallel work is not collapsed into a single stage.</p></div></div><div id="fieldBoard" class="batch-grid"></div></section>
+      <section aria-labelledby="flowTitle" class="panel"><div class="section-head"><div><h2 id="flowTitle">Process map</h2><p>Functional stages, not a physical floor plan. No bunker or tunnel occupancy is inferred.</p></div></div><div id="processMap" class="process-map"></div></section>
+      <section aria-labelledby="timeTitle" class="panel"><div class="section-head"><div><h2 id="timeTitle">Observed actual time by task</h2><p>Historical average of completed tasks with both actual start and finish times, grouped by task name, stream and Turner pass. The sample count (n) shows how many observations support each average. These are not Process Time SOP standards.</p></div><button class="btn sm" data-export="averages" type="button">Download for Excel</button></div><div id="durationChart"></div></section>
+      <section aria-labelledby="manpowerTitle" class="panel"><div class="section-head"><div><h2 id="manpowerTitle">Manpower by task</h2><p>Average recorded crew and observed labour-hours. Coverage exposes missing crew counts or actual times; people are not deduplicated across tasks.</p></div><button class="btn sm" data-export="manpower" type="button">Download for Excel</button></div><div id="manpowerTable" class="table-scroll"></div></section>
+      <section aria-labelledby="machineTitle" class="panel"><div class="section-head"><div><h2 id="machineTitle">Machines and fuel</h2><p>Kilometres come from paired task odometer readings. Litres are measured at refuelling, <strong>not</strong> allocated to tasks.</p></div><button class="btn sm" data-export="machines" type="button">Download for Excel</button></div><div id="machineTable" class="table-scroll"></div></section>
+      <section aria-labelledby="ledgerTitle" class="panel"><div class="section-head"><div><h2 id="ledgerTitle">Task ledger</h2><p>Current active batches plus tasks finished in the selected period. Planned and actual timestamps stay separate.</p></div><button class="btn sm" data-export="tasks" type="button">Download for Excel</button></div><label class="ledger-search">Find batch or task <input id="taskSearch" type="search" placeholder="e.g. 182, paddy soak, T1"></label><p id="ledgerCount" class="muted small"></p><div id="taskLedger" class="table-scroll"></div></section>
+      <section class="panel method" aria-labelledby="methodTitle"><h2 id="methodTitle">What these figures mean</h2><div id="methodNotes"></div></section>
+    </div>
+    <section id="managerSetup" class="panel" hidden aria-labelledby="managerSetupTitle"><h2 id="managerSetupTitle">Manager login setup · Admin only</h2><p>Create a separate Manager account. The Manager role can read factory records but cannot edit tasks, approve Lab work or change machines. Give the password to the person through your normal private channel; it is not shown again here.</p><form id="managerForm" class="manager-form"><label>Email<input id="managerEmail" type="email" value="vikasjasti@freshbowl.in" autocomplete="off" required></label><label>Display name<input id="managerName" type="text" autocomplete="off" required></label><label>Initial password<input id="managerPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="btn pri" type="submit">Create Manager login</button></form><p id="managerMessage" role="status"></p></section>
+  </main>
+  <script src="operations-analytics.js?v=2.5"></script>
+  <script src="batch-report.js?v=task-resources-1"></script>
+  <script src="operations.js?v=2.5"></script>
+</body>
+</html>

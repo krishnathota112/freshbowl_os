@@ -40,7 +40,7 @@ src/
 │
 ├── styles/              index.css (Tailwind + globals) and tokens.css (colours, fonts)
 │
-└── legacy/              RETIRED screens kept for reference. Not routed, not built into the app
+└── NOT_NEEDED/          RETIRED screens moved to NOT_NEEDED/frontend_legacy/. Not routed, not built into the app
 ```
 
 ## Where each screen lives
@@ -67,7 +67,7 @@ src/
 
 ## Rules (checked by `tests/structure.test.ts`)
 
-1. **Live code never imports from `legacy/`.** If a retired screen is needed again, move it back into
+1. **Live code never imports from `NOT_NEEDED/frontend_legacy/`.** If a retired screen is needed again, move it back into
    `features/` on purpose.
 2. **A feature never imports another feature.** Anything two roles need goes in `shared/`.
 3. **`domain/` stays pure** — no React, no Supabase, no screens.
