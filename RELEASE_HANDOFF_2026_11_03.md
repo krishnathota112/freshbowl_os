@@ -20,4 +20,4 @@ Start with `mushroomos-tasks/README.md` for the deployed Tasks app. `mushroomos/
 
 Extract the source ZIP, open `mushroomos-tasks`, then run `npm run setup`, `npm run check`, `npm test`, and `npm run dev`. Node.js 20+ is required. Android builds additionally need JDK 17 and an Android SDK. Factory records remain in Supabase and are not embedded in this source archive. Obtain any private development credentials separately.
 
-The release lives on branch `codex/tasks-release-2026-11-03` because local and remote `main` had diverged. Both histories are preserved; no force-push was used.
+The release was prepared on branch `codex/tasks-release-2026-11-03` and is now included in `main`. Git ancestry checks confirmed that `main` could be fast-forwarded to the tested release without conflicts. No force-push was used.
